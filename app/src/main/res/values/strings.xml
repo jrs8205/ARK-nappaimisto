@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ARK-näppäimistö</string>
+    <string name="subtype_suomi">suomi</string>
+
+    <!-- Asetukset -->
+    <string name="asetukset_kayttoonotto">Käyttöönotto</string>
+    <string name="ota_kayttoon">Ota näppäimistö käyttöön</string>
+    <string name="ota_kayttoon_kuvaus">Avaa järjestelmän asetukset ja salli ARK-näppäimistö</string>
+    <string name="vaihda_nappaimistoksi">Vaihda näppäimistöksi</string>
+    <string name="vaihda_nappaimistoksi_kuvaus">Valitse ARK-näppäimistö käytössä olevaksi näppäimistöksi</string>
+
+    <string name="asetukset_ulkoasu">Ulkoasu</string>
+    <string name="asetus_teema">Teema</string>
+    <string name="asetus_korkeus">Näppäimistön korkeus</string>
+    <string name="asetus_korkeus_kuvaus">Korkeus prosentteina perusarvosta</string>
+
+    <string name="asetukset_kirjoittaminen">Kirjoittaminen</string>
+    <string name="asetus_aanet">Näppäinäänet</string>
+    <string name="asetus_varina">Värinä näppäinpainalluksesta</string>
+    <string name="asetus_esikatselu">Näppäimen esikatselukupla</string>
+
+    <string name="teema_tumma">Tumma</string>
+    <string name="teema_vaalea">Vaalea</string>
+    <string name="teema_amoled">AMOLED</string>
+
+    <!-- Enter-näppäimen toimintotekstit -->
+    <string name="enter_hae">Hae</string>
+    <string name="enter_laheta">Lähetä</string>
+    <string name="enter_siirry">Siirry</string>
+    <string name="enter_seuraava">Seur.</string>
+    <string name="enter_valmis">Valmis</string>
+</resources>

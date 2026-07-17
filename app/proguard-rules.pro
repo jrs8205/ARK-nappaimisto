@@ -1,0 +1,1 @@
+# Projektikohtaiset ProGuard-säännöt.

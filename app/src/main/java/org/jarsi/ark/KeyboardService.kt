@@ -165,6 +165,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         sendDownUpKeyEvents(
             if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
         )
+        // Kevyt napsaus jokaisesta askeleesta, jotta liu'utukseen saa tuntuman.
+        if (vibrationEnabled) {
+            keyboardView?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
     }
 
     private fun handleShift() {

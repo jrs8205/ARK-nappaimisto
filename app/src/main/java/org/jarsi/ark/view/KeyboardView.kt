@@ -7,7 +7,9 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.view.Gravity
+import android.view.WindowInsets
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -75,6 +77,7 @@ class KeyboardView(context: Context) : View(context) {
 
     private var boundedKeys: List<BoundedKey> = emptyList()
     private var rowHeight = 0f
+    private var bottomInset = 0
 
     private inner class PressInfo(val bounded: BoundedKey) {
         var spaceAnchorX = 0f
@@ -123,12 +126,28 @@ class KeyboardView(context: Context) : View(context) {
         invalidate()
     }
 
+    // Uudemmissa Android-versioissa IME-ikkuna ulottuu navigointipalkin alle,
+    // joten palkin korkeus varataan näkymän alareunasta tyhjänä tilana.
+    override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+        val bottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        } else {
+            @Suppress("DEPRECATION")
+            insets.systemWindowInsetBottom
+        }
+        if (bottom != bottomInset) {
+            bottomInset = bottom
+            requestLayout()
+        }
+        return super.onApplyWindowInsets(insets)
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val baseRowHeight = dp(if (landscape) 44f else 56f)
         val rows = layout.rows.size.coerceAtLeast(1)
-        val height = (baseRowHeight * rows * heightScale + dp(4f)).roundToInt()
+        val height = (baseRowHeight * rows * heightScale + dp(4f)).roundToInt() + bottomInset
         setMeasuredDimension(width, height)
     }
 
@@ -143,7 +162,7 @@ class KeyboardView(context: Context) : View(context) {
             boundedKeys = emptyList()
             return
         }
-        rowHeight = (height - dp(4f)) / rows.size.toFloat()
+        rowHeight = (height - dp(4f) - bottomInset) / rows.size.toFloat()
         val result = mutableListOf<BoundedKey>()
         rows.forEachIndexed { rowIndex, row ->
             val totalWeight = row.sumOf { it.widthWeight.toDouble() }.toFloat()

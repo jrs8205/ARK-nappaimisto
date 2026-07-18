@@ -122,6 +122,11 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   puheentunnistuspalvelussa — ensisijaisesti laitteella; jos suomen
   laitemallia ei ole, laitteen palvelu voi käyttää verkkoa. Sanellut
   sanat oppivat kuten kirjoitetut.
+* leikepöytä työkaluriviltä: tekstit ja kuvat kaksisarakkeisessa
+  ruudukossa, kiinnitys neulasta, kolmen pisteen valikosta liittäminen,
+  haku verkosta ja poisto, sekä oman kiinnitetyn leikkeen luonti
+  plus-napista. Kiinnittämättömät vanhenevat tunnissa, ja
+  arkaluonteisiksi merkityt kopiot ohitetaan kokonaan.
 
 ## Yksityisyys
 

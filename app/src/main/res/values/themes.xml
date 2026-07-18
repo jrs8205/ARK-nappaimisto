@@ -10,4 +10,11 @@
         <item name="colorSurfaceVariant">@color/vaalea_erikoisnappain</item>
         <item name="colorOnSurfaceVariant">@color/vaalea_vihje</item>
     </style>
+
+    <!-- Läpinäkyvä teema lupakyselylle: näppäimistön alla oleva sovellus jää näkyviin. -->
+    <style name="Theme.Ark.Lapinakyva">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
 </resources>

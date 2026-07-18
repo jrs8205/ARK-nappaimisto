@@ -36,6 +36,9 @@
     <string name="opitut_tyhjenna">Tyhjennä kaikki</string>
     <string name="opitut_tyhjenna_varmistus">Poistetaanko kaikki opitut sanat ja sanaketjut? Tätä ei voi perua.</string>
 
+    <string name="sanelu_virhe">Sanelu ei onnistunut</string>
+    <string name="sanelu_ei_saatavilla">Sanelu ei ole käytettävissä tällä laitteella</string>
+
     <string name="ehdotus_kiinnita">Kiinnitä</string>
     <string name="ehdotus_irrota">Poista kiinnitys</string>
     <string name="ehdotus_poista">Poista opittu sana</string>

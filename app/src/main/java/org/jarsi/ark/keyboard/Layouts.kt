@@ -111,7 +111,10 @@ object Layouts {
         )
     )
 
-    /** Nuolitila: isot suuntanäppäimet koko näppäinalueelle. */
+    /**
+     * Nuolitila: isot suuntanäppäimet ristikkona koko näppäinalueelle.
+     * Takaisin näppäimistöön palataan työkalurivin nuolikuvakkeesta.
+     */
     val arrows = KeyboardLayout(
         listOf(
             listOf(
@@ -121,12 +124,12 @@ object Layouts {
             ),
             listOf(
                 Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_LEFT), "◀", repeatable = true),
-                Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_DOWN), "▼", repeatable = true),
+                Key(KeyAction.None),
                 Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_RIGHT), "▶", repeatable = true),
             ),
             listOf(
                 Key(KeyAction.None),
-                Key(KeyAction.Letters, "Takaisin"),
+                Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_DOWN), "▼", repeatable = true),
                 Key(KeyAction.None),
             ),
         )

@@ -109,6 +109,13 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 * korjausten peruutuksista oppiminen tulee automaattikorjauksen mukana
   (vaihe 7)
 
+## Muut ominaisuudet
+
+* opittujen sanojen hallinta asetuksissa: haku, kiinnitys, eston purku,
+  poisto ja koko oppimishistorian tyhjennys
+* yleissanasto 170 100 sanaa: Parole-taajuuslista täydennettynä Kotuksen
+  Nykysuomen sanalistalla (ks. [docs/sanalista.md](docs/sanalista.md))
+
 ## Yksityisyys
 
 Kaikki toiminta on paikallista. Sovellus ei pyydä internet-oikeutta, ei sisällä

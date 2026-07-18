@@ -44,6 +44,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.preference)
     implementation(libs.material)
+    implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)

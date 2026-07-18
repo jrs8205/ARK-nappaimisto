@@ -52,6 +52,10 @@ class SettingsActivity : AppCompatActivity() {
                 imm.showInputMethodPicker()
                 true
             }
+            findPreference<Preference>("opitut_sanat")?.setOnPreferenceClickListener {
+                startActivity(Intent(requireContext(), LearnedWordsActivity::class.java))
+                true
+            }
         }
     }
 }

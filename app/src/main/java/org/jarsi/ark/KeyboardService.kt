@@ -16,6 +16,7 @@ import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import androidx.preference.PreferenceManager
 import org.jarsi.ark.data.BigramEntity
+import org.jarsi.ark.data.LearnedDataStamp
 import org.jarsi.ark.data.LearnedDatabase
 import org.jarsi.ark.data.TrigramEntity
 import org.jarsi.ark.data.WordEntity
@@ -60,6 +61,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private val suggestionEngine = SuggestionEngine(dictionary, learning)
     private var database: LearnedDatabase? = null
     private var learningEnabled = false
+    private var loadedStamp = 0L
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val suggestExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -102,18 +104,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             try {
                 val db = LearnedDatabase.create(this)
-                val words = db.dao().allWords().map {
-                    LearnedWord(
-                        it.word, it.count, it.lastUsed, it.blocked, it.created,
-                        it.acceptedCount, it.ignoredCount, it.pinned,
-                    )
-                }
-                val pairs = db.dao().allBigrams()
-                    .map { LearnedBigram(it.previous, it.next, it.count, it.lastUsed) }
-                val triples = db.dao().allTrigrams()
-                    .map { LearnedTrigram(it.first, it.second, it.next, it.count, it.lastUsed) }
+                val stamp = LearnedDataStamp.stamp
+                val (words, pairs, triples) = readLearnedData(db)
                 mainHandler.post {
                     database = db
+                    loadedStamp = stamp
                     learning.load(words, pairs, triples)
                 }
             } catch (e: Exception) {
@@ -136,6 +131,42 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         flushLearned()
         learning.resetContext()
         super.onFinishInputView(finishingInput)
+    }
+
+    private fun readLearnedData(
+        db: LearnedDatabase,
+    ): Triple<List<LearnedWord>, List<LearnedBigram>, List<LearnedTrigram>> {
+        val words = db.dao().allWords().map {
+            LearnedWord(
+                it.word, it.count, it.lastUsed, it.blocked, it.created,
+                it.acceptedCount, it.ignoredCount, it.pinned,
+            )
+        }
+        val pairs = db.dao().allBigrams()
+            .map { LearnedBigram(it.previous, it.next, it.count, it.lastUsed) }
+        val triples = db.dao().allTrigrams()
+            .map { LearnedTrigram(it.first, it.second, it.next, it.count, it.lastUsed) }
+        return Triple(words, pairs, triples)
+    }
+
+    /** Lataa oppimisdatan uudelleen, kun hallintanäkymä on muuttanut sitä. */
+    private fun reloadLearnedIfChanged() {
+        val db = database ?: return
+        if (loadedStamp == LearnedDataStamp.stamp) return
+        val stamp = LearnedDataStamp.stamp
+        loadedStamp = stamp
+        Thread {
+            try {
+                val (words, pairs, triples) = readLearnedData(db)
+                mainHandler.post {
+                    learning.load(words, pairs, triples)
+                    updateSuggestions()
+                }
+            } catch (e: Exception) {
+                // Lukuvirhe: vanha data jää käyttöön, yritetään seuraavalla kerralla.
+                loadedStamp = stamp - 1
+            }
+        }.start()
     }
 
     /** Kirjoittaa kertyneet oppimismuutokset tietokantaan taustasäikeessä. */
@@ -323,6 +354,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Salasanakentissä ei opita mitään; kentän vaihto katkaisee sanaketjun.
         learningEnabled = !passwordField
         learning.resetContext()
+        reloadLearnedIfChanged()
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
         // Salasana- ja numerokentissä ehdotusrivi on aina piilossa.

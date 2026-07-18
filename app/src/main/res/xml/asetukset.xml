@@ -61,5 +61,10 @@
             android:title="@string/asetus_ehdotus_yleiset"
             android:defaultValue="true"
             app:singleLineTitle="false" />
+        <Preference
+            android:key="opitut_sanat"
+            android:title="@string/opitut_sanat"
+            android:summary="@string/opitut_sanat_kuvaus"
+            app:singleLineTitle="false" />
     </PreferenceCategory>
 </PreferenceScreen>

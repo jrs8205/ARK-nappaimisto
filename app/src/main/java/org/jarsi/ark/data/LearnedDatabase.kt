@@ -9,8 +9,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Oppimisdatan paikallinen tietokanta. */
 @Database(
-    entities = [WordEntity::class, BigramEntity::class, TrigramEntity::class],
-    version = 3,
+    entities = [WordEntity::class, BigramEntity::class, TrigramEntity::class, ClipEntity::class],
+    version = 4,
     exportSchema = false,
 )
 abstract class LearnedDatabase : RoomDatabase() {
@@ -38,9 +38,21 @@ abstract class LearnedDatabase : RoomDatabase() {
             }
         }
 
+        // Versio 4 lisäsi leiketaulun; vanha data säilyy.
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `clips` (" +
+                        "`id` INTEGER NOT NULL, `text` TEXT, `imagePath` TEXT, " +
+                        "`created` INTEGER NOT NULL, `pinned` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+                )
+            }
+        }
+
         fun create(context: Context): LearnedDatabase =
             Room.databaseBuilder(context, LearnedDatabase::class.java, "oppiminen.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

@@ -16,4 +16,7 @@ interface LearnedDao {
     @Query("DELETE FROM words") fun deleteAllWords()
     @Query("DELETE FROM bigrams") fun deleteAllBigrams()
     @Query("DELETE FROM trigrams") fun deleteAllTrigrams()
+    @Query("SELECT * FROM clips") fun allClips(): List<ClipEntity>
+    @Upsert fun upsertClip(clip: ClipEntity)
+    @Query("DELETE FROM clips WHERE id = :id") fun deleteClip(id: Long)
 }

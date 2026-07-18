@@ -11,7 +11,6 @@
     <string name="vaihda_nappaimistoksi_kuvaus">Valitse ARK-näppäimistö käytössä olevaksi näppäimistöksi</string>
 
     <string name="asetukset_ulkoasu">Ulkoasu</string>
-    <string name="asetus_teema">Teema</string>
     <string name="asetus_korkeus">Näppäimistön korkeus</string>
     <string name="asetus_korkeus_kuvaus">Korkeus prosentteina perusarvosta</string>
 
@@ -24,10 +23,6 @@
     <string name="asetus_ehdotukset">Näytä ehdotukset</string>
     <string name="asetus_ehdotus_valilyonti">Välilyönti ehdotuksen jälkeen</string>
     <string name="asetus_ehdotus_yleiset">Yleisimmät sanat tyhjällä syötteellä</string>
-
-    <string name="teema_jarjestelma">Järjestelmä</string>
-    <string name="teema_tumma">Tumma</string>
-    <string name="teema_vaalea">Vaalea</string>
 
     <!-- Enter-näppäimen toimintotekstit -->
     <string name="enter_hae">Hae</string>

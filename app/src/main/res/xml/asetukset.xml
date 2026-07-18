@@ -16,14 +16,6 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_ulkoasu">
-        <ListPreference
-            android:key="teema"
-            android:title="@string/asetus_teema"
-            android:entries="@array/teema_nimet"
-            android:entryValues="@array/teema_arvot"
-            android:defaultValue="jarjestelma"
-            app:singleLineTitle="false"
-            app:useSimpleSummaryProvider="true" />
         <SeekBarPreference
             android:key="korkeus"
             android:title="@string/asetus_korkeus"

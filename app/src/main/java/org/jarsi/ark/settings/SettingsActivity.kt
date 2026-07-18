@@ -2,6 +2,7 @@ package org.jarsi.ark.settings
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
@@ -9,20 +10,19 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
-import androidx.preference.PreferenceManager
 import org.jarsi.ark.R
 
-/** Näppäimistön asetukset ja käyttöönotto. */
+/** Näppäimistön asetukset ja käyttöönotto. Teema seuraa järjestelmää. */
 class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Asetussivu noudattaa näppäimistön teemavalintaa.
-        applyNightMode(
-            PreferenceManager.getDefaultSharedPreferences(this).getString("teema", "jarjestelma")
-        )
+        // Vanhoilla Android-versioilla ei ole järjestelmän tummaa tilaa;
+        // niillä koko sovellus on aina tumma, kuten näppäimistökin.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+        }
         super.onCreate(savedInstanceState)
         // Reunasta reunaan -tilassa sisältö menisi tila- ja navigointipalkkien
         // alle; palkkien korkeus varataan reunuksina.
@@ -52,23 +52,6 @@ class SettingsActivity : AppCompatActivity() {
                 imm.showInputMethodPicker()
                 true
             }
-            // Teeman vaihto näkyy asetussivulla heti.
-            findPreference<ListPreference>("teema")?.setOnPreferenceChangeListener { _, value ->
-                applyNightMode(value as? String)
-                true
-            }
-        }
-    }
-
-    private companion object {
-        fun applyNightMode(theme: String?) {
-            AppCompatDelegate.setDefaultNightMode(
-                when (theme) {
-                    "vaalea" -> AppCompatDelegate.MODE_NIGHT_NO
-                    "tumma" -> AppCompatDelegate.MODE_NIGHT_YES
-                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                }
-            )
         }
     }
 }

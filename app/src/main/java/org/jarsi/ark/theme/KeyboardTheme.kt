@@ -2,6 +2,7 @@ package org.jarsi.ark.theme
 
 import android.content.Context
 import android.content.res.Configuration
+import android.os.Build
 import org.jarsi.ark.R
 
 /**
@@ -19,14 +20,15 @@ data class KeyboardTheme(
     val accentText: Int,
 ) {
     companion object {
-        /** Lataa teeman värit resursseista; muu kuin tumma/vaalea seuraa järjestelmän teemaa. */
-        fun load(context: Context, name: String? = null): KeyboardTheme {
-            val light = when (name) {
-                "vaalea" -> true
-                "tumma" -> false
-                else -> context.resources.configuration.uiMode and
-                    Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
-            }
+        /**
+         * Lataa teeman järjestelmän tumman tilan mukaan. Vanhoilla
+         * Android-versioilla (ennen 10:tä) ei ole järjestelmän tummaa tilaa,
+         * joten niillä käytetään aina tummaa teemaa.
+         */
+        fun load(context: Context): KeyboardTheme {
+            val light = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+                context.resources.configuration.uiMode and
+                Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
             return if (light) {
                 KeyboardTheme(
                     background = context.getColor(R.color.vaalea_tausta),

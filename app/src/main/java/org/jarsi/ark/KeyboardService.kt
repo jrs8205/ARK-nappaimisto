@@ -2,6 +2,7 @@ package org.jarsi.ark
 
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
 import android.os.Handler
@@ -64,7 +65,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // Ulkoasuasetukset otetaan käyttöön heti asetuksissa vaihdettaessa, jotta
     // näppäimistö on jo oikeassa teemassa kun asetuksista palataan.
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "teema" || key == "korkeus" || key == "esikatselu" || key == "varina") {
+        if (key == "korkeus" || key == "esikatselu" || key == "varina") {
             applyVisualSettings()
         }
     }
@@ -90,8 +91,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         super.onDestroy()
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Järjestelmän tumman tilan vaihtuminen päivittää teeman heti.
+        applyVisualSettings()
+    }
+
     private fun applyVisualSettings() {
-        val theme = KeyboardTheme.load(this, prefs.getString("teema", "jarjestelma"))
+        val theme = KeyboardTheme.load(this)
         val heightScale = prefs.getInt("korkeus", 100) / 100f
         vibrationEnabled = prefs.getBoolean("varina", true)
         keyboardView?.applySettings(

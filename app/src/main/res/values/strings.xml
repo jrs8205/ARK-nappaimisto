@@ -39,6 +39,13 @@
     <string name="sanelu_virhe">Sanelu ei onnistunut</string>
     <string name="sanelu_ei_saatavilla">Sanelu ei ole käytettävissä tällä laitteella</string>
 
+    <string name="leikepoyta_tyhja">Kopioi tekstiä tai kuva, niin se ilmestyy tähän</string>
+    <string name="leike_liita">Liitä</string>
+    <string name="leike_hae_verkosta">Hae verkosta</string>
+    <string name="leike_poista">Poista</string>
+    <string name="leike_kuva_ei_tuettu">Tämä kenttä ei ota vastaan kuvia</string>
+    <string name="leike_haku_epaonnistui">Hakua ei voitu avata</string>
+
     <string name="ehdotus_kiinnita">Kiinnitä</string>
     <string name="ehdotus_irrota">Poista kiinnitys</string>
     <string name="ehdotus_poista">Poista opittu sana</string>

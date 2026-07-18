@@ -46,5 +46,16 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:theme="@style/Theme.Ark.Lapinakyva" />
+
+        <!-- Kuvaleikkeiden luovutus vastaanottavalle sovellukselle. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="org.jarsi.ark.nappaimisto.tiedostot"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/tiedostopolut" />
+        </provider>
     </application>
 </manifest>

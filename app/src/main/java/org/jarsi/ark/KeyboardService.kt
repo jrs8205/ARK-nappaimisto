@@ -1,11 +1,15 @@
 package org.jarsi.ark
 
 import android.Manifest
+import android.app.SearchManager
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
+import android.net.Uri
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
@@ -17,7 +21,14 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import androidx.core.view.inputmethod.EditorInfoCompat
+import androidx.core.view.inputmethod.InputConnectionCompat
+import androidx.core.view.inputmethod.InputContentInfoCompat
 import androidx.preference.PreferenceManager
+import org.jarsi.ark.clipboard.Clip
+import org.jarsi.ark.clipboard.ClipStore
+import org.jarsi.ark.data.ClipEntity
 import org.jarsi.ark.dictation.DictationController
 import org.jarsi.ark.dictation.RecordAudioPermissionActivity
 import org.jarsi.ark.data.BigramEntity
@@ -37,9 +48,12 @@ import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
+import org.jarsi.ark.view.ClipboardPanelView
 import org.jarsi.ark.view.KeyboardView
 import org.jarsi.ark.view.SuggestionBarView
 import org.jarsi.ark.view.ToolbarView
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -68,6 +82,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var learningEnabled = false
     private var loadedStamp = 0L
     private var pendingDictation = false
+
+    private val clipStore = ClipStore()
+    private var clipboardPanel: ClipboardPanelView? = null
+    private var clipboardManager: ClipboardManager? = null
+    private val clipChangedListener =
+        ClipboardManager.OnPrimaryClipChangedListener { handleClipChanged() }
 
     private val dictation by lazy {
         DictationController(
@@ -141,6 +161,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         super.onCreate()
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         prefs.registerOnSharedPreferenceChangeListener(prefListener)
+        clipboardManager = getSystemService(ClipboardManager::class.java)
+        clipboardManager?.addPrimaryClipChangedListener(clipChangedListener)
         // Sanalista ja oppimisdata ladataan taustalla; ehdotusrivi on tyhjä
         // kunnes lataus valmistuu.
         Thread {
@@ -153,10 +175,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 val db = LearnedDatabase.create(this)
                 val stamp = LearnedDataStamp.stamp
                 val (words, pairs, triples) = readLearnedData(db)
+                val clips = db.dao().allClips()
+                    .map { Clip(it.id, it.text, it.imagePath, it.created, it.pinned) }
                 mainHandler.post {
                     database = db
                     loadedStamp = stamp
                     learning.load(words, pairs, triples)
+                    clipStore.load(clips)
+                    pruneClips()
                 }
             } catch (e: Exception) {
                 // Tietokanta ei auennut: oppiminen jää pois, näppäimistö toimii silti.
@@ -167,6 +193,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onDestroy() {
         dictation.stop()
+        clipboardManager?.removePrimaryClipChangedListener(clipChangedListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         flushLearned()
         suggestExecutor.shutdownNow()
@@ -220,6 +247,147 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 loadedStamp = stamp - 1
             }
         }.start()
+    }
+
+    private fun handleClipChanged() {
+        val manager = clipboardManager ?: return
+        try {
+            val clip = manager.primaryClip ?: return
+            // Arkaluonteisiksi merkityt kopiot (esim. salasanat) ohitetaan kokonaan.
+            val sensitive = clip.description.extras
+                ?.getBoolean("android.content.extra.IS_SENSITIVE", false) == true
+            if (sensitive || clip.itemCount == 0) return
+            val item = clip.getItemAt(0)
+            val text = item.text
+            if (!text.isNullOrBlank()) {
+                val saved = clipStore.addText(text.toString()) ?: return
+                persistClip(saved)
+                pruneClips()
+                refreshClipboardPanel()
+            } else {
+                val uri = item.uri ?: return
+                if (contentResolver.getType(uri)?.startsWith("image/") == true) {
+                    copyImageClip(uri)
+                }
+            }
+        } catch (e: Exception) {
+            // Leikepöydän luku voi olla estetty taustalla; ohitetaan hiljaisesti.
+        }
+    }
+
+    private fun copyImageClip(uri: Uri) {
+        val type = contentResolver.getType(uri)
+        val extension = when (type) {
+            "image/jpeg" -> "jpg"
+            "image/webp" -> "webp"
+            else -> "png"
+        }
+        ioExecutor.execute {
+            try {
+                val dir = File(filesDir, "clips").apply { mkdirs() }
+                val file = File(dir, "leike_${System.currentTimeMillis()}.$extension")
+                contentResolver.openInputStream(uri)?.use { input ->
+                    FileOutputStream(file).use { output -> input.copyTo(output) }
+                } ?: return@execute
+                mainHandler.post {
+                    val saved = clipStore.addImage(file.absolutePath)
+                    persistClip(saved)
+                    pruneClips()
+                    refreshClipboardPanel()
+                }
+            } catch (e: Exception) {
+                // Kuvan kopiointi epäonnistui: leike jää tallentamatta.
+            }
+        }
+    }
+
+    private fun persistClip(clip: Clip) {
+        val db = database ?: return
+        ioExecutor.execute {
+            try {
+                db.dao().upsertClip(
+                    ClipEntity(clip.id, clip.text, clip.imagePath, clip.created, clip.pinned)
+                )
+            } catch (e: Exception) {
+                // Kirjoitusvirhe ei saa kaataa näppäimistöä.
+            }
+        }
+    }
+
+    private fun pruneClips() {
+        val prune = clipStore.prune()
+        if (prune.removedIds.isEmpty()) return
+        val db = database
+        ioExecutor.execute {
+            try {
+                prune.removedIds.forEach { db?.dao()?.deleteClip(it) }
+                prune.removedImagePaths.forEach { File(it).delete() }
+            } catch (e: Exception) {
+                // Siivousvirhe ei saa kaataa näppäimistöä.
+            }
+        }
+    }
+
+    private fun refreshClipboardPanel() {
+        if (clipboardPanel?.visibility == View.VISIBLE) {
+            clipboardPanel?.setClips(clipStore.all())
+        }
+    }
+
+    private fun showClipboardPanel() {
+        val panel = clipboardPanel ?: return
+        val kb = keyboardView ?: return
+        if (kb.height > 0) {
+            panel.layoutParams = panel.layoutParams.apply { height = kb.height }
+        }
+        panel.setClips(clipStore.all())
+        kb.visibility = View.GONE
+        panel.visibility = View.VISIBLE
+        toolbar?.clipboardActive = true
+    }
+
+    private fun hideClipboardPanel() {
+        val panel = clipboardPanel ?: return
+        if (panel.visibility != View.VISIBLE) return
+        panel.closeMenu()
+        panel.visibility = View.GONE
+        keyboardView?.visibility = View.VISIBLE
+        toolbar?.clipboardActive = false
+    }
+
+    private fun pasteClip(clip: Clip) {
+        val ic = currentInputConnection ?: return
+        if (clip.text != null) {
+            ic.commitText(clip.text, 1)
+            hideClipboardPanel()
+            feedback()
+            return
+        }
+        val path = clip.imagePath ?: return
+        val info = currentInputEditorInfo ?: return
+        val mime = when {
+            path.endsWith(".jpg") -> "image/jpeg"
+            path.endsWith(".webp") -> "image/webp"
+            else -> "image/png"
+        }
+        val supported = EditorInfoCompat.getContentMimeTypes(info)
+            .any { ClipDescription.compareMimeTypes(mime, it) }
+        if (!supported) {
+            Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(this, FILE_AUTHORITY, File(path))
+            val content = InputContentInfoCompat(uri, ClipDescription("leike", arrayOf(mime)), null)
+            InputConnectionCompat.commitContent(
+                ic, info, content,
+                InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null,
+            )
+            hideClipboardPanel()
+            feedback()
+        } catch (e: Exception) {
+            Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+        }
     }
 
     /** Kirjoittaa kertyneet oppimismuutokset tietokantaan taustasäikeessä. */
@@ -295,6 +463,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         )
         suggestionBar?.applySettings(theme, heightScale)
         toolbar?.applySettings(theme)
+        clipboardPanel?.applySettings(theme)
     }
 
     override fun onCreateInputView(): View {
@@ -339,6 +508,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                                 ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             )
                         }
+                    }
+                }
+
+                override fun onToggleClipboard() {
+                    feedback()
+                    if (clipboardPanel?.visibility == View.VISIBLE) {
+                        hideClipboardPanel()
+                    } else {
+                        showClipboardPanel()
                     }
                 }
 
@@ -388,6 +566,50 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             it.listener = this
             container.addView(it, LinearLayout.LayoutParams(params))
         }
+        clipboardPanel = ClipboardPanelView(this).also {
+            it.listener = object : ClipboardPanelView.Listener {
+                override fun onPaste(clip: Clip) = pasteClip(clip)
+
+                override fun onTogglePin(clip: Clip) {
+                    clipStore.setPinned(clip.id, !clip.pinned)?.let(::persistClip)
+                    clipboardPanel?.setClips(clipStore.all())
+                }
+
+                override fun onWebSearch(clip: Clip) {
+                    val query = clip.text ?: return
+                    hideClipboardPanel()
+                    try {
+                        startActivity(
+                            Intent(Intent.ACTION_WEB_SEARCH)
+                                .putExtra(SearchManager.QUERY, query)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            this@KeyboardService,
+                            R.string.leike_haku_epaonnistui,
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+
+                override fun onDelete(clip: Clip) {
+                    clipStore.remove(clip.id)
+                    val db = database
+                    ioExecutor.execute {
+                        try {
+                            db?.dao()?.deleteClip(clip.id)
+                            clip.imagePath?.let { path -> File(path).delete() }
+                        } catch (e: Exception) {
+                            // Poistovirhe ei saa kaataa näppäimistöä.
+                        }
+                    }
+                    clipboardPanel?.setClips(clipStore.all())
+                }
+            }
+            it.visibility = View.GONE
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
         return container
     }
 
@@ -431,6 +653,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         reloadLearnedIfChanged()
         // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
         dictation.stop()
+        hideClipboardPanel()
         if (pendingDictation) {
             pendingDictation = false
             if (!passwordField &&
@@ -733,5 +956,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3
+        const val FILE_AUTHORITY = "org.jarsi.ark.nappaimisto.tiedostot"
     }
 }

@@ -137,6 +137,13 @@ class KeyboardView(context: Context) : View(context) {
         invalidate()
     }
 
+    // Näkymä voidaan rakentaa uudelleen esim. teeman vaihtuessa; insetit on
+    // pyydettävä joka kiinnityksellä, ettei navigointipalkin varaus katoa.
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        requestApplyInsets()
+    }
+
     // Uudemmissa Android-versioissa IME-ikkuna ulottuu navigointipalkin alle,
     // joten palkin korkeus varataan näkymän alareunasta tyhjänä tilana.
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {

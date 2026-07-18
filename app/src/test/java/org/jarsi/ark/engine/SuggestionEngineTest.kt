@@ -10,7 +10,7 @@ class SuggestionEngineTest {
 
     private fun build(vararg dictLines: String): Pair<SuggestionEngine, LearningEngine> {
         val dict = DictionaryEngine().apply { load(dictLines.asSequence()) }
-        val learning = LearningEngine { now }.apply { load(emptyList(), emptyList()) }
+        val learning = LearningEngine { now }.apply { load(emptyList(), emptyList(), emptyList()) }
         return SuggestionEngine(dict, learning) to learning
     }
 

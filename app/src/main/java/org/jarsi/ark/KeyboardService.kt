@@ -102,7 +102,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     .map { LearnedBigram(it.previous, it.next, it.count, it.lastUsed) }
                 mainHandler.post {
                     database = db
-                    learning.load(words, pairs)
+                    learning.load(words, pairs, emptyList())
                 }
             } catch (e: Exception) {
                 // Tietokanta ei auennut: oppiminen jää pois, näppäimistö toimii silti.

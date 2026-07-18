@@ -9,7 +9,8 @@ class LearningEngineTest {
 
     private var now = 1_000_000_000_000L
 
-    private fun engine() = LearningEngine { now }.apply { load(emptyList(), emptyList()) }
+    private fun engine() =
+        LearningEngine { now }.apply { load(emptyList(), emptyList(), emptyList()) }
 
     @Test
     fun `sana opitaan ja ehdotetaan heti`() {
@@ -106,5 +107,51 @@ class LearningEngineTest {
         e.onWordCommitted("sana")
         assertTrue(e.suggest("sa").isEmpty())
         assertEquals(0, e.dirtyCount)
+    }
+
+    @Test
+    fun `trigram voittaa bigramin`() {
+        val e = engine()
+        listOf("alfa", "beeta", "cee").forEach { e.onWordCommitted(it) }
+        e.resetContext()
+        listOf("xoo", "beeta", "dee").forEach { e.onWordCommitted(it) }
+        assertEquals("cee", e.predictNext(listOf("alfa", "beeta")).first())
+    }
+
+    @Test
+    fun `bigram taydentaa kun trigramia ei ole`() {
+        val e = engine()
+        listOf("eka", "toka").forEach { e.onWordCommitted(it) }
+        assertEquals(listOf("toka"), e.predictNext(listOf("eka")))
+    }
+
+    @Test
+    fun `ennustus sailyttaa asun ja numerot`() {
+        val e = engine()
+        listOf("prx4", "Jako", "20", "nouto").forEach { e.onWordCommitted(it) }
+        assertEquals(listOf("Jako"), e.predictNext(listOf("prx4")))
+        assertEquals(listOf("20"), e.predictNext(listOf("prx4", "Jako")).take(1))
+        assertEquals(listOf("nouto"), e.predictNext(listOf("Jako", "20")).take(1))
+    }
+
+    @Test
+    fun `estetty ei ennustu`() {
+        val e = engine()
+        listOf("eka", "paha").forEach { e.onWordCommitted(it) }
+        e.blockWord("paha")
+        assertTrue(e.predictNext(listOf("eka")).isEmpty())
+    }
+
+    @Test
+    fun `tyhja konteksti antaa tyhjan ennustuksen`() {
+        assertTrue(engine().predictNext(emptyList()).isEmpty())
+    }
+
+    @Test
+    fun `trigramit paatyvat draineen`() {
+        val e = engine()
+        listOf("a1", "b2", "c3").forEach { e.onWordCommitted(it) }
+        val dirty = e.drainDirty()
+        assertTrue(dirty.trigrams.any { it.first == "a1" && it.second == "b2" && it.next == "c3" })
     }
 }

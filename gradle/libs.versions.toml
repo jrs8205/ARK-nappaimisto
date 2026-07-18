@@ -6,6 +6,8 @@ appcompat = "1.7.1"
 material = "1.12.0"
 preference = "1.2.1"
 junit = "4.13.2"
+room = "2.8.4"
+ksp = "2.2.20-2.0.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -13,7 +15,10 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 androidx-preference = { group = "androidx.preference", name = "preference-ktx", version.ref = "preference" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

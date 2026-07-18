@@ -1,5 +1,6 @@
 package org.jarsi.ark.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -12,4 +13,7 @@ data class WordEntity(
     val lastUsed: Long,
     val blocked: Boolean,
     val created: Long,
+    @ColumnInfo(defaultValue = "0") val acceptedCount: Int = 0,
+    @ColumnInfo(defaultValue = "0") val ignoredCount: Int = 0,
+    @ColumnInfo(defaultValue = "0") val pinned: Boolean = false,
 )

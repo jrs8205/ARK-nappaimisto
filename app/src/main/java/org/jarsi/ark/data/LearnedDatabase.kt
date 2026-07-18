@@ -10,7 +10,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 /** Oppimisdatan paikallinen tietokanta. */
 @Database(
     entities = [WordEntity::class, BigramEntity::class, TrigramEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class LearnedDatabase : RoomDatabase() {
@@ -29,9 +29,18 @@ abstract class LearnedDatabase : RoomDatabase() {
             }
         }
 
+        // Versio 3 lisäsi palautesarakkeet; vanha data säilyy.
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `words` ADD COLUMN `acceptedCount` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `words` ADD COLUMN `ignoredCount` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `words` ADD COLUMN `pinned` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun create(context: Context): LearnedDatabase =
             Room.databaseBuilder(context, LearnedDatabase::class.java, "oppiminen.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

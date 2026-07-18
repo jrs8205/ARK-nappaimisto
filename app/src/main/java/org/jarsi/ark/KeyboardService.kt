@@ -98,8 +98,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             try {
                 val db = LearnedDatabase.create(this)
-                val words = db.dao().allWords()
-                    .map { LearnedWord(it.word, it.count, it.lastUsed, it.blocked, it.created) }
+                val words = db.dao().allWords().map {
+                    LearnedWord(
+                        it.word, it.count, it.lastUsed, it.blocked, it.created,
+                        it.acceptedCount, it.ignoredCount, it.pinned,
+                    )
+                }
                 val pairs = db.dao().allBigrams()
                     .map { LearnedBigram(it.previous, it.next, it.count, it.lastUsed) }
                 val triples = db.dao().allTrigrams()
@@ -144,6 +148,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                             WordEntity(
                                 it.word.lowercase(fiLocale), it.word,
                                 it.count, it.lastUsed, it.blocked, it.created,
+                                it.acceptedCount, it.ignoredCount, it.pinned,
                             )
                         }
                     )

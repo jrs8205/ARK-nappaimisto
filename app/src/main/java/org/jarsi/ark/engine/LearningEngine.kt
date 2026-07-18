@@ -16,6 +16,9 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         var lastUsed: Long,
         var blocked: Boolean,
         val created: Long,
+        var acceptedCount: Int = 0,
+        var ignoredCount: Int = 0,
+        var pinned: Boolean = false,
     )
 
     private class CountState(var count: Int, var lastUsed: Long)
@@ -61,7 +64,10 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         bigrams.clear()
         trigrams.clear()
         for (w in loadedWords) {
-            words[keyOf(w.word)] = WordState(w.word, w.count, w.lastUsed, w.blocked, w.created)
+            words[keyOf(w.word)] = WordState(
+                w.word, w.count, w.lastUsed, w.blocked, w.created,
+                w.acceptedCount, w.ignoredCount, w.pinned,
+            )
         }
         for (b in loadedBigrams) {
             bigrams.getOrPut(b.previous) { HashMap() }[b.next] = CountState(b.count, b.lastUsed)
@@ -196,7 +202,12 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
 
     fun drainDirty(): DirtyLearned {
         val outWords = dirtyWords.mapNotNull { key ->
-            words[key]?.let { LearnedWord(it.word, it.count, it.lastUsed, it.blocked, it.created) }
+            words[key]?.let {
+                LearnedWord(
+                    it.word, it.count, it.lastUsed, it.blocked, it.created,
+                    it.acceptedCount, it.ignoredCount, it.pinned,
+                )
+            }
         }
         val outBigrams = dirtyBigrams.mapNotNull { (prev, next) ->
             bigrams[prev]?.get(next)?.let { LearnedBigram(prev, next, it.count, it.lastUsed) }

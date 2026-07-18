@@ -7,6 +7,25 @@ data class LearnedWord(
     val lastUsed: Long,
     val blocked: Boolean,
     val created: Long,
+    val acceptedCount: Int = 0,
+    val ignoredCount: Int = 0,
+    val pinned: Boolean = false,
+)
+
+/** Sanan pisteytyssignaalit; [usage] on käyttömäärä × tuoreuskerroin. */
+data class WordSignals(
+    val usage: Float,
+    val manuallyTyped: Boolean,
+    val acceptedCount: Int,
+    val ignoredCount: Int,
+    val pinned: Boolean,
+    val blocked: Boolean,
+)
+
+/** Kontekstiosuman raakapisteet (määrä × tuoreuskerroin). */
+data class NextMatch(
+    val bigram: Float,
+    val trigram: Float,
 )
 
 /** Peräkkäisten sanojen pari pienennetyssä muodossa. */

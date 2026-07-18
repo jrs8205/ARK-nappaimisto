@@ -33,7 +33,7 @@ class SuggestionEngineTest {
         val (s, l) = build("auto 100", "autio 50")
         l.blockWord("auto")
         assertEquals(listOf("autio"), s.suggest("au"))
-        assertEquals(listOf("autio"), s.topWords())
+        assertEquals(listOf("autio"), s.emptyInput(emptyList(), includeCommon = true))
     }
 
     @Test
@@ -47,5 +47,26 @@ class SuggestionEngineTest {
         val (s, l) = build("aa 5", "ab 4", "ac 3", "ad 2")
         l.onWordCommitted("aatto")
         assertEquals(3, s.suggest("a", max = 3).size)
+    }
+
+    @Test
+    fun `ennustus nousee karkeen tyhjalla syotteella`() {
+        val (s, l) = build("ja 100", "on 90")
+        listOf("prx4", "Jako").forEach { l.onWordCommitted(it) }
+        assertEquals(listOf("Jako", "ja", "on"), s.emptyInput(listOf("prx4"), includeCommon = true))
+    }
+
+    @Test
+    fun `ilman yleisia vain ennustukset`() {
+        val (s, l) = build("ja 100")
+        listOf("prx4", "Jako").forEach { l.onWordCommitted(it) }
+        assertEquals(listOf("Jako"), s.emptyInput(listOf("prx4"), includeCommon = false))
+    }
+
+    @Test
+    fun `etuliite suodattaa ennustukset karkeen`() {
+        val (s, l) = build("nopea 100")
+        listOf("Jako", "20", "nouto").forEach { l.onWordCommitted(it) }
+        assertEquals("nouto", s.suggest("no", listOf("Jako", "20")).first())
     }
 }

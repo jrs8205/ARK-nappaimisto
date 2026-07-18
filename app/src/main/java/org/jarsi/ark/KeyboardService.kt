@@ -17,9 +17,11 @@ import android.widget.LinearLayout
 import androidx.preference.PreferenceManager
 import org.jarsi.ark.data.BigramEntity
 import org.jarsi.ark.data.LearnedDatabase
+import org.jarsi.ark.data.TrigramEntity
 import org.jarsi.ark.data.WordEntity
 import org.jarsi.ark.engine.DictionaryEngine
 import org.jarsi.ark.engine.LearnedBigram
+import org.jarsi.ark.engine.LearnedTrigram
 import org.jarsi.ark.engine.LearnedWord
 import org.jarsi.ark.engine.LearningEngine
 import org.jarsi.ark.engine.SuggestionEngine
@@ -100,9 +102,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     .map { LearnedWord(it.word, it.count, it.lastUsed, it.blocked, it.created) }
                 val pairs = db.dao().allBigrams()
                     .map { LearnedBigram(it.previous, it.next, it.count, it.lastUsed) }
+                val triples = db.dao().allTrigrams()
+                    .map { LearnedTrigram(it.first, it.second, it.next, it.count, it.lastUsed) }
                 mainHandler.post {
                     database = db
-                    learning.load(words, pairs, emptyList())
+                    learning.load(words, pairs, triples)
                 }
             } catch (e: Exception) {
                 // Tietokanta ei auennut: oppiminen jää pois, näppäimistö toimii silti.
@@ -147,6 +151,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 if (dirty.bigrams.isNotEmpty()) {
                     db.dao().upsertBigrams(
                         dirty.bigrams.map { BigramEntity(it.previous, it.next, it.count, it.lastUsed) }
+                    )
+                }
+                if (dirty.trigrams.isNotEmpty()) {
+                    db.dao().upsertTrigrams(
+                        dirty.trigrams.map {
+                            TrigramEntity(it.first, it.second, it.next, it.count, it.lastUsed)
+                        }
                     )
                 }
             } catch (e: Exception) {
@@ -336,10 +347,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val generation = ++suggestGeneration
         suggestExecutor.execute {
             val word = WordTools.currentWord(before)
-            var result = when {
-                word.isNotEmpty() -> suggestionEngine.suggest(word)
-                commonWordsEnabled -> suggestionEngine.topWords()
-                else -> emptyList()
+            val context = WordTools.previousWords(before)
+            var result = if (word.isNotEmpty()) {
+                suggestionEngine.suggest(word, context)
+            } else {
+                suggestionEngine.emptyInput(context, commonWordsEnabled)
             }
             val capitalize = if (word.isEmpty()) shiftActive else word.first().isUpperCase()
             if (capitalize) {

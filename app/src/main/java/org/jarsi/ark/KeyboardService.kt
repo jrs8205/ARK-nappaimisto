@@ -2,19 +2,27 @@ package org.jarsi.ark
 
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.text.InputType
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.LinearLayout
 import androidx.preference.PreferenceManager
+import org.jarsi.ark.engine.DictionaryEngine
+import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
 import org.jarsi.ark.theme.KeyboardTheme
 import org.jarsi.ark.view.KeyboardView
+import org.jarsi.ark.view.SuggestionBarView
+import java.io.IOException
 import java.util.Locale
+import java.util.concurrent.Executors
 
 /** ARK-näppäimistön pääpalvelu. */
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
@@ -22,6 +30,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private enum class Page { LETTERS, SYMBOLS1, SYMBOLS2, NUMERIC }
 
     private var keyboardView: KeyboardView? = null
+    private var suggestionBar: SuggestionBarView? = null
     private var page = Page.LETTERS
     private var extraKey: String? = null
     private var shiftState = ShiftState.OFF
@@ -31,11 +40,51 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var soundEnabled = false
     private var vibrationEnabled = true
 
+    private val dictionary = DictionaryEngine()
+    private val suggestExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile private var suggestGeneration = 0
+    private var suggestionsVisible = true
+    private var spaceAfterSuggestion = true
+    private var commonWordsEnabled = true
+
     private val fiLocale = Locale.forLanguageTag("fi")
 
-    override fun onCreateInputView(): View = KeyboardView(this).also {
-        it.listener = this
-        keyboardView = it
+    override fun onCreate() {
+        super.onCreate()
+        // Sanalista ladataan taustalla; ehdotusrivi on tyhjä kunnes lataus valmistuu.
+        Thread {
+            try {
+                assets.open("sanalista.txt").bufferedReader().useLines { dictionary.load(it) }
+            } catch (e: IOException) {
+                // Sanalista puuttuu tai ei aukea: ehdotusrivi jää tyhjäksi.
+            }
+            mainHandler.post { updateSuggestions() }
+        }.start()
+    }
+
+    override fun onDestroy() {
+        suggestExecutor.shutdownNow()
+        super.onDestroy()
+    }
+
+    override fun onCreateInputView(): View {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+        )
+        suggestionBar = SuggestionBarView(this).also {
+            it.listener = ::onSuggestionPicked
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
+        keyboardView = KeyboardView(this).also {
+            it.listener = this
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
+        return container
     }
 
     // Koko näytön muokkaustila vaakasuunnassa peittäisi sovelluksen — pidetään pois.
@@ -51,12 +100,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val variation = info.inputType and InputType.TYPE_MASK_VARIATION
         passwordField = isPasswordField(inputClass, variation)
 
+        val theme = KeyboardTheme.fromName(prefs.getString("teema", "tumma"))
+        val heightScale = prefs.getInt("korkeus", 100) / 100f
         keyboardView?.applySettings(
-            KeyboardTheme.fromName(prefs.getString("teema", "tumma")),
-            prefs.getInt("korkeus", 100) / 100f,
+            theme,
+            heightScale,
             // Salasanakentässä esikatselukupla jää pois, ettei syöte näy sivullisille.
             prefs.getBoolean("esikatselu", true) && !passwordField,
         )
+        suggestionBar?.applySettings(theme, heightScale)
 
         page = when (inputClass) {
             InputType.TYPE_CLASS_NUMBER,
@@ -78,8 +130,49 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         keyboardView?.enterText = enterLabel(info)
         shiftState = ShiftState.OFF
         manualShift = false
+        // Salasanakentissä ehdotusrivi on aina piilossa eikä tekstiä lueta.
+        suggestionsVisible = !passwordField
+        suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         updateLayout()
         updateAutoCaps()
+        updateSuggestions()
+    }
+
+    private fun onSuggestionPicked(word: String) {
+        val ic = currentInputConnection ?: return
+        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val current = WordTools.currentWord(before)
+        if (current.isNotEmpty()) ic.deleteSurroundingText(current.length, 0)
+        ic.commitText(if (spaceAfterSuggestion) "$word " else word, 1)
+        feedback()
+        updateAutoCaps()
+        updateSuggestions()
+    }
+
+    private fun updateSuggestions() {
+        val bar = suggestionBar ?: return
+        if (!suggestionsVisible) {
+            bar.setSuggestions(emptyList())
+            return
+        }
+        val before = currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val generation = ++suggestGeneration
+        suggestExecutor.execute {
+            val word = WordTools.currentWord(before)
+            var result = when {
+                word.isNotEmpty() -> dictionary.suggest(word)
+                commonWordsEnabled -> dictionary.topWords()
+                else -> emptyList()
+            }
+            if (word.isNotEmpty() && word.first().isUpperCase()) {
+                result = result.map { s -> s.replaceFirstChar { it.titlecase(fiLocale) } }
+            }
+            if (generation == suggestGeneration) {
+                mainHandler.post {
+                    if (generation == suggestGeneration) bar.setSuggestions(result)
+                }
+            }
+        }
     }
 
     private fun isPasswordField(inputClass: Int, variation: Int): Boolean = when {
@@ -239,6 +332,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd
         )
         updateAutoCaps()
+        updateSuggestions()
     }
 
     private fun feedback(soundEffect: Int = AudioManager.FX_KEYPRESS_STANDARD) {
@@ -252,5 +346,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private companion object {
         const val DOUBLE_TAP_CAPS_MS = 350L
+        const val MAX_WORD_LOOKBACK = 48
     }
 }

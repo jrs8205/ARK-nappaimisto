@@ -40,7 +40,7 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 | 2 | Vieritettävä ehdotusrivi ja yleinen suomen sanalista | Valmis |
 | 3 | Henkilökohtaisten sanojen oppiminen | Valmis |
 | 4 | Sanaparit ja trigrammit, seuraavan sanan ennustus | Valmis |
-| 5 | Palautteesta oppiminen (hyväksynnät, hylkäykset, korjausten peruutukset) | — |
+| 5 | Palautteesta oppiminen (hyväksynnät, hylkäykset, korjausten peruutukset) | Valmis |
 | 6 | Sovelluskohtainen oppiminen | — |
 | 7 | Oikeinkirjoitus ja varovainen automaattikorjaus | — |
 | 8 | Fraasit ja tekstipohjat | — |
@@ -97,6 +97,17 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   jota yleiset näppäimistöt eivät osaa
 * trigramit tarkentavat ennustusta, kun kaksi edeltävää sanaa tunnetaan
 * ennustus toimii myös vanhan tekstin perään jatkettaessa
+
+## Ominaisuudet (vaihe 5)
+
+* yhtenäinen pisteytysmalli: yleisyys, oma käyttö, ketjuosumat,
+  hyväksynnät, kiinnitys ja ohitukset painottavat ehdotuksia yhdessä
+* hyväksytty ehdotus nousee jatkossa korkeammalle; toistuvasti ohitettu
+  täydennys laskee hiljalleen
+* sanan kiinnitys: kiinnitetty sana nousee aina kärkeen kun sanan alku
+  täsmää, ja se merkitään ehdotuksessa pienellä pisteellä
+* korjausten peruutuksista oppiminen tulee automaattikorjauksen mukana
+  (vaihe 7)
 
 ## Yksityisyys
 

@@ -227,13 +227,15 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
             // mukana — kumpaankin on helpompi osua sormella.
             val side = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.VERTICAL
-                minimumHeight = dp(72)
                 addView(more, LinearLayout.LayoutParams(dp(28), dp(28)))
                 addView(Space(parent.context), LinearLayout.LayoutParams(0, 0, 1f))
                 addView(pin, LinearLayout.LayoutParams(dp(28), dp(28)))
             }
             val row = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.HORIZONTAL
+                // Minimikorkeus korttiin asti, jotta neula mahtuu aina näkyviin
+                // myös yksirivisillä leikkeillä.
+                minimumHeight = dp(76)
                 setPadding(dp(12), dp(8), dp(4), dp(8))
                 addView(
                     content,

@@ -42,13 +42,15 @@ class ToolbarView(context: Context) : View(context) {
     private fun dp(value: Float) = value * density
 
     private val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        textAlign = Paint.Align.CENTER
+    }
 
     private enum class Tool { ARROWS, WEB, SETTINGS }
 
     private val tools = listOf(Tool.ARROWS, Tool.WEB, Tool.SETTINGS)
 
     private val cursorIcon = context.getDrawable(R.drawable.ic_cursor_move)?.mutate()
-    private val webIcon = context.getDrawable(R.drawable.ic_web)?.mutate()
     private val settingsIcon = context.getDrawable(R.drawable.ic_settings)?.mutate()
 
     fun applySettings(newTheme: KeyboardTheme) {
@@ -60,10 +62,17 @@ class ToolbarView(context: Context) : View(context) {
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dp(40f).roundToInt())
     }
 
+    // www-nappi on tekstin vuoksi leveämpi kuin kuvakenapit.
+    private fun buttonWidth(tool: Tool, size: Float): Float =
+        if (tool == Tool.WEB) size * 1.6f else size
+
     private fun buttonRect(index: Int): RectF {
         val size = height - dp(8f)
-        val left = dp(6f) + index * (size + dp(6f))
-        return RectF(left, dp(4f), left + size, dp(4f) + size)
+        var left = dp(6f)
+        for (i in 0 until index) {
+            left += buttonWidth(tools[i], size) + dp(6f)
+        }
+        return RectF(left, dp(4f), left + buttonWidth(tools[index], size), dp(4f) + size)
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -77,12 +86,23 @@ class ToolbarView(context: Context) : View(context) {
                 else -> theme.specialKey
             }
             canvas.drawRoundRect(rect, dp(8f), dp(8f), buttonPaint)
+            val contentColor = if (active) theme.accentText else theme.text
+            if (tool == Tool.WEB) {
+                labelPaint.color = contentColor
+                labelPaint.textSize = rect.height() * 0.42f
+                canvas.drawText(
+                    "www",
+                    rect.centerX(),
+                    rect.centerY() + labelPaint.textSize * 0.35f,
+                    labelPaint,
+                )
+                return@forEachIndexed
+            }
             val icon = when (tool) {
                 Tool.ARROWS -> cursorIcon
-                Tool.WEB -> webIcon
-                Tool.SETTINGS -> settingsIcon
+                else -> settingsIcon
             } ?: return@forEachIndexed
-            icon.setTint(if (active) theme.accentText else theme.text)
+            icon.setTint(contentColor)
             val iconSize = (rect.height() * 0.62f).roundToInt()
             val cx = rect.centerX().roundToInt()
             val cy = rect.centerY().roundToInt()

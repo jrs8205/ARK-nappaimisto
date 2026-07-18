@@ -39,6 +39,7 @@ class KeyboardView(context: Context) : View(context) {
         fun onText(text: String)
         fun onKey(action: KeyAction)
         fun onSpaceSwipe(steps: Int)
+        fun onSpaceSwipeVertical(steps: Int)
     }
 
     var listener: Listener? = null
@@ -89,8 +90,12 @@ class KeyboardView(context: Context) : View(context) {
     private var rowHeight = 0f
     private var bottomInset = 0
 
+    private enum class SpaceAxis { NONE, HORIZONTAL, VERTICAL }
+
     private inner class PressInfo(val bounded: BoundedKey) {
         var spaceAnchorX = 0f
+        var spaceAnchorY = 0f
+        var spaceAxis = SpaceAxis.NONE
         var spaceSwiping = false
         var committed = false
         var alternatesOpen = false
@@ -287,7 +292,7 @@ class KeyboardView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_MOVE -> {
                 for (i in 0 until event.pointerCount) {
-                    handleMove(event.getPointerId(i), event.getX(i))
+                    handleMove(event.getPointerId(i), event.getX(i), event.getY(i))
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
@@ -320,6 +325,7 @@ class KeyboardView(context: Context) : View(context) {
             }
             if (key.action == KeyAction.Space) {
                 info.spaceAnchorX = x
+                info.spaceAnchorY = y
             }
             if (previewEnabled && key.action is KeyAction.Text) {
                 showPreview(bounded)
@@ -328,22 +334,48 @@ class KeyboardView(context: Context) : View(context) {
         invalidate()
     }
 
-    private fun handleMove(pointerId: Int, x: Float) {
+    private fun handleMove(pointerId: Int, x: Float, y: Float) {
         val info = pressed[pointerId] ?: return
         if (info.alternatesOpen) {
             updateAlternateSelection(x)
             return
         }
-        if (info.bounded.key.action == KeyAction.Space) {
-            val threshold = dp(16f)
-            var dx = x - info.spaceAnchorX
-            while (abs(dx) >= threshold) {
-                val step = if (dx > 0) 1 else -1
-                listener?.onSpaceSwipe(step)
-                info.spaceAnchorX += step * threshold
-                info.spaceSwiping = true
-                dx = x - info.spaceAnchorX
+        if (info.bounded.key.action != KeyAction.Space) return
+        val hThreshold = dp(16f)
+        val vThreshold = dp(24f)
+        if (info.spaceAxis == SpaceAxis.NONE) {
+            // Akseli valitaan vasta selvästi hallitsevasta liikkeestä, eivätkä
+            // suunnat sekoitu saman painalluksen aikana.
+            val dx = x - info.spaceAnchorX
+            val dy = y - info.spaceAnchorY
+            if (abs(dx) >= hThreshold && abs(dx) > abs(dy) * AXIS_DOMINANCE) {
+                info.spaceAxis = SpaceAxis.HORIZONTAL
+            } else if (abs(dy) >= vThreshold && abs(dy) > abs(dx) * AXIS_DOMINANCE) {
+                info.spaceAxis = SpaceAxis.VERTICAL
             }
+        }
+        when (info.spaceAxis) {
+            SpaceAxis.HORIZONTAL -> {
+                var dx = x - info.spaceAnchorX
+                while (abs(dx) >= hThreshold) {
+                    val step = if (dx > 0) 1 else -1
+                    listener?.onSpaceSwipe(step)
+                    info.spaceAnchorX += step * hThreshold
+                    info.spaceSwiping = true
+                    dx = x - info.spaceAnchorX
+                }
+            }
+            SpaceAxis.VERTICAL -> {
+                var dy = y - info.spaceAnchorY
+                while (abs(dy) >= vThreshold) {
+                    val step = if (dy > 0) 1 else -1
+                    listener?.onSpaceSwipeVertical(step)
+                    info.spaceAnchorY += step * vThreshold
+                    info.spaceSwiping = true
+                    dy = y - info.spaceAnchorY
+                }
+            }
+            SpaceAxis.NONE -> Unit
         }
     }
 
@@ -528,5 +560,6 @@ class KeyboardView(context: Context) : View(context) {
     private companion object {
         const val REPEAT_DELAY_MS = 400L
         const val REPEAT_INTERVAL_MS = 50L
+        const val AXIS_DOMINANCE = 1.5f
     }
 }

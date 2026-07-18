@@ -528,6 +528,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
     }
 
+    override fun onSpaceSwipeVertical(steps: Int) {
+        sendDownUpKeyEvents(
+            if (steps > 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP
+        )
+        learning.resetContext()
+        if (vibrationEnabled) {
+            keyboardView?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
+    }
+
     private fun handleShift() {
         val now = SystemClock.uptimeMillis()
         shiftState = when (shiftState) {

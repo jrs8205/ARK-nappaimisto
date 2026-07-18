@@ -6,10 +6,11 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
+import org.jarsi.ark.R
 import org.jarsi.ark.theme.KeyboardTheme
 import kotlin.math.roundToInt
 
-/** Työkalurivi ehdotusrivin yläpuolella: nuolitila ja asetukset. */
+/** Työkalurivi ehdotusrivin yläpuolella: kursorinsiirtotila ja asetukset. */
 class ToolbarView(context: Context) : View(context) {
 
     interface Listener {
@@ -19,7 +20,7 @@ class ToolbarView(context: Context) : View(context) {
 
     var listener: Listener? = null
 
-    /** Korostaa nuolinapin, kun nuolitila on päällä. */
+    /** Korostaa kursorinapin, kun nuolitila on päällä. */
     var arrowsActive = false
         set(value) {
             field = value
@@ -33,17 +34,13 @@ class ToolbarView(context: Context) : View(context) {
     private fun dp(value: Float) = value * density
 
     private val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        textAlign = Paint.Align.CENTER
-    }
-    private val iconStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
 
     private enum class Tool { ARROWS, SETTINGS }
 
     private val tools = listOf(Tool.ARROWS, Tool.SETTINGS)
+
+    private val cursorIcon = context.getDrawable(R.drawable.ic_cursor_move)?.mutate()
+    private val settingsIcon = context.getDrawable(R.drawable.ic_settings)?.mutate()
 
     fun applySettings(newTheme: KeyboardTheme) {
         theme = newTheme
@@ -71,41 +68,17 @@ class ToolbarView(context: Context) : View(context) {
                 else -> theme.specialKey
             }
             canvas.drawRoundRect(rect, dp(8f), dp(8f), buttonPaint)
-            val iconColor = if (active) theme.accentText else theme.text
-            when (tool) {
-                Tool.ARROWS -> drawArrowsIcon(canvas, rect, iconColor)
-                Tool.SETTINGS -> {
-                    iconPaint.color = iconColor
-                    iconPaint.textSize = rect.height() * 0.55f
-                    canvas.drawText(
-                        "⚙",
-                        rect.centerX(),
-                        rect.centerY() + iconPaint.textSize * 0.35f,
-                        iconPaint,
-                    )
-                }
-            }
+            val icon = when (tool) {
+                Tool.ARROWS -> cursorIcon
+                Tool.SETTINGS -> settingsIcon
+            } ?: return@forEachIndexed
+            icon.setTint(if (active) theme.accentText else theme.text)
+            val iconSize = (rect.height() * 0.62f).roundToInt()
+            val cx = rect.centerX().roundToInt()
+            val cy = rect.centerY().roundToInt()
+            icon.setBounds(cx - iconSize / 2, cy - iconSize / 2, cx + iconSize / 2, cy + iconSize / 2)
+            icon.draw(canvas)
         }
-    }
-
-    /** Nelisuuntainen nuolikuvake piirretään viivoina, jotta se näkyy joka laitteella. */
-    private fun drawArrowsIcon(canvas: Canvas, rect: RectF, color: Int) {
-        iconStroke.color = color
-        iconStroke.strokeWidth = dp(1.8f)
-        val cx = rect.centerX()
-        val cy = rect.centerY()
-        val r = rect.width() * 0.28f
-        val a = rect.width() * 0.12f
-        canvas.drawLine(cx - r, cy, cx + r, cy, iconStroke)
-        canvas.drawLine(cx, cy - r, cx, cy + r, iconStroke)
-        canvas.drawLine(cx + r, cy, cx + r - a, cy - a, iconStroke)
-        canvas.drawLine(cx + r, cy, cx + r - a, cy + a, iconStroke)
-        canvas.drawLine(cx - r, cy, cx - r + a, cy - a, iconStroke)
-        canvas.drawLine(cx - r, cy, cx - r + a, cy + a, iconStroke)
-        canvas.drawLine(cx, cy - r, cx - a, cy - r + a, iconStroke)
-        canvas.drawLine(cx, cy - r, cx + a, cy - r + a, iconStroke)
-        canvas.drawLine(cx, cy + r, cx - a, cy + r - a, iconStroke)
-        canvas.drawLine(cx, cy + r, cx + a, cy + r - a, iconStroke)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

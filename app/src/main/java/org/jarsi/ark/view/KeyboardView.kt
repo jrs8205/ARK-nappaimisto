@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.Gravity
@@ -16,6 +17,7 @@ import android.view.ViewConfiguration
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
+import org.jarsi.ark.R
 import org.jarsi.ark.keyboard.Key
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.KeyboardLayout
@@ -72,6 +74,12 @@ class KeyboardView(context: Context) : View(context) {
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.RIGHT
     }
+
+    // Erikoisnäppäinten vektorikuvakkeet; mutate erottaa sävytykset toisistaan.
+    private val enterIcon = context.getDrawable(R.drawable.ic_enter)?.mutate()
+    private val shiftIcon = context.getDrawable(R.drawable.ic_shift)?.mutate()
+    private val shiftCapsIcon = context.getDrawable(R.drawable.ic_shift_caps)?.mutate()
+    private val backspaceIcon = context.getDrawable(R.drawable.ic_backspace)?.mutate()
 
     private class BoundedKey(val key: Key, val rect: RectF, val row: Int)
 
@@ -203,15 +211,34 @@ class KeyboardView(context: Context) : View(context) {
         else -> theme.specialKey
     }
 
+    private fun iconFor(key: Key): Drawable? = when (key.action) {
+        // Enter-kuvake vain kun näppäimellä ei ole toimintatekstiä (Hae, Lähetä…).
+        KeyAction.Enter -> if (enterText == "⏎") enterIcon else null
+        KeyAction.Shift -> if (shiftState == ShiftState.CAPS) shiftCapsIcon else shiftIcon
+        KeyAction.Backspace -> backspaceIcon
+        else -> null
+    }
+
     private fun drawLabel(canvas: Canvas, key: Key, rect: RectF) {
         val label = labelFor(key)
         val accentKey = key.action == KeyAction.Enter ||
             (key.action == KeyAction.Shift && shiftState != ShiftState.OFF)
-        labelPaint.color = when {
+        val contentColor = when {
             key.action == KeyAction.Space -> theme.hint
             accentKey -> theme.accentText
             else -> theme.text
         }
+        val icon = iconFor(key)
+        if (icon != null) {
+            icon.setTint(contentColor)
+            val size = (rowHeight * 0.42f).roundToInt()
+            val cx = rect.centerX().roundToInt()
+            val cy = rect.centerY().roundToInt()
+            icon.setBounds(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2)
+            icon.draw(canvas)
+            return
+        }
+        labelPaint.color = contentColor
         labelPaint.textSize = when {
             key.action == KeyAction.Space -> rowHeight * 0.26f
             label.length > 2 -> rowHeight * 0.28f

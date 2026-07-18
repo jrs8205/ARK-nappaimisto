@@ -10,10 +10,13 @@ Tämä dokumentti kattaa leikepöytänäkymän (kokonaissuunnitelman kohdat 4 ja
   näppäinalueen tilalle, kuten nuolitila; sama nappi (korostettuna)
   sulkee sen.
 * Näkymässä on vieritettävä lista leikkeistä: **kiinnitetyt ensin**,
-  sitten muut uusin ylimpänä. Pitkät leikkeet näytetään lyhennettyinä,
-  mutta syöttö vie koko sisällön.
-* **Napautus syöttää leikkeen tekstikenttään.** Pitkä painallus avaa
-  tutun liu'utusvalikon: Kiinnitä / Poista kiinnitys ja Poista.
+  sitten muut uusin ylimpänä. Pitkät tekstit näytetään lyhennettyinä,
+  mutta syöttö vie koko sisällön. **Kuvaleikkeet** näytetään
+  pikkukuvina.
+* **Napautus syöttää leikkeen kenttään.** Tekstit syötetään aina;
+  kuva syötetään, jos kenttä ottaa kuvia vastaan (esim.
+  viestisovellukset) — muuten näytetään lyhyt ilmoitus. Pitkä painallus
+  avaa tutun liu'utusvalikon: Kiinnitä / Poista kiinnitys ja Poista.
 * Tyhjä leikepöytä näyttää lyhyen ohjetekstin.
 
 ## 2. Keräys ja tallennus
@@ -21,6 +24,11 @@ Tämä dokumentti kattaa leikepöytänäkymän (kokonaissuunnitelman kohdat 4 ja
 * Näppäimistö kuuntelee leikepöytää ja tallentaa uudet kopiot
   paikalliseen tietokantaan (uusi leiketaulu; versio nousee
   lisäysmigraatiolla — olemassa oleva data säilyy).
+* **Kuvaleikkeen sisältö kopioidaan sovelluksen omaan tallennustilaan**
+  (lähdesovelluksen käyttöoikeus vanhenee muuten nopeasti); tiedosto
+  poistetaan, kun leike vanhenee tai poistetaan. Kuvan syöttö kenttään
+  tehdään Androidin sisällönsyöttörajapinnalla, ja vastaanottava
+  sovellus saa lukuoikeuden vain kyseiseen kuvaan.
 * **Vanheneminen**: kiinnittämätön leike vanhenee **1 tunnissa**;
   kiinnitetty säilyy kunnes käyttäjä poistaa sen. Kiinnittämättömiä
   pidetään enintään 20 tuoreinta. Vanhentuneet siivotaan latauksen ja
@@ -46,6 +54,6 @@ Tämä dokumentti kattaa leikepöytänäkymän (kokonaissuunnitelman kohdat 4 ja
 
 ## 5. Ulkopuolelle jää
 
-Kuva- ja muut ei-tekstileikkeet, leikkeiden muokkaus, tekstipohjat
-(vaihe 8) sekä leikepöydän ehdotusintegraatio (tuore kopio ehdotusrivillä
-— harkitaan myöhemmin käyttökokemuksen perusteella).
+Muut tiedostotyypit kuin teksti ja kuvat, leikkeiden muokkaus,
+tekstipohjat (vaihe 8) sekä leikepöydän ehdotusintegraatio (tuore kopio
+ehdotusrivillä — harkitaan myöhemmin käyttökokemuksen perusteella).

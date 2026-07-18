@@ -229,6 +229,23 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         suggestionBar = SuggestionBarView(this).also {
             it.listener = ::onSuggestionPicked
+            it.menuListener = object : SuggestionBarView.MenuListener {
+                override fun isOwnWord(word: String) = learning.isOwnWord(word)
+
+                override fun onDeleteLearned(word: String) {
+                    learning.removeWord(word)
+                    flushLearned()
+                    updateSuggestions()
+                    feedback()
+                }
+
+                override fun onBlockWord(word: String) {
+                    learning.blockWord(word)
+                    flushLearned()
+                    updateSuggestions()
+                    feedback()
+                }
+            }
             container.addView(it, LinearLayout.LayoutParams(params))
         }
         keyboardView = KeyboardView(this).also {

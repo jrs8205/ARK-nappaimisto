@@ -56,4 +56,28 @@ class WordToolsTest {
     @Test
     fun `piste ilman jatkoa ei kuulu sanaan`() =
         assertEquals("", WordTools.currentWord("jarsi."))
+
+    @Test
+    fun `edellinen sana rivinvaihdon yli`() =
+        assertEquals(listOf("prx4"), WordTools.previousWords("prx4\n"))
+
+    @Test
+    fun `kaksi edellista sanaa`() =
+        assertEquals(listOf("Jako", "20"), WordTools.previousWords("Jako 20 "))
+
+    @Test
+    fun `keskeneraista sanaa ei lasketa edeltaviin`() =
+        assertEquals(listOf("Jako", "20"), WordTools.previousWords("prx4\nJako 20 nouto"))
+
+    @Test
+    fun `lauseen loppupiste ohitetaan`() =
+        assertEquals(listOf("sana"), WordTools.previousWords("sana. ", 1))
+
+    @Test
+    fun `tyhja teksti antaa tyhjat edeltavat`() =
+        assertEquals(emptyList<String>(), WordTools.previousWords(""))
+
+    @Test
+    fun `count rajaa edeltavien maaran`() =
+        assertEquals(listOf("c"), WordTools.previousWords("a b c ", 1))
 }

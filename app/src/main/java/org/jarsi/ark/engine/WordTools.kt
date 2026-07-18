@@ -22,4 +22,24 @@ object WordTools {
         return textBefore.subSequence(start, textBefore.length).toString()
             .trimStart('-', '.')
     }
+
+    /**
+     * Palauttaa enintään [count] valmista sanaa kursorin keskeneräisen sanan
+     * edeltä aikajärjestyksessä (lähin viimeisenä). Erottimet — välilyönnit,
+     * rivinvaihdot ja välimerkit — ohitetaan, joten ennustus toimii myös
+     * rivinvaihtojen yli.
+     */
+    fun previousWords(textBefore: CharSequence, count: Int = 2): List<String> {
+        val words = ArrayDeque<String>()
+        var end = textBefore.length - currentWord(textBefore).length
+        while (words.size < count && end > 0) {
+            while (end > 0 && !isCore(textBefore[end - 1])) end--
+            if (end == 0) break
+            val word = currentWord(textBefore.subSequence(0, end))
+            if (word.isEmpty()) break
+            words.addFirst(word)
+            end -= word.length
+        }
+        return words.toList()
+    }
 }

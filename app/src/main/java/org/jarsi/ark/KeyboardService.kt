@@ -154,8 +154,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         keyboardView?.enterText = enterLabel(info)
         shiftState = ShiftState.OFF
         manualShift = false
+        spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
+        commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
         // Salasanakentissä ehdotusrivi on aina piilossa eikä tekstiä lueta.
-        suggestionsVisible = !passwordField
+        suggestionsVisible = prefs.getBoolean("ehdotukset", true) &&
+            !passwordField &&
+            (page != Page.NUMERIC || prefs.getBoolean("ehdotus_numerot", false))
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         updateLayout()
         updateAutoCaps()

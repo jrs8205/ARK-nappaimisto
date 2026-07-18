@@ -205,6 +205,8 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
             }
             val content = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.VERTICAL
+                // Pystytäyte vain sisällölle; ikonipalsta ulottuu kortin reunoihin.
+                setPadding(0, dp(8), 0, dp(8))
                 addView(
                     text,
                     LinearLayout.LayoutParams(
@@ -220,10 +222,10 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
             // Ikonit pysyvät pieninä, mutta kosketusalueet ovat n. 44 dp,
             // jotta ⋮:hen ja neulaan osuu varmasti eikä kortti liity vahingossa.
             val more = ImageView(parent.context).apply {
-                setPadding(dp(11), dp(8), dp(11), dp(10))
+                setPadding(dp(11), dp(4), dp(11), dp(14))
             }
             val pin = ImageView(parent.context).apply {
-                setPadding(dp(11), dp(10), dp(11), dp(8))
+                setPadding(dp(11), dp(14), dp(11), dp(4))
             }
             val side = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.VERTICAL
@@ -239,7 +241,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                 // Minimikorkeus korttiin asti, jotta molemmat kosketusalueet
                 // mahtuvat aina kokonaan näkyviin.
                 minimumHeight = dp(96)
-                setPadding(dp(12), dp(8), dp(4), dp(8))
+                setPadding(dp(12), 0, dp(4), 0)
                 addView(
                     content,
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),

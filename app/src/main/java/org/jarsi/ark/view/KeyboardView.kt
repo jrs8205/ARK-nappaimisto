@@ -10,6 +10,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.WindowInsets
 import android.view.MotionEvent
 import android.view.View
@@ -58,6 +59,7 @@ class KeyboardView(context: Context) : View(context) {
     private var theme: KeyboardTheme = KeyboardTheme.load(context)
     private var heightScale = 1f
     private var previewEnabled = true
+    private var hapticsEnabled = true
 
     private val fiLocale = Locale.forLanguageTag("fi")
     private val density = resources.displayMetrics.density
@@ -124,9 +126,10 @@ class KeyboardView(context: Context) : View(context) {
         invalidate()
     }
 
-    fun applySettings(newTheme: KeyboardTheme, scale: Float, preview: Boolean) {
+    fun applySettings(newTheme: KeyboardTheme, scale: Float, preview: Boolean, haptics: Boolean) {
         theme = newTheme
         previewEnabled = preview
+        hapticsEnabled = haptics
         if (heightScale != scale) {
             heightScale = scale
             requestLayout()
@@ -442,6 +445,10 @@ class KeyboardView(context: Context) : View(context) {
         if (index != alternateSelected) {
             alternateSelected = index
             updateAlternateHighlight()
+            // Kevyt napsaus jokaisesta valinnan vaihtumisesta, kuten kursoriliu'utuksessa.
+            if (hapticsEnabled) {
+                performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
         }
     }
 

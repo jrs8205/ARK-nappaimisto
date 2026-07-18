@@ -64,7 +64,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // Ulkoasuasetukset otetaan käyttöön heti asetuksissa vaihdettaessa, jotta
     // näppäimistö on jo oikeassa teemassa kun asetuksista palataan.
     private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key == "teema" || key == "korkeus" || key == "esikatselu") {
+        if (key == "teema" || key == "korkeus" || key == "esikatselu" || key == "varina") {
             applyVisualSettings()
         }
     }
@@ -93,11 +93,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun applyVisualSettings() {
         val theme = KeyboardTheme.load(this, prefs.getString("teema", "jarjestelma"))
         val heightScale = prefs.getInt("korkeus", 100) / 100f
+        vibrationEnabled = prefs.getBoolean("varina", true)
         keyboardView?.applySettings(
             theme,
             heightScale,
             // Salasanakentässä esikatselukupla jää pois, ettei syöte näy sivullisille.
             prefs.getBoolean("esikatselu", true) && !passwordField,
+            vibrationEnabled,
         )
         suggestionBar?.applySettings(theme, heightScale)
         toolbar?.applySettings(theme)
@@ -128,6 +130,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
 
                 override fun onOpenSettings() {
+                    // Näppäimistö suljetaan ensin, ettei se jää sovelluksen
+                    // ruutukaappaukseen ja välähdä vanhalla teemalla palattaessa.
+                    requestHideSelf(0)
                     startActivity(
                         Intent(this@KeyboardService, SettingsActivity::class.java)
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -183,10 +188,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         manualShift = false
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
-        // Salasanakentissä ehdotusrivi on aina piilossa eikä tekstiä lueta.
+        // Salasana- ja numerokentissä ehdotusrivi on aina piilossa.
         suggestionsVisible = prefs.getBoolean("ehdotukset", true) &&
             !passwordField &&
-            (page != Page.NUMERIC || prefs.getBoolean("ehdotus_numerot", false))
+            page != Page.NUMERIC
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         updateLayout()
         updateAutoCaps()

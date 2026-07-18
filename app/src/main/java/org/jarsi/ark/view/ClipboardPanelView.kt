@@ -264,7 +264,8 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
             val image = content.getChildAt(1) as ImageView
             val side = row.getChildAt(1) as LinearLayout
             val more = side.getChildAt(0) as ImageView
-            val pin = side.getChildAt(1) as ImageView
+            // Indeksissä 1 on venyvä Space; neula on sen jälkeen.
+            val pin = side.getChildAt(2) as ImageView
 
             row.background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()

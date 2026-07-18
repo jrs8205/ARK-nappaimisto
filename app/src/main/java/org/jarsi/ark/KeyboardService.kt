@@ -30,7 +30,7 @@ import java.util.concurrent.Executors
 /** ARK-näppäimistön pääpalvelu. */
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
-    private enum class Page { LETTERS, SYMBOLS1, SYMBOLS2, NUMERIC, ARROWS }
+    private enum class Page { LETTERS, SYMBOLS1, SYMBOLS2, SYMBOLS3, NUMERIC, ARROWS }
 
     private var keyboardView: KeyboardView? = null
     private var suggestionBar: SuggestionBarView? = null
@@ -193,6 +193,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         val before = currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        // Lauseen alussa (automaattinen iso kirjain päällä) ehdotukset alkavat isolla.
+        val shiftActive = shiftState != ShiftState.OFF
         val generation = ++suggestGeneration
         suggestExecutor.execute {
             val word = WordTools.currentWord(before)
@@ -201,7 +203,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 commonWordsEnabled -> dictionary.topWords()
                 else -> emptyList()
             }
-            if (word.isNotEmpty() && word.first().isUpperCase()) {
+            val capitalize = if (word.isEmpty()) shiftActive else word.first().isUpperCase()
+            if (capitalize) {
                 result = result.map { s -> s.replaceFirstChar { it.titlecase(fiLocale) } }
             }
             if (generation == suggestGeneration) {
@@ -240,6 +243,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             Page.LETTERS -> Layouts.letters(extraKey)
             Page.SYMBOLS1 -> Layouts.symbols1
             Page.SYMBOLS2 -> Layouts.symbols2
+            Page.SYMBOLS3 -> Layouts.symbols3
             Page.NUMERIC -> Layouts.numeric
             Page.ARROWS -> Layouts.arrows
         }
@@ -262,7 +266,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         autoSpaceState = 0
-        val output = if (shiftState != ShiftState.OFF) text.uppercase(fiLocale) else text
+        // Vain yksittäiset merkit shiftautuvat; esim. verkko-osoitepalat pysyvät ennallaan.
+        val output = if (shiftState != ShiftState.OFF && text.length == 1) {
+            text.uppercase(fiLocale)
+        } else {
+            text
+        }
         ic.commitText(output, 1)
         if (shiftState == ShiftState.SHIFT) {
             shiftState = ShiftState.OFF
@@ -298,6 +307,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             KeyAction.SymbolsMore -> {
                 page = Page.SYMBOLS2
+                updateLayout()
+                feedback()
+            }
+            KeyAction.SymbolsWeb -> {
+                page = Page.SYMBOLS3
                 updateLayout()
                 feedback()
             }

@@ -13,4 +13,7 @@ interface LearnedDao {
     @Upsert fun upsertBigrams(bigrams: List<BigramEntity>)
     @Upsert fun upsertTrigrams(trigrams: List<TrigramEntity>)
     @Query("DELETE FROM words WHERE `key` = :key") fun deleteWord(key: String)
+    @Query("DELETE FROM words") fun deleteAllWords()
+    @Query("DELETE FROM bigrams") fun deleteAllBigrams()
+    @Query("DELETE FROM trigrams") fun deleteAllTrigrams()
 }

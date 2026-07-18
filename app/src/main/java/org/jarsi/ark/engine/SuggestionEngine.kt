@@ -52,18 +52,27 @@ class SuggestionEngine(
         max: Int,
     ): List<String> {
         val maxFreq = dictionary.maxFrequency()
-        return candidateKeys
-            .mapNotNull { key ->
-                val signals = learning.signals(key)
-                if (signals?.blocked == true) return@mapNotNull null
-                key to score(key, signals, contextMatches[key], maxFreq)
-            }
-            .sortedByDescending { it.second }
+        val candidates = candidateKeys.mapNotNull { key ->
+            val signals = learning.signals(key)
+            if (signals?.blocked == true) return@mapNotNull null
+            Candidate(key, baseScore(key, signals, contextMatches[key], maxFreq), signals?.pinned == true)
+        }
+        // Kiinnitysbonus vain kahdelle parhaalle, etteivät kiinnitetyt sanat
+        // täytä koko riviä, jos samalla alulla on monta kiinnitystä.
+        val bonusKeys = candidates
+            .filter { it.pinned }
+            .sortedByDescending { it.base }
+            .take(PINNED_TOP)
+            .mapTo(HashSet()) { it.key }
+        return candidates
+            .sortedByDescending { it.base + if (it.key in bonusKeys) PINNED_WEIGHT else 0f }
             .take(max)
-            .map { learning.displayForm(it.first) }
+            .map { learning.displayForm(it.key) }
     }
 
-    private fun score(
+    private class Candidate(val key: String, val base: Float, val pinned: Boolean)
+
+    private fun baseScore(
         key: String,
         signals: WordSignals?,
         match: NextMatch?,
@@ -82,7 +91,6 @@ class SuggestionEngine(
             score += signals.usage / (signals.usage + 5f) * USAGE_WEIGHT
             score += signals.acceptedCount / (signals.acceptedCount + 3f) * ACCEPTED_WEIGHT
             if (signals.manuallyTyped) score += MANUAL_WEIGHT
-            if (signals.pinned) score += PINNED_WEIGHT
             if (signals.ignoredCount >= IGNORED_THRESHOLD) {
                 score -= signals.ignoredCount / (signals.ignoredCount + 3f) * IGNORED_WEIGHT
             }
@@ -94,6 +102,7 @@ class SuggestionEngine(
         const val DICTIONARY_CANDIDATES = 12
         const val OWN_CANDIDATES = 10
         const val IGNORED_THRESHOLD = 2
+        const val PINNED_TOP = 2
 
         // Kokonaissuunnitelman kohdan 22 painokertoimet.
         const val FREQUENCY_WEIGHT = 1.0f

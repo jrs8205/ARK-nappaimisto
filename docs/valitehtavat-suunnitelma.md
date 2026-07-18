@@ -35,6 +35,11 @@ Välilyönnin kursoriliu'utus laajenee pystysuuntaan:
   **jos liike ei tunnu laitteella tarkalta, koko ominaisuus poistetaan**
   (käyttäjän asettama ehto).
 
+**Lopputulos (18.7.2026):** kokeiltu laitteella ja **poistettu**. Ele toimi
+teknisesti, mutta alaspäin ylsi vain noin kolme riviä ennen kuin sormi
+osui puhelimen alareunaan. Välilyönnin liu'utus palautettiin pelkkään
+vaakasuuntaan; rivinvaihdot hoituvat nuolitilalla.
+
 ## 3. Yleissanaston täydennys Kotuksen sanalistalla
 
 * `tools/sanalista.py` saa valinnaisen parametrin Kotuksen nykysuomen

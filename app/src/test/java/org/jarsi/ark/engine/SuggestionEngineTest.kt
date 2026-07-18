@@ -94,6 +94,15 @@ class SuggestionEngineTest {
     }
 
     @Test
+    fun `kiinnitysbonus rajautuu kahteen`() {
+        val (s, l) = build("maa 100", "meri 90", "metsa 80", "mies 70")
+        l.setPinned("meri", true)
+        l.setPinned("metsa", true)
+        l.setPinned("mies", true)
+        assertEquals(listOf("meri", "metsa", "maa", "mies"), s.suggest("m").take(4))
+    }
+
+    @Test
     fun `yksi ohitus ei viela rankaise`() {
         val (s, l) = build("auto 100", "autio 50")
         l.onSuggestionsIgnored(listOf("auto"), "muu")

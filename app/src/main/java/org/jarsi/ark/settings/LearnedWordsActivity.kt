@@ -6,6 +6,7 @@ import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -73,10 +74,26 @@ class LearnedWordsActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@LearnedWordsActivity)
             adapter = this@LearnedWordsActivity.adapter
         }
+        val clearButton = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
+            text = getString(R.string.opitut_tyhjenna)
+            setOnClickListener { confirmClearAll() }
+        }
+        val topRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(search, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(
+                clearButton,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(
-                search,
+                topRow,
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -174,6 +191,33 @@ class LearnedWordsActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun confirmClearAll() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.opitut_tyhjenna)
+            .setMessage(R.string.opitut_tyhjenna_varmistus)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.opitut_tyhjenna) { _, _ -> clearAll() }
+            .show()
+    }
+
+    private fun clearAll() {
+        val db = database ?: return
+        ioExecutor.execute {
+            try {
+                db.dao().deleteAllWords()
+                db.dao().deleteAllBigrams()
+                db.dao().deleteAllTrigrams()
+                LearnedDataStamp.bump()
+                runOnUiThread {
+                    allWords = emptyList()
+                    refreshList()
+                }
+            } catch (e: Exception) {
+                // Tyhjennysvirhe ei kaada näkymää; lista jää ennalleen.
+            }
+        }
+    }
+
     private fun mutate(entity: WordEntity, change: (LearnedDatabase) -> Unit) {
         val db = database ?: return
         ioExecutor.execute {
@@ -252,10 +296,10 @@ class LearnedWordsActivity : AppCompatActivity() {
                     meta.text = buildString {
                         append(getString(R.string.opitut_kaytto, item.entity.count))
                         if (item.entity.pinned) {
-                            append(" • ").append(getString(R.string.ehdotus_kiinnita))
+                            append(" • ").append(getString(R.string.opitut_kiinnitetty))
                         }
                         if (item.entity.blocked) {
-                            append(" • ").append(getString(R.string.ehdotus_esta))
+                            append(" • ").append(getString(R.string.opitut_estetty))
                         }
                     }
                     column.setOnClickListener { showActions(item.entity) }

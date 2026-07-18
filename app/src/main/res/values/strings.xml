@@ -31,6 +31,10 @@
     <string name="opitut_salli">Salli taas</string>
     <string name="opitut_tyhja">Ei vielä opittuja sanoja</string>
     <string name="opitut_kaytto">%d käyttöä</string>
+    <string name="opitut_kiinnitetty">Kiinnitetty</string>
+    <string name="opitut_estetty">Estetty</string>
+    <string name="opitut_tyhjenna">Tyhjennä kaikki</string>
+    <string name="opitut_tyhjenna_varmistus">Poistetaanko kaikki opitut sanat ja sanaketjut? Tätä ei voi perua.</string>
 
     <string name="ehdotus_kiinnita">Kiinnitä</string>
     <string name="ehdotus_irrota">Poista kiinnitys</string>

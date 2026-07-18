@@ -116,6 +116,12 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   poisto ja koko oppimishistorian tyhjennys
 * yleissanasto 170 100 sanaa: Parole-taajuuslista täydennettynä Kotuksen
   Nykysuomen sanalistalla (ks. [docs/sanalista.md](docs/sanalista.md))
+* jatkuva sanelu työkalurivin mikrofonista: miettimistauko ei katkaise,
+  ja sanelu päättyy hiljaisuuteen, mikrofonin napautukseen tai kentän
+  vaihtumiseen (esim. viestin lähetys). Puhe käsitellään laitteen
+  puheentunnistuspalvelussa — ensisijaisesti laitteella; jos suomen
+  laitemallia ei ole, laitteen palvelu voi käyttää verkkoa. Sanellut
+  sanat oppivat kuten kirjoitetut.
 
 ## Yksityisyys
 

@@ -52,6 +52,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var spaceAfterSuggestion = true
     private var commonWordsEnabled = true
 
+    // 2 = automaattinen välilyönti juuri lisätty, 1 = commitin oma kursoripäivitys
+    // ohitettu, 0 = ei voimassa. Välimerkki imaisee välin vain tilassa > 0.
+    private var autoSpaceState = 0
+
     private val fiLocale = Locale.forLanguageTag("fi")
 
     override fun onCreate() {
@@ -86,6 +90,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     page = if (page == Page.ARROWS) Page.LETTERS else Page.ARROWS
                     toolbar?.arrowsActive = page == Page.ARROWS
                     updateLayout()
+                    updateSuggestions()
                     feedback()
                 }
 
@@ -170,8 +175,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val ic = currentInputConnection ?: return
         val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
         val current = WordTools.currentWord(before)
+        ic.beginBatchEdit()
         if (current.isNotEmpty()) ic.deleteSurroundingText(current.length, 0)
         ic.commitText(if (spaceAfterSuggestion) "$word " else word, 1)
+        ic.endBatchEdit()
+        autoSpaceState = if (spaceAfterSuggestion) 2 else 0
         feedback()
         updateAutoCaps()
         updateSuggestions()
@@ -179,7 +187,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun updateSuggestions() {
         val bar = suggestionBar ?: return
-        if (!suggestionsVisible) {
+        // Nuolitilassa kursoria liikutellaan tekstin yli; ehdotukset olisivat vain häiriöksi.
+        if (!suggestionsVisible || page == Page.ARROWS) {
             bar.setSuggestions(emptyList())
             return
         }
@@ -240,6 +249,19 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onText(text: String) {
         val ic = currentInputConnection ?: return
+        if (autoSpaceState > 0 && text.length == 1 && text[0] in AUTO_SPACE_PUNCTUATION &&
+            ic.getTextBeforeCursor(1, 0)?.toString() == " "
+        ) {
+            // Ehdotuksen lisäämä välilyönti siirtyy välimerkin taakse: "sana ." -> "sana. "
+            ic.beginBatchEdit()
+            ic.deleteSurroundingText(1, 0)
+            ic.commitText(text + " ", 1)
+            ic.endBatchEdit()
+            autoSpaceState = 2
+            feedback()
+            return
+        }
+        autoSpaceState = 0
         val output = if (shiftState != ShiftState.OFF) text.uppercase(fiLocale) else text
         ic.commitText(output, 1)
         if (shiftState == ShiftState.SHIFT) {
@@ -251,6 +273,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     override fun onKey(action: KeyAction) {
+        // Tekstiä muuttava näppäin katkaisee automaattivälin seurannan.
+        when (action) {
+            KeyAction.Backspace, KeyAction.Enter, KeyAction.Space, is KeyAction.Arrow ->
+                autoSpaceState = 0
+            else -> Unit
+        }
         when (action) {
             KeyAction.Shift -> handleShift()
             KeyAction.Backspace -> {
@@ -278,6 +306,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 toolbar?.arrowsActive = false
                 updateLayout()
                 updateAutoCaps()
+                updateSuggestions()
                 feedback()
             }
             is KeyAction.Arrow -> {
@@ -367,6 +396,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd
         )
         updateAutoCaps()
+        if (autoSpaceState > 0) autoSpaceState--
         updateSuggestions()
     }
 
@@ -382,5 +412,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private companion object {
         const val DOUBLE_TAP_CAPS_MS = 350L
         const val MAX_WORD_LOOKBACK = 48
+        const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
     }
 }

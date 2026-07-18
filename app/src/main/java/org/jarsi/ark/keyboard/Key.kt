@@ -10,6 +10,12 @@ sealed interface KeyAction {
     data object Symbols : KeyAction
     data object SymbolsMore : KeyAction
     data object Letters : KeyAction
+
+    /** Nuolinäppäin: lähettää annetun näppäinkoodin (DPAD-suunnat). */
+    data class Arrow(val keyCode: Int) : KeyAction
+
+    /** Tyhjä paikka asettelussa; ei piirretä eikä reagoi kosketukseen. */
+    data object None : KeyAction
 }
 
 data class Key(

@@ -1,5 +1,6 @@
 package org.jarsi.ark
 
+import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
 import android.os.Handler
@@ -17,9 +18,11 @@ import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
+import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
 import org.jarsi.ark.view.KeyboardView
 import org.jarsi.ark.view.SuggestionBarView
+import org.jarsi.ark.view.ToolbarView
 import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -27,10 +30,11 @@ import java.util.concurrent.Executors
 /** ARK-näppäimistön pääpalvelu. */
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
-    private enum class Page { LETTERS, SYMBOLS1, SYMBOLS2, NUMERIC }
+    private enum class Page { LETTERS, SYMBOLS1, SYMBOLS2, NUMERIC, ARROWS }
 
     private var keyboardView: KeyboardView? = null
     private var suggestionBar: SuggestionBarView? = null
+    private var toolbar: ToolbarView? = null
     private var page = Page.LETTERS
     private var extraKey: String? = null
     private var shiftState = ShiftState.OFF
@@ -76,6 +80,24 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
         )
+        toolbar = ToolbarView(this).also {
+            it.listener = object : ToolbarView.Listener {
+                override fun onToggleArrows() {
+                    page = if (page == Page.ARROWS) Page.LETTERS else Page.ARROWS
+                    toolbar?.arrowsActive = page == Page.ARROWS
+                    updateLayout()
+                    feedback()
+                }
+
+                override fun onOpenSettings() {
+                    startActivity(
+                        Intent(this@KeyboardService, SettingsActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
         suggestionBar = SuggestionBarView(this).also {
             it.listener = ::onSuggestionPicked
             container.addView(it, LinearLayout.LayoutParams(params))
@@ -109,6 +131,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             prefs.getBoolean("esikatselu", true) && !passwordField,
         )
         suggestionBar?.applySettings(theme, heightScale)
+        toolbar?.applySettings(theme)
+        toolbar?.arrowsActive = false
 
         page = when (inputClass) {
             InputType.TYPE_CLASS_NUMBER,
@@ -204,6 +228,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             Page.SYMBOLS1 -> Layouts.symbols1
             Page.SYMBOLS2 -> Layouts.symbols2
             Page.NUMERIC -> Layouts.numeric
+            Page.ARROWS -> Layouts.arrows
         }
         keyboardView?.setKeyboardLayout(layout)
         keyboardView?.shiftState = shiftState
@@ -246,10 +271,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             KeyAction.Letters -> {
                 page = Page.LETTERS
+                toolbar?.arrowsActive = false
                 updateLayout()
                 updateAutoCaps()
                 feedback()
             }
+            is KeyAction.Arrow -> {
+                sendDownUpKeyEvents(action.keyCode)
+                feedback()
+            }
+            KeyAction.None -> Unit
             is KeyAction.Text -> Unit
         }
     }

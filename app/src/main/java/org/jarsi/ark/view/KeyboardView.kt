@@ -182,6 +182,7 @@ class KeyboardView(context: Context) : View(context) {
         canvas.drawColor(theme.background)
         val pressedKeys = pressed.values.mapTo(HashSet()) { it.bounded }
         for (bounded in boundedKeys) {
+            if (bounded.key.action == KeyAction.None) continue
             val rect = RectF(
                 bounded.rect.left + keyGap / 2f,
                 bounded.rect.top + keyGap,
@@ -343,7 +344,7 @@ class KeyboardView(context: Context) : View(context) {
     private fun keyAt(x: Float, y: Float): BoundedKey? {
         if (boundedKeys.isEmpty() || rowHeight <= 0f) return null
         val row = (y / rowHeight).toInt().coerceIn(0, layout.rows.size - 1)
-        val rowKeys = boundedKeys.filter { it.row == row }
+        val rowKeys = boundedKeys.filter { it.row == row && it.key.action != KeyAction.None }
         return rowKeys.firstOrNull { x >= it.rect.left && x < it.rect.right }
             ?: rowKeys.minByOrNull { abs(it.rect.centerX() - x) }
     }

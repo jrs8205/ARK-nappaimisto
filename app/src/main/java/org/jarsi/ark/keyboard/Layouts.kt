@@ -1,6 +1,8 @@
 package org.jarsi.ark.keyboard
 
-/** Näppäinasettelut: suomalainen QWERTY, symbolisivut ja numeronäppäimistö. */
+import android.view.KeyEvent
+
+/** Näppäinasettelut: suomalainen QWERTY, symbolisivut, numerot ja nuolitila. */
 object Layouts {
 
     private fun key(char: String, longPress: List<String> = emptyList()) =
@@ -105,6 +107,27 @@ object Layouts {
                 Key(KeyAction.Space, "", widthWeight = 4f),
                 key("."),
                 Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
+            ),
+        )
+    )
+
+    /** Nuolitila: isot suuntanäppäimet koko näppäinalueelle. */
+    val arrows = KeyboardLayout(
+        listOf(
+            listOf(
+                Key(KeyAction.None),
+                Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_UP), "▲", repeatable = true),
+                Key(KeyAction.None),
+            ),
+            listOf(
+                Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_LEFT), "◀", repeatable = true),
+                Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_DOWN), "▼", repeatable = true),
+                Key(KeyAction.Arrow(KeyEvent.KEYCODE_DPAD_RIGHT), "▶", repeatable = true),
+            ),
+            listOf(
+                Key(KeyAction.None),
+                Key(KeyAction.Letters, "Takaisin"),
+                Key(KeyAction.None),
             ),
         )
     )

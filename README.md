@@ -26,8 +26,9 @@ tavallisia näppäimistöjä tehokkaammin:
 * muistaa usein käytetyt sanaparit
 * oppii automaattikorjausten peruuttamisesta
 * näyttää enemmän kuin kolme ehdotusta (5–8 vieritettävällä rivillä)
-* toimii täysin paikallisesti — sovelluksella ei ole internet-oikeutta
-* ei lähetä kirjoitettua tekstiä palvelimelle
+* oppii ja ehdottaa täysin paikallisesti
+* ei lähetä kirjoitettua tekstiä minnekään ilman käyttäjän omaa,
+  tietoista toimintoa
 * antaa käyttäjän hallita kaikkea opittua tietoa
 
 ## Tila
@@ -118,9 +119,12 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 
 ## Yksityisyys
 
-Kaikki toiminta on paikallista. Sovellus ei pyydä internet-oikeutta, ei sisällä
-analytiikkaa eikä mainoksia. Oppiminen kytkeytyy kokonaan pois salasana- ja
-muissa arkaluonteisissa kentissä.
+Oppiminen ja ehdotukset ovat kokonaan paikallisia, eikä sovelluksessa ole
+analytiikkaa tai mainoksia. Sovelluksella ei tällä hetkellä ole
+internet-oikeutta; jos jokin tuleva ominaisuus tarvitsee verkkoa, oikeus
+lisätään ja asia dokumentoidaan avoimesti — kirjoitettua tekstiä ei
+silloinkaan lähetetä minnekään ilman käyttäjän omaa toimintoa. Oppiminen
+kytkeytyy kokonaan pois salasana- ja muissa arkaluonteisissa kentissä.
 
 ## Kääntäminen
 

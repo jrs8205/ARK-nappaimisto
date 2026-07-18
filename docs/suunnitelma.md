@@ -138,8 +138,9 @@ ehdotukset taustasäikeessä, vanhan haun peruutus uuden kirjaimen tullessa.
 
 ## 31–33. Yksityisyys, leikepöytä, tekstipohjat
 
-* kaikki oppiminen paikallisesti, ei internet-oikeutta, ei analytiikkaa,
-  ei mainoksia
+* kaikki oppiminen paikallisesti; ei analytiikkaa eikä mainoksia;
+  internet-oikeus vain ominaisuuksille, jotka sitä aidosti tarvitsevat,
+  avoimesti dokumentoituna (linjattu 18.7.2026)
 * ei oppimista salasana- eikä maksukorttikentissä; incognito-tila;
   sovelluskohtainen esto; historian tyhjennys; salattu varmuuskopio
 * leikepöytänäkymä: viimeksi kopioidut, kiinnitetyt, automaattinen

@@ -38,7 +38,7 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 |---|---|---|
 | 1 | Toimiva perusnäppäimistö: suomalainen QWERTY, numerorivi, teemat, asetussivu | Valmis |
 | 2 | Vieritettävä ehdotusrivi ja yleinen suomen sanalista | Valmis |
-| 3 | Henkilökohtaisten sanojen oppiminen | — |
+| 3 | Henkilökohtaisten sanojen oppiminen | Valmis |
 | 4 | Sanaparit ja trigrammit, seuraavan sanan ennustus | — |
 | 5 | Palautteesta oppiminen (hyväksynnät, hylkäykset, korjausten peruutukset) | — |
 | 6 | Sovelluskohtainen oppiminen | — |
@@ -74,6 +74,19 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   yleisimmät sanat tyhjällä syötteellä
 * teema seuraa järjestelmän tummaa tilaa; salasana- ja numerokentissä
   ehdotukset pois käytöstä
+
+## Ominaisuudet (vaihe 3)
+
+* henkilökohtaisten sanojen oppiminen: käsin kirjoitetut sanat (myös
+  numeroita sisältävät kuten tuotekoodit sekä verkko-osoitteet) nousevat
+  ehdotuksiin heti ensimmäisestä kerrasta
+* omat sanat ehdotusrivin kärkeen käyttömäärän ja tuoreuden mukaan,
+  alkuperäisessä kirjoitusasussaan
+* pitkä painallus ehdotukseen: Poista opittu sana / Älä ehdota tätä
+* sanaketjujen tallennus rivinvaihtojen yli seuraavan sanan ennustusta
+  varten (vaihe 4)
+* kaikki oppimisdata paikallisessa tietokannassa; salasanakentissä ei
+  opita mitään
 
 ## Yksityisyys
 

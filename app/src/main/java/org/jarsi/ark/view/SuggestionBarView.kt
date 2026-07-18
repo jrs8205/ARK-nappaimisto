@@ -272,7 +272,7 @@ class SuggestionBarView(context: Context) : View(context) {
     private fun updateMenuSelection(x: Float) {
         if (menuActions.isEmpty()) return
         if (!menuArmed) {
-            if (abs(x - menuAnchorX) < dp(12f)) return
+            if (abs(x - menuAnchorX) < dp(8f)) return
             menuArmed = true
         }
         var index = -1

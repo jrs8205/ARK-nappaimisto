@@ -64,12 +64,15 @@ class ClipStore(private val clock: () -> Long = System::currentTimeMillis) {
         return clip
     }
 
-    /** Kiinnitetyt ensin (uusin ylin), sitten muut uusin ylin; vanhentuneet pois. */
+    /**
+     * Tuoreet kiinnittämättömät ensin (ne vanhenevat, joten niiden pitää olla
+     * heti saatavilla), kiinnitetyt listan lopussa; vanhentuneet pois.
+     */
     fun all(): List<Clip> {
         val now = clock()
         val valid = clips.values.filter { it.pinned || now - it.created < EXPIRY_MS }
-        return valid.filter { it.pinned }.sortedByDescending { it.created } +
-            valid.filter { !it.pinned }.sortedByDescending { it.created }
+        return valid.filter { !it.pinned }.sortedByDescending { it.created } +
+            valid.filter { it.pinned }.sortedByDescending { it.created }
     }
 
     fun setPinned(id: Long, pinned: Boolean): Clip? {

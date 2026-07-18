@@ -56,7 +56,7 @@ class ClipStoreTest {
     }
 
     @Test
-    fun `kiinnitetyt ensin ja kuvapolku palautuu siivouksessa`() {
+    fun `kiinnittamattomat ensin ja kuvapolku palautuu siivouksessa`() {
         val s = store()
         s.addText("teksti")
         now += 1
@@ -64,7 +64,7 @@ class ClipStoreTest {
         now += 1
         val pinnattu = s.addText("pinni")!!
         s.setPinned(pinnattu.id, true)
-        assertEquals(listOf("pinni", null, "teksti"), s.all().map { it.text })
+        assertEquals(listOf(null, "teksti", "pinni"), s.all().map { it.text })
         now += 61L * 60 * 1000
         val prune = s.prune()
         assertTrue(prune.removedImagePaths.contains("/data/kuva.png"))

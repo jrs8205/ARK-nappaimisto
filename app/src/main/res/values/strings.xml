@@ -45,6 +45,9 @@
     <string name="leike_poista">Poista</string>
     <string name="leike_kuva_ei_tuettu">Tämä kenttä ei ota vastaan kuvia</string>
     <string name="leike_haku_epaonnistui">Hakua ei voitu avata</string>
+    <string name="leike_uusi">Uusi kiinnitetty leike</string>
+    <string name="leike_uusi_vihje">Kirjoita leikkeen teksti</string>
+    <string name="leike_tallenna">Tallenna</string>
 
     <string name="ehdotus_kiinnita">Kiinnitä</string>
     <string name="ehdotus_irrota">Poista kiinnitys</string>

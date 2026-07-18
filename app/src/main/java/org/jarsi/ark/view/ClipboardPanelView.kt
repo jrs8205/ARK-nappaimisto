@@ -13,8 +13,9 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
-import androidx.recyclerview.widget.LinearLayoutManager
+import android.widget.Space
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import org.jarsi.ark.R
 import org.jarsi.ark.clipboard.Clip
 import org.jarsi.ark.theme.KeyboardTheme
@@ -32,6 +33,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
         fun onTogglePin(clip: Clip)
         fun onWebSearch(clip: Clip)
         fun onDelete(clip: Clip)
+        fun onCreatePin()
     }
 
     var listener: Listener? = null
@@ -51,10 +53,17 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
     }
 
     private val recycler = RecyclerView(context).apply {
-        layoutManager = LinearLayoutManager(context)
+        // Kaksi saraketta, erikorkuiset kortit: lyhyet leikkeet ja kuvat
+        // asettuvat vierekkäin, pitkät saavat kasvaa.
+        layoutManager = StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL)
         adapter = this@ClipboardPanelView.adapter
         clipToPadding = false
-        setPadding(0, dp(4), 0, dp(4))
+        setPadding(0, dp(4), 0, dp(64))
+    }
+
+    private val addButton = ImageView(context).apply {
+        setPadding(dp(14), dp(14), dp(14), dp(14))
+        setOnClickListener { listener?.onCreatePin() }
     }
 
     init {
@@ -70,12 +79,23 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                 Gravity.CENTER,
             ),
         )
+        addView(
+            addButton,
+            LayoutParams(dp(52), dp(52), Gravity.BOTTOM or Gravity.END).apply {
+                setMargins(0, 0, dp(16), dp(16))
+            },
+        )
     }
 
     fun applySettings(newTheme: KeyboardTheme) {
         theme = newTheme
         setBackgroundColor(theme.background)
         emptyView.setTextColor(theme.hint)
+        addButton.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(theme.accent)
+        }
+        tintedIcon(addButton, R.drawable.ic_add, theme.accentText)
         adapter.notifyDataSetChanged()
     }
 
@@ -198,20 +218,23 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                 )
             }
             val more = ImageView(parent.context).apply {
-                setPadding(dp(4), dp(4), dp(4), dp(4))
+                setPadding(dp(4), dp(2), dp(4), dp(6))
             }
             val pin = ImageView(parent.context).apply {
-                setPadding(dp(4), dp(8), dp(4), dp(4))
+                setPadding(dp(4), dp(6), dp(4), dp(2))
             }
+            // Kolme pistettä ylhäällä ja neula alhaalla, väli venyy kortin
+            // mukana — kumpaankin on helpompi osua sormella.
             val side = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = Gravity.TOP
+                minimumHeight = dp(72)
                 addView(more, LinearLayout.LayoutParams(dp(28), dp(28)))
-                addView(pin, LinearLayout.LayoutParams(dp(28), dp(32)))
+                addView(Space(parent.context), LinearLayout.LayoutParams(0, 0, 1f))
+                addView(pin, LinearLayout.LayoutParams(dp(28), dp(28)))
             }
             val row = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.HORIZONTAL
-                setPadding(dp(12), dp(10), dp(6), dp(10))
+                setPadding(dp(12), dp(8), dp(4), dp(8))
                 addView(
                     content,
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
@@ -220,14 +243,14 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                     side,
                     LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
                     ),
                 )
-                layoutParams = RecyclerView.LayoutParams(
+                layoutParams = StaggeredGridLayoutManager.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                 ).apply {
-                    setMargins(dp(8), dp(4), dp(8), dp(4))
+                    setMargins(dp(6), dp(4), dp(6), dp(4))
                 }
             }
             return object : RecyclerView.ViewHolder(row) {}

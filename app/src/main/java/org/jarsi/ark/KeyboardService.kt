@@ -1,7 +1,6 @@
 package org.jarsi.ark
 
 import android.Manifest
-import android.app.SearchManager
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Intent
@@ -28,6 +27,7 @@ import androidx.core.view.inputmethod.InputContentInfoCompat
 import androidx.preference.PreferenceManager
 import org.jarsi.ark.clipboard.Clip
 import org.jarsi.ark.clipboard.ClipStore
+import org.jarsi.ark.clipboard.NewClipActivity
 import org.jarsi.ark.data.ClipEntity
 import org.jarsi.ark.dictation.DictationController
 import org.jarsi.ark.dictation.RecordAudioPermissionActivity
@@ -82,6 +82,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var learningEnabled = false
     private var loadedStamp = 0L
     private var pendingDictation = false
+    private var pendingClipboardPanel = false
 
     private val clipStore = ClipStore()
     private var clipboardPanel: ClipboardPanelView? = null
@@ -238,9 +239,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         Thread {
             try {
                 val (words, pairs, triples) = readLearnedData(db)
+                val clips = db.dao().allClips()
+                    .map { Clip(it.id, it.text, it.imagePath, it.created, it.pinned) }
                 mainHandler.post {
                     learning.load(words, pairs, triples)
+                    clipStore.load(clips)
+                    pruneClips()
                     updateSuggestions()
+                    refreshClipboardPanel()
                 }
             } catch (e: Exception) {
                 // Lukuvirhe: vanha data jää käyttöön, yritetään seuraavalla kerralla.
@@ -579,9 +585,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     val query = clip.text ?: return
                     hideClipboardPanel()
                     try {
+                        // Suora hakutulossivu: haku suoritetaan heti eikä vain
+                        // esitäytetä hakukenttää.
+                        val url = "https://www.google.com/search?q=" + Uri.encode(query)
                         startActivity(
-                            Intent(Intent.ACTION_WEB_SEARCH)
-                                .putExtra(SearchManager.QUERY, query)
+                            Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         )
                     } catch (e: Exception) {
@@ -605,6 +613,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         }
                     }
                     clipboardPanel?.setClips(clipStore.all())
+                }
+
+                override fun onCreatePin() {
+                    // Oma kiinnitetty leike luodaan pienessä ikkunassa;
+                    // leikepöytä avataan takaisin kenttään palattaessa.
+                    pendingClipboardPanel = true
+                    startActivity(
+                        Intent(this@KeyboardService, NewClipActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
                 }
             }
             it.visibility = View.GONE
@@ -662,6 +680,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             ) {
                 dictation.start()
             }
+        }
+        if (pendingClipboardPanel) {
+            pendingClipboardPanel = false
+            showClipboardPanel()
         }
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)

@@ -47,6 +47,13 @@
             android:noHistory="true"
             android:theme="@style/Theme.Ark.Lapinakyva" />
 
+        <activity
+            android:name=".clipboard.NewClipActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Ark.Lapinakyva" />
+
         <!-- Kuvaleikkeiden luovutus vastaanottavalle sovellukselle. -->
         <provider
             android:name="androidx.core.content.FileProvider"

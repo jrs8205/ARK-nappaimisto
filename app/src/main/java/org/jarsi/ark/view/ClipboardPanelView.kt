@@ -217,25 +217,28 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                     LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(84)),
                 )
             }
+            // Ikonit pysyvät pieninä, mutta kosketusalueet ovat n. 44 dp,
+            // jotta ⋮:hen ja neulaan osuu varmasti eikä kortti liity vahingossa.
             val more = ImageView(parent.context).apply {
-                setPadding(dp(4), dp(2), dp(4), dp(6))
+                setPadding(dp(11), dp(8), dp(11), dp(10))
             }
             val pin = ImageView(parent.context).apply {
-                setPadding(dp(4), dp(6), dp(4), dp(2))
+                setPadding(dp(11), dp(10), dp(11), dp(8))
             }
-            // Kolme pistettä ylhäällä ja neula alhaalla, väli venyy kortin
-            // mukana — kumpaankin on helpompi osua sormella.
             val side = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.VERTICAL
-                addView(more, LinearLayout.LayoutParams(dp(28), dp(28)))
+                // Palsta kuluttaa omat kosketuksensa: väliin osuva sormi ei
+                // liitä leikettä.
+                isClickable = true
+                addView(more, LinearLayout.LayoutParams(dp(44), dp(40)))
                 addView(Space(parent.context), LinearLayout.LayoutParams(0, 0, 1f))
-                addView(pin, LinearLayout.LayoutParams(dp(28), dp(28)))
+                addView(pin, LinearLayout.LayoutParams(dp(44), dp(40)))
             }
             val row = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.HORIZONTAL
-                // Minimikorkeus korttiin asti, jotta neula mahtuu aina näkyviin
-                // myös yksirivisillä leikkeillä.
-                minimumHeight = dp(76)
+                // Minimikorkeus korttiin asti, jotta molemmat kosketusalueet
+                // mahtuvat aina kokonaan näkyviin.
+                minimumHeight = dp(96)
                 setPadding(dp(12), dp(8), dp(4), dp(8))
                 addView(
                     content,

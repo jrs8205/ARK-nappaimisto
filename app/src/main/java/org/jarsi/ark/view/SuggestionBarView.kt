@@ -57,6 +57,10 @@ class SuggestionBarView(context: Context) : View(context) {
     private var menuLeft = 0f
     private var menuCellWidths = FloatArray(0)
     private var menuWord: String? = null
+    // Valinta aktivoituu vasta kun sormi on liikahtanut selvästi avauskohdasta,
+    // ettei irrotus heti avauksen jälkeen suorita mitään vahingossa.
+    private var menuAnchorX = 0f
+    private var menuArmed = false
     private val longPressRunnable = Runnable { openMenu() }
 
     private val density = resources.displayMetrics.density
@@ -205,6 +209,8 @@ class SuggestionBarView(context: Context) : View(context) {
             add(MenuAction.BLOCK)
         }
         menuSelected = -1
+        menuAnchorX = downX
+        menuArmed = false
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
 
         val cellHeight = dp(48f)
@@ -265,6 +271,10 @@ class SuggestionBarView(context: Context) : View(context) {
 
     private fun updateMenuSelection(x: Float) {
         if (menuActions.isEmpty()) return
+        if (!menuArmed) {
+            if (abs(x - menuAnchorX) < dp(12f)) return
+            menuArmed = true
+        }
         var index = -1
         var pos = menuLeft
         menuCellWidths.forEachIndexed { i, cellWidth ->
@@ -307,6 +317,7 @@ class SuggestionBarView(context: Context) : View(context) {
         menuActions = emptyList()
         menuSelected = -1
         menuWord = null
+        menuArmed = false
     }
 
     override fun onDetachedFromWindow() {

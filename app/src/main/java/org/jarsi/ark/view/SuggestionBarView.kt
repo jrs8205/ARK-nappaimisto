@@ -27,6 +27,8 @@ class SuggestionBarView(context: Context) : View(context) {
 
     interface MenuListener {
         fun isOwnWord(word: String): Boolean
+        fun isPinned(word: String): Boolean
+        fun onTogglePin(word: String)
         fun onDeleteLearned(word: String)
         fun onBlockWord(word: String)
     }
@@ -48,7 +50,7 @@ class SuggestionBarView(context: Context) : View(context) {
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     // Pitkän painalluksen valikko
-    private enum class MenuAction { DELETE, BLOCK }
+    private enum class MenuAction { PIN, DELETE, BLOCK }
 
     private var menuPopup: PopupWindow? = null
     private var menuActions: List<MenuAction> = emptyList()
@@ -205,6 +207,7 @@ class SuggestionBarView(context: Context) : View(context) {
         val word = suggestions.getOrNull(pressedIndex) ?: return
         menuWord = word
         menuActions = buildList {
+            add(MenuAction.PIN)
             if (menu.isOwnWord(word)) add(MenuAction.DELETE)
             add(MenuAction.BLOCK)
         }
@@ -218,6 +221,9 @@ class SuggestionBarView(context: Context) : View(context) {
         textPaint.textSize = height * 0.34f
         val labels = menuActions.map { action ->
             when (action) {
+                MenuAction.PIN -> context.getString(
+                    if (menu.isPinned(word)) R.string.ehdotus_irrota else R.string.ehdotus_kiinnita
+                )
                 MenuAction.DELETE -> context.getString(R.string.ehdotus_poista)
                 MenuAction.BLOCK -> context.getString(R.string.ehdotus_esta)
             }
@@ -304,6 +310,7 @@ class SuggestionBarView(context: Context) : View(context) {
         closeMenu()
         if (action != null && word != null) {
             when (action) {
+                MenuAction.PIN -> menuListener?.onTogglePin(word)
                 MenuAction.DELETE -> menuListener?.onDeleteLearned(word)
                 MenuAction.BLOCK -> menuListener?.onBlockWord(word)
             }

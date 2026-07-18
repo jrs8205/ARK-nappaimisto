@@ -72,6 +72,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // ohitettu, 0 = ei voimassa. Välimerkki imaisee välin vain tilassa > 0.
     private var autoSpaceState = 0
 
+    // Viimeksi näytetyt täydennysehdotukset ohitusten kirjaamista varten.
+    // Vain täydennysrivit lasketaan — ei tyhjän syötteen ennustuksia.
+    private var shownCompletions: List<String> = emptyList()
+
     private val fiLocale = Locale.forLanguageTag("fi")
 
     private lateinit var prefs: SharedPreferences
@@ -181,6 +185,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val before = currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: return
         val word = WordTools.currentWord(before)
         if (word.isNotEmpty()) {
+            learning.onSuggestionsIgnored(shownCompletions, word)
+            shownCompletions = emptyList()
             learning.onWordCommitted(word)
             maybeFlush()
         }
@@ -247,6 +253,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             it.listener = ::onSuggestionPicked
             it.menuListener = object : SuggestionBarView.MenuListener {
                 override fun isOwnWord(word: String) = learning.isOwnWord(word)
+
+                override fun isPinned(word: String) = learning.isPinned(word)
+
+                override fun onTogglePin(word: String) {
+                    learning.setPinned(word, !learning.isPinned(word))
+                    flushLearned()
+                    updateSuggestions()
+                    feedback()
+                }
 
                 override fun onDeleteLearned(word: String) {
                     learning.removeWord(word)
@@ -330,7 +345,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         ic.endBatchEdit()
         autoSpaceState = if (spaceAfterSuggestion) 2 else 0
         if (learningEnabled) {
-            // Ketju jatkuu valitun sanan kautta; määrä kasvaa vain omilla sanoilla.
+            // Muut näkyneet täydennykset ohitettiin; valittu sana saa hyväksynnän.
+            learning.onSuggestionsIgnored(shownCompletions, word)
+            shownCompletions = emptyList()
             learning.onSuggestionAccepted(word)
             maybeFlush()
         }
@@ -364,7 +381,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             if (generation == suggestGeneration) {
                 mainHandler.post {
-                    if (generation == suggestGeneration) bar.setSuggestions(result)
+                    if (generation == suggestGeneration) {
+                        bar.setSuggestions(result)
+                        shownCompletions =
+                            if (word.isNotEmpty()) result.take(SHOWN_TOP_COUNT) else emptyList()
+                    }
                 }
             }
         }
@@ -593,5 +614,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val MAX_WORD_LOOKBACK = 48
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
+        const val SHOWN_TOP_COUNT = 3
     }
 }

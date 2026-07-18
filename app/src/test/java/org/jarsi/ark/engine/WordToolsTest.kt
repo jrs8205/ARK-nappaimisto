@@ -15,7 +15,7 @@ class WordToolsTest {
 
     @Test
     fun `valimerkin jalkeen tyhja`() =
-        assertEquals("", WordTools.currentWord("sana."))
+        assertEquals("", WordTools.currentWord("sana!"))
 
     @Test
     fun `yhdysmerkki kuuluu sanaan`() =
@@ -34,6 +34,26 @@ class WordToolsTest {
         assertEquals("", WordTools.currentWord(""))
 
     @Test
-    fun `numero katkaisee sanan`() =
-        assertEquals("", WordTools.currentWord("v123"))
+    fun `numerot kuuluvat sanaan`() =
+        assertEquals("prx4", WordTools.currentWord("koodi prx4"))
+
+    @Test
+    fun `pelkka numero on sana`() =
+        assertEquals("20", WordTools.currentWord("Jako 20"))
+
+    @Test
+    fun `sisainen piste kuuluu sanaan`() =
+        assertEquals("jarsi.org", WordTools.currentWord("käy jarsi.org"))
+
+    @Test
+    fun `keskeneraisen osoitteen piste`() =
+        assertEquals("jarsi.o", WordTools.currentWord("jarsi.o"))
+
+    @Test
+    fun `loppupiste ei kuulu sanaan`() =
+        assertEquals("", WordTools.currentWord("sana."))
+
+    @Test
+    fun `piste ilman jatkoa ei kuulu sanaan`() =
+        assertEquals("", WordTools.currentWord("jarsi."))
 }

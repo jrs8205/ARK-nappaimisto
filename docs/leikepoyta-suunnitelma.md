@@ -15,8 +15,15 @@ Tämä dokumentti kattaa leikepöytänäkymän (kokonaissuunnitelman kohdat 4 ja
   pikkukuvina.
 * **Napautus syöttää leikkeen kenttään.** Tekstit syötetään aina;
   kuva syötetään, jos kenttä ottaa kuvia vastaan (esim.
-  viestisovellukset) — muuten näytetään lyhyt ilmoitus. Pitkä painallus
-  avaa tutun liu'utusvalikon: Kiinnitä / Poista kiinnitys ja Poista.
+  viestisovellukset) — muuten näytetään lyhyt ilmoitus.
+* Jokaisen leikkeen oikeassa yläkulmassa on **kolme pistettä (⋮)** ja
+  sen alla **neulakuvake**: ääriviiva kun leikettä ei ole kiinnitetty,
+  täysi kun on; napautus vaihtaa tilan suoraan.
+* ⋮ avaa valikon, jossa kuvakkeelliset kohdat: **Liitä**,
+  **Kiinnitä / Poista kiinnitys**, **Hae verkosta** (maapallo ja
+  suurennuslasi; avaa haun selaimessa leikkeen tekstillä — vain
+  tekstileikkeille) ja **Poista** (roskakori). Ulkoasu vektorikuvakkein
+  kuten muukin näppäimistö.
 * Tyhjä leikepöytä näyttää lyhyen ohjetekstin.
 
 ## 2. Keräys ja tallennus

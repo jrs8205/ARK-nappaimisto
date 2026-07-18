@@ -1,12 +1,17 @@
 """Muodostaa näppäimistön sanalistan Parole-taajuuslistasta.
 
 Käyttö:
-    python tools/sanalista.py parole_frek_3.txt app/src/main/assets/sanalista.txt
+    python tools/sanalista.py parole_frek_3.txt app/src/main/assets/sanalista.txt \
+        [--kotus nykysuomensanalista2024.csv]
 
 Syöterivin muoto: "järjestysnro taajuus sananmuoto (osuus %)", Latin-1-koodattu.
 Tulos: "sananmuoto taajuus" -rivit yleisyysjärjestyksessä, UTF-8.
 Sanamuodot pienennetään ja siivotaan: mukaan vain suomen kirjaimista (ja
 yhdysmerkeistä) koostuvat muodot, harvinaisimmat karsitaan.
+
+Valinnainen --kotus lisää Kotuksen nykysuomen sanalistan (TSV, 1. sarake
+Hakusana) perusmuodot, joita taajuuslistalla ei jo ole, listan jatkoksi
+pienellä oletustaajuudella.
 """
 import argparse
 import re
@@ -23,6 +28,8 @@ def main() -> None:
     p.add_argument("--sana-sarake", type=int, default=2)
     p.add_argument("--min", type=int, default=5)
     p.add_argument("--sanoja", type=int, default=80000)
+    p.add_argument("--kotus")
+    p.add_argument("--kotus-taajuus", type=int, default=2)
     a = p.parse_args()
 
     maarat: dict[str, int] = {}
@@ -45,10 +52,25 @@ def main() -> None:
         ((s, t) for s, t in maarat.items() if t >= a.min),
         key=lambda x: -x[1],
     )[: a.sanoja]
+
+    # Kotuksen perusmuodot täydentävät sanastoa pienellä oletustaajuudella;
+    # ne jäävät yleisyydeltään tunnettujen sanojen taakse.
+    lisatyt = 0
+    if a.kotus:
+        mukana = {s for s, _ in kelvot}
+        with open(a.kotus, encoding="utf-8") as f:
+            next(f)  # otsikkorivi
+            for rivi in f:
+                sana = rivi.split("\t", 1)[0].strip().lower()
+                if sana and SANA.match(sana) and sana not in mukana:
+                    kelvot.append((sana, a.kotus_taajuus))
+                    mukana.add(sana)
+                    lisatyt += 1
+
     with open(a.tulos, "w", encoding="utf-8", newline="\n") as f:
         for sana, taajuus in kelvot:
             f.write(f"{sana} {taajuus}\n")
-    print(f"{len(kelvot)} sanaa kirjoitettu")
+    print(f"{len(kelvot)} sanaa kirjoitettu ({lisatyt} Kotuksen listalta)")
 
 
 if __name__ == "__main__":

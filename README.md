@@ -130,5 +130,6 @@ Vaatimukset: JDK 17 tai uudempi ja Android SDK (compileSdk 36).
 Katso [LICENSE](LICENSE).
 
 Yleinen suomen sanalista on muodostettu Kotimaisten kielten keskuksen
-Parole-taajuuslistasta ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fi)),
+Parole-taajuuslistasta ja Nykysuomen sanalistasta
+([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fi)),
 katso [docs/sanalista.md](docs/sanalista.md).

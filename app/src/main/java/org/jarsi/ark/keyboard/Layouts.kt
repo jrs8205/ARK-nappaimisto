@@ -37,16 +37,21 @@ object Layouts {
         Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true),
     )
 
-    private fun bottomRow(extraKey: String?): List<Key> = listOf(
-        Key(KeyAction.Symbols, "?123", widthWeight = 1.5f),
-        if (extraKey != null) key(extraKey) else key(",", listOf(";", ":")),
-        Key(KeyAction.Space, "", widthWeight = 4f),
-        key(".", listOf(",", "?", "!", ":", ";", "…", "-", "\"")),
-        Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
-    )
+    private fun bottomRow(extraKey: String?): List<Key> {
+        val row = mutableListOf(
+            Key(KeyAction.Symbols, "?123", widthWeight = 1.5f),
+            key(",", listOf(";", ":")),
+        )
+        // Kenttäkohtainen lisämerkki omana näppäimenään, jotta pilkku ei koskaan katoa.
+        if (extraKey != null) row += key(extraKey)
+        row += Key(KeyAction.Space, "", widthWeight = if (extraKey != null) 3f else 4f)
+        row += key(".", listOf(",", "?", "!", ":", ";", "…", "-", "\""))
+        row += Key(KeyAction.Enter, "⏎", widthWeight = 1.5f)
+        return row
+    }
 
     /**
-     * Kirjainasettelu. [extraKey] korvaa pilkun kenttäkohtaisella merkillä,
+     * Kirjainasettelu. [extraKey] lisää kenttäkohtaisen merkin pilkun viereen,
      * esimerkiksi @ sähköpostikentässä tai / osoitekentässä.
      */
     fun letters(extraKey: String? = null) = KeyboardLayout(

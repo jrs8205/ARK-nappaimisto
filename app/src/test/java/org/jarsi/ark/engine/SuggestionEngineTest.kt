@@ -69,4 +69,34 @@ class SuggestionEngineTest {
         listOf("Jako", "20", "nouto").forEach { l.onWordCommitted(it) }
         assertEquals("nouto", s.suggest("no", listOf("Jako", "20")).first())
     }
+
+    @Test
+    fun `kiinnitetty voittaa kaiken`() {
+        val (s, l) = build("auto 100", "autio 50")
+        l.setPinned("autio", true)
+        assertEquals("autio", s.suggest("au").first())
+    }
+
+    @Test
+    fun `hyvaksytty yleissana ohittaa yleisemman`() {
+        val (s, l) = build("auto 100", "autio 50")
+        l.onSuggestionAccepted("autio")
+        l.onSuggestionAccepted("autio")
+        assertEquals(listOf("autio", "auto"), s.suggest("au"))
+    }
+
+    @Test
+    fun `toistuvat ohitukset pudottavat`() {
+        val (s, l) = build("auto 100", "autio 50")
+        l.onSuggestionsIgnored(listOf("auto"), "muu")
+        l.onSuggestionsIgnored(listOf("auto"), "muu")
+        assertEquals(listOf("autio", "auto"), s.suggest("au"))
+    }
+
+    @Test
+    fun `yksi ohitus ei viela rankaise`() {
+        val (s, l) = build("auto 100", "autio 50")
+        l.onSuggestionsIgnored(listOf("auto"), "muu")
+        assertEquals(listOf("auto", "autio"), s.suggest("au"))
+    }
 }

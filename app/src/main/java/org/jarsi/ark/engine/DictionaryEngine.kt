@@ -14,6 +14,7 @@ class DictionaryEngine {
 
     @Volatile private var entries: List<Entry> = emptyList()
     @Volatile private var common: List<String> = emptyList()
+    @Volatile private var maxFreq = 0L
 
     private val fiLocale = Locale.forLanguageTag("fi")
 
@@ -34,7 +35,25 @@ class DictionaryEngine {
         common = parsed.sortedByDescending { it.freq }
             .take(topWordCount)
             .map { it.word }
+        maxFreq = parsed.maxOfOrNull { it.freq } ?: 0L
         entries = parsed
+    }
+
+    /** Suurin listalla esiintyvä taajuus pisteiden normalisointia varten. */
+    fun maxFrequency(): Long = maxFreq
+
+    /** Sanan taajuus tai 0, jos sana ei ole listalla. */
+    fun frequencyOf(word: String): Long {
+        val list = entries
+        if (list.isEmpty()) return 0L
+        val key = word.lowercase(fiLocale)
+        var low = 0
+        var high = list.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (list[mid].key < key) low = mid + 1 else high = mid
+        }
+        return if (low < list.size && list[low].key == key) list[low].freq else 0L
     }
 
     /** Yleisimmät sanat tyhjälle syötteelle. */

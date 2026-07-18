@@ -36,8 +36,8 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 
 | Vaihe | Sisältö | Tila |
 |---|---|---|
-| 1 | Toimiva perusnäppäimistö: suomalainen QWERTY, numerorivi, teemat, asetussivu | Työn alla |
-| 2 | Vieritettävä ehdotusrivi ja yleinen suomen sanalista | — |
+| 1 | Toimiva perusnäppäimistö: suomalainen QWERTY, numerorivi, teemat, asetussivu | Valmis |
+| 2 | Vieritettävä ehdotusrivi ja yleinen suomen sanalista | Valmis |
 | 3 | Henkilökohtaisten sanojen oppiminen | — |
 | 4 | Sanaparit ja trigrammit, seuraavan sanan ennustus | — |
 | 5 | Palautteesta oppiminen (hyväksynnät, hylkäykset, korjausten peruutukset) | — |
@@ -61,6 +61,19 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 * näppäinäänet, värinä ja esikatselukupla
 * välilyönnin pyyhkäisy siirtää kursoria
 * salasanakentissä esikatselu pois käytöstä
+
+## Ominaisuudet (vaihe 2)
+
+* vieritettävä ehdotusrivi: täydennykset yleisestä suomen sanalistasta
+  (80 000 sanamuotoa taajuuksineen, ks. [docs/sanalista.md](docs/sanalista.md))
+* työkalurivi: kursorinsiirtotila (isot nuolinäppäimet), verkko-osoitesivu
+  (https://, www., .fi …) ja asetukset
+* välimerkki siirtyy ehdotuksen lisäämän välilyönnin eteen
+* isot alkukirjaimet ehdotuksissa lauseen alussa
+* ehdotusten asetukset: näkyvyys, välilyönti hyväksynnän jälkeen,
+  yleisimmät sanat tyhjällä syötteellä
+* teema seuraa järjestelmän tummaa tilaa; salasana- ja numerokentissä
+  ehdotukset pois käytöstä
 
 ## Yksityisyys
 

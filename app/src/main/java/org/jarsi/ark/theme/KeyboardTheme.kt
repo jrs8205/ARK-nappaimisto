@@ -1,6 +1,12 @@
 package org.jarsi.ark.theme
 
-/** Näppäimistön väriteema. */
+import android.content.Context
+import org.jarsi.ark.R
+
+/**
+ * Näppäimistön väriteema. Värit määritellään kertaalleen colors.xml:ssä
+ * Material 3 -rooleittain; asetussivu käyttää samoja värejä teemansa kautta.
+ */
 data class KeyboardTheme(
     val background: Int,
     val key: Int,
@@ -12,43 +18,29 @@ data class KeyboardTheme(
     val accentText: Int,
 ) {
     companion object {
-        val TUMMA = KeyboardTheme(
-            background = 0xFF14161B.toInt(),
-            key = 0xFF2A2E37.toInt(),
-            specialKey = 0xFF20232B.toInt(),
-            keyPressed = 0xFF3D4350.toInt(),
-            text = 0xFFE8EAF0.toInt(),
-            hint = 0xFF8A8F9C.toInt(),
-            accent = 0xFF4C8DFF.toInt(),
-            accentText = 0xFFFFFFFF.toInt(),
-        )
-
-        val VAALEA = KeyboardTheme(
-            background = 0xFFE9EBEF.toInt(),
-            key = 0xFFFFFFFF.toInt(),
-            specialKey = 0xFFD4D8E0.toInt(),
-            keyPressed = 0xFFBFC6D1.toInt(),
-            text = 0xFF1B1D22.toInt(),
-            hint = 0xFF6E7480.toInt(),
-            accent = 0xFF1B6EF3.toInt(),
-            accentText = 0xFFFFFFFF.toInt(),
-        )
-
-        val AMOLED = KeyboardTheme(
-            background = 0xFF000000.toInt(),
-            key = 0xFF15161A.toInt(),
-            specialKey = 0xFF0B0C0F.toInt(),
-            keyPressed = 0xFF2A2C33.toInt(),
-            text = 0xFFE8EAF0.toInt(),
-            hint = 0xFF7A7F8C.toInt(),
-            accent = 0xFF4C8DFF.toInt(),
-            accentText = 0xFFFFFFFF.toInt(),
-        )
-
-        fun fromName(name: String?): KeyboardTheme = when (name) {
-            "vaalea" -> VAALEA
-            "amoled" -> AMOLED
-            else -> TUMMA
+        /** Lataa teeman värit resursseista; tuntematon nimi antaa tumman. */
+        fun load(context: Context, name: String? = null): KeyboardTheme = if (name == "vaalea") {
+            KeyboardTheme(
+                background = context.getColor(R.color.vaalea_tausta),
+                key = context.getColor(R.color.vaalea_nappain),
+                specialKey = context.getColor(R.color.vaalea_erikoisnappain),
+                keyPressed = context.getColor(R.color.vaalea_painettu),
+                text = context.getColor(R.color.vaalea_teksti),
+                hint = context.getColor(R.color.vaalea_vihje),
+                accent = context.getColor(R.color.vaalea_korostus),
+                accentText = context.getColor(R.color.vaalea_korostusteksti),
+            )
+        } else {
+            KeyboardTheme(
+                background = context.getColor(R.color.tumma_tausta),
+                key = context.getColor(R.color.tumma_nappain),
+                specialKey = context.getColor(R.color.tumma_erikoisnappain),
+                keyPressed = context.getColor(R.color.tumma_painettu),
+                text = context.getColor(R.color.tumma_teksti),
+                hint = context.getColor(R.color.tumma_vihje),
+                accent = context.getColor(R.color.tumma_korostus),
+                accentText = context.getColor(R.color.tumma_korostusteksti),
+            )
         }
     }
 }

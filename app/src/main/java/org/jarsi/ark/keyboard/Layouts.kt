@@ -103,16 +103,15 @@ object Layouts {
             ),
             listOf(
                 Key(KeyAction.Letters, "ABC", widthWeight = 1.5f),
-                Key(KeyAction.SymbolsWeb, "www"),
                 key(","),
-                Key(KeyAction.Space, "", widthWeight = 3f),
+                Key(KeyAction.Space, "", widthWeight = 4f),
                 key("."),
                 Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
             ),
         )
     )
 
-    /** Verkko-osoitesivu: osoitteiden alut ja yleisimmät päätteet. */
+    /** Verkko-osoitesivu: osoitteiden alut ja yleisimmät päätteet. Avataan työkaluriviltä. */
     val symbols3 = KeyboardLayout(
         listOf(
             listOf(key("https://"), key("http://"), key("www.")),

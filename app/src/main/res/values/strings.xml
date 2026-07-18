@@ -28,7 +28,6 @@
 
     <string name="teema_tumma">Tumma</string>
     <string name="teema_vaalea">Vaalea</string>
-    <string name="teema_amoled">AMOLED</string>
 
     <!-- Enter-näppäimen toimintotekstit -->
     <string name="enter_hae">Hae</string>

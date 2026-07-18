@@ -55,7 +55,7 @@ class KeyboardView(context: Context) : View(context) {
         }
 
     private var layout: KeyboardLayout = Layouts.letters()
-    private var theme: KeyboardTheme = KeyboardTheme.TUMMA
+    private var theme: KeyboardTheme = KeyboardTheme.load(context)
     private var heightScale = 1f
     private var previewEnabled = true
 

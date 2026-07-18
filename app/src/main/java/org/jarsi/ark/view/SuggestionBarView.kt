@@ -19,7 +19,7 @@ class SuggestionBarView(context: Context) : View(context) {
 
     var listener: ((String) -> Unit)? = null
 
-    private var theme = KeyboardTheme.TUMMA
+    private var theme = KeyboardTheme.load(context)
     private var heightScale = 1f
     private var suggestions: List<String> = emptyList()
     private var slotWidths = FloatArray(0)

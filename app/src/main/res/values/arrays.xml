@@ -3,11 +3,9 @@
     <string-array name="teema_nimet">
         <item>@string/teema_tumma</item>
         <item>@string/teema_vaalea</item>
-        <item>@string/teema_amoled</item>
     </string-array>
     <string-array name="teema_arvot">
         <item>tumma</item>
         <item>vaalea</item>
-        <item>amoled</item>
     </string-array>
 </resources>

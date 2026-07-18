@@ -9,7 +9,6 @@ sealed interface KeyAction {
     data object Space : KeyAction
     data object Symbols : KeyAction
     data object SymbolsMore : KeyAction
-    data object SymbolsWeb : KeyAction
     data object Letters : KeyAction
 
     /** Nuolinäppäin: lähettää annetun näppäinkoodin (DPAD-suunnat). */

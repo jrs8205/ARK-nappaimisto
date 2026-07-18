@@ -88,7 +88,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             it.listener = object : ToolbarView.Listener {
                 override fun onToggleArrows() {
                     page = if (page == Page.ARROWS) Page.LETTERS else Page.ARROWS
-                    toolbar?.arrowsActive = page == Page.ARROWS
+                    updateLayout()
+                    updateSuggestions()
+                    feedback()
+                }
+
+                override fun onToggleWeb() {
+                    page = if (page == Page.SYMBOLS3) Page.LETTERS else Page.SYMBOLS3
                     updateLayout()
                     updateSuggestions()
                     feedback()
@@ -127,7 +133,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val variation = info.inputType and InputType.TYPE_MASK_VARIATION
         passwordField = isPasswordField(inputClass, variation)
 
-        val theme = KeyboardTheme.fromName(prefs.getString("teema", "tumma"))
+        val theme = KeyboardTheme.load(this, prefs.getString("teema", "tumma"))
         val heightScale = prefs.getInt("korkeus", 100) / 100f
         keyboardView?.applySettings(
             theme,
@@ -137,7 +143,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         )
         suggestionBar?.applySettings(theme, heightScale)
         toolbar?.applySettings(theme)
-        toolbar?.arrowsActive = false
 
         page = when (inputClass) {
             InputType.TYPE_CLASS_NUMBER,
@@ -249,6 +254,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         keyboardView?.setKeyboardLayout(layout)
         keyboardView?.shiftState = shiftState
+        // Työkalurivin korostukset seuraavat aina nykyistä sivua.
+        toolbar?.arrowsActive = page == Page.ARROWS
+        toolbar?.webActive = page == Page.SYMBOLS3
     }
 
     override fun onText(text: String) {
@@ -310,14 +318,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 updateLayout()
                 feedback()
             }
-            KeyAction.SymbolsWeb -> {
-                page = Page.SYMBOLS3
-                updateLayout()
-                feedback()
-            }
             KeyAction.Letters -> {
                 page = Page.LETTERS
-                toolbar?.arrowsActive = false
                 updateLayout()
                 updateAutoCaps()
                 updateSuggestions()

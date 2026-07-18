@@ -6,16 +6,23 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceManager
 import org.jarsi.ark.R
 
 /** Näppäimistön asetukset ja käyttöönotto. */
 class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Asetussivu noudattaa näppäimistön teemavalintaa järjestelmäteeman sijaan.
+        applyNightMode(
+            PreferenceManager.getDefaultSharedPreferences(this).getString("teema", "tumma")
+        )
         super.onCreate(savedInstanceState)
         // Reunasta reunaan -tilassa sisältö menisi tila- ja navigointipalkkien
         // alle; palkkien korkeus varataan reunuksina.
@@ -45,6 +52,23 @@ class SettingsActivity : AppCompatActivity() {
                 imm.showInputMethodPicker()
                 true
             }
+            // Teeman vaihto näkyy asetussivulla heti.
+            findPreference<ListPreference>("teema")?.setOnPreferenceChangeListener { _, value ->
+                applyNightMode(value as? String)
+                true
+            }
+        }
+    }
+
+    private companion object {
+        fun applyNightMode(theme: String?) {
+            AppCompatDelegate.setDefaultNightMode(
+                if (theme == "vaalea") {
+                    AppCompatDelegate.MODE_NIGHT_NO
+                } else {
+                    AppCompatDelegate.MODE_NIGHT_YES
+                }
+            )
         }
     }
 }

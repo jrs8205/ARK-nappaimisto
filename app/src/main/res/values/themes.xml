@@ -2,5 +2,12 @@
 <resources>
     <style name="Theme.Ark" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+        <item name="colorPrimary">@color/vaalea_korostus</item>
+        <item name="colorOnPrimary">@color/vaalea_korostusteksti</item>
+        <item name="android:colorBackground">@color/vaalea_tausta</item>
+        <item name="colorSurface">@color/vaalea_nappain</item>
+        <item name="colorOnSurface">@color/vaalea_teksti</item>
+        <item name="colorSurfaceVariant">@color/vaalea_erikoisnappain</item>
+        <item name="colorOnSurfaceVariant">@color/vaalea_vihje</item>
     </style>
 </resources>

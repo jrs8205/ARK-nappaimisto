@@ -10,11 +10,12 @@ import org.jarsi.ark.R
 import org.jarsi.ark.theme.KeyboardTheme
 import kotlin.math.roundToInt
 
-/** Työkalurivi ehdotusrivin yläpuolella: kursorinsiirtotila ja asetukset. */
+/** Työkalurivi ehdotusrivin yläpuolella: kursorinsiirtotila, verkko-osoitteet ja asetukset. */
 class ToolbarView(context: Context) : View(context) {
 
     interface Listener {
         fun onToggleArrows()
+        fun onToggleWeb()
         fun onOpenSettings()
     }
 
@@ -27,7 +28,14 @@ class ToolbarView(context: Context) : View(context) {
             invalidate()
         }
 
-    private var theme = KeyboardTheme.TUMMA
+    /** Korostaa verkkonapin, kun osoitesivu on auki. */
+    var webActive = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private var theme = KeyboardTheme.load(context)
     private var pressedIndex = -1
 
     private val density = resources.displayMetrics.density
@@ -35,11 +43,12 @@ class ToolbarView(context: Context) : View(context) {
 
     private val buttonPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private enum class Tool { ARROWS, SETTINGS }
+    private enum class Tool { ARROWS, WEB, SETTINGS }
 
-    private val tools = listOf(Tool.ARROWS, Tool.SETTINGS)
+    private val tools = listOf(Tool.ARROWS, Tool.WEB, Tool.SETTINGS)
 
     private val cursorIcon = context.getDrawable(R.drawable.ic_cursor_move)?.mutate()
+    private val webIcon = context.getDrawable(R.drawable.ic_web)?.mutate()
     private val settingsIcon = context.getDrawable(R.drawable.ic_settings)?.mutate()
 
     fun applySettings(newTheme: KeyboardTheme) {
@@ -61,7 +70,7 @@ class ToolbarView(context: Context) : View(context) {
         canvas.drawColor(theme.background)
         tools.forEachIndexed { i, tool ->
             val rect = buttonRect(i)
-            val active = tool == Tool.ARROWS && arrowsActive
+            val active = (tool == Tool.ARROWS && arrowsActive) || (tool == Tool.WEB && webActive)
             buttonPaint.color = when {
                 i == pressedIndex -> theme.keyPressed
                 active -> theme.accent
@@ -70,6 +79,7 @@ class ToolbarView(context: Context) : View(context) {
             canvas.drawRoundRect(rect, dp(8f), dp(8f), buttonPaint)
             val icon = when (tool) {
                 Tool.ARROWS -> cursorIcon
+                Tool.WEB -> webIcon
                 Tool.SETTINGS -> settingsIcon
             } ?: return@forEachIndexed
             icon.setTint(if (active) theme.accentText else theme.text)
@@ -92,6 +102,7 @@ class ToolbarView(context: Context) : View(context) {
                 if (index >= 0 && index == pressedIndex) {
                     when (tools[index]) {
                         Tool.ARROWS -> listener?.onToggleArrows()
+                        Tool.WEB -> listener?.onToggleWeb()
                         Tool.SETTINGS -> listener?.onOpenSettings()
                     }
                 }

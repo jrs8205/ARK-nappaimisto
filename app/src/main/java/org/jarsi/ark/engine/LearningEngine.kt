@@ -195,7 +195,11 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         if (prefix.isEmpty() || max <= 0) return emptyList()
         val key = keyOf(prefix)
         return words.entries
-            .filter { !it.value.blocked && it.value.count > 0 && it.key.startsWith(key) }
+            .filter {
+                !it.value.blocked && it.key.startsWith(key) &&
+                    // Kiinnitetty pääsee ehdolle, vaikkei sitä olisi kirjoitettu.
+                    (it.value.count > 0 || it.value.pinned)
+            }
             .sortedByDescending { it.value.count * recency(it.value.lastUsed) }
             .take(max)
             .map { it.value.word }

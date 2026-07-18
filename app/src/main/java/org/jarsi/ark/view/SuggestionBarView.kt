@@ -73,6 +73,7 @@ class SuggestionBarView(context: Context) : View(context) {
     }
     private val dividerPaint = Paint()
     private val pressedPaint = Paint()
+    private val pinPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     fun applySettings(newTheme: KeyboardTheme, scale: Float) {
         theme = newTheme
@@ -140,6 +141,11 @@ class SuggestionBarView(context: Context) : View(context) {
                     height / 2f + textPaint.textSize * 0.35f,
                     textPaint,
                 )
+                // Kiinnitetty sana merkitään pienellä korostuspisteellä.
+                if (menuListener?.isPinned(word) == true) {
+                    pinPaint.color = theme.accent
+                    canvas.drawCircle(x + slot - dp(9f), dp(9f), dp(3f), pinPaint)
+                }
                 if (i > 0) {
                     canvas.drawRect(x, height * 0.25f, x + dp(1f), height * 0.75f, dividerPaint)
                 }
@@ -217,8 +223,8 @@ class SuggestionBarView(context: Context) : View(context) {
         performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
 
         val cellHeight = dp(48f)
-        val labelPadding = dp(20f)
-        textPaint.textSize = height * 0.34f
+        val labelPadding = dp(10f)
+        textPaint.textSize = dp(13f)
         val labels = menuActions.map { action ->
             when (action) {
                 MenuAction.PIN -> context.getString(
@@ -232,6 +238,16 @@ class SuggestionBarView(context: Context) : View(context) {
         labels.forEachIndexed { i, label ->
             menuCellWidths[i] = textPaint.measureText(label) + labelPadding * 2
         }
+        // Valikko ei saa ylittää näkymän leveyttä millään näytöllä:
+        // ylileveä valikko kutistetaan suhteessa ja teksti pienenee hieman.
+        var menuTextSize = 13f
+        val available = width - dp(8f)
+        val naturalWidth = menuCellWidths.sum()
+        if (naturalWidth > available) {
+            val factor = available / naturalWidth
+            for (i in menuCellWidths.indices) menuCellWidths[i] *= factor
+            menuTextSize = 12f
+        }
 
         val container = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -244,7 +260,9 @@ class SuggestionBarView(context: Context) : View(context) {
             TextView(context).apply {
                 text = label
                 gravity = Gravity.CENTER
-                textSize = 14f
+                textSize = menuTextSize
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
                 setTextColor(theme.text)
                 layoutParams = LinearLayout.LayoutParams(
                     menuCellWidths[i].roundToInt(),

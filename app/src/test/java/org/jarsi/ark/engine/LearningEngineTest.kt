@@ -202,6 +202,13 @@ class LearningEngineTest {
     }
 
     @Test
+    fun `kiinnitetty ilman kayttoa loytyy etuliitteella`() {
+        val e = engine()
+        e.setPinned("zebra", true)
+        assertEquals(listOf("zebra"), e.suggest("ze"))
+    }
+
+    @Test
     fun `displayForm palauttaa asun tai avaimen`() {
         val e = engine()
         e.onWordCommitted("Jako")

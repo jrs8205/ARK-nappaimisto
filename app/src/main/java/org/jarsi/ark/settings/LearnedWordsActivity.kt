@@ -54,15 +54,25 @@ class LearnedWordsActivity : AppCompatActivity() {
             hint = getString(R.string.opitut_haku)
             maxLines = 1
             setPadding(dp(16), dp(12), dp(16), dp(12))
-            addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
-                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
-                override fun afterTextChanged(s: Editable?) {
-                    query = s?.toString()?.trim()?.lowercase(fiLocale) ?: ""
-                    refreshList()
-                }
-            })
         }
+        // Haun pikatyhjennys; näkyy vain kun kentässä on tekstiä.
+        val clearSearch = TextView(this).apply {
+            text = "✕"
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(12), dp(16), dp(12))
+            visibility = View.GONE
+            setOnClickListener { search.setText("") }
+        }
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
+            override fun afterTextChanged(s: Editable?) {
+                query = s?.toString()?.trim()?.lowercase(fiLocale) ?: ""
+                clearSearch.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE
+                refreshList()
+            }
+        })
         emptyView = TextView(this).apply {
             text = getString(R.string.opitut_tyhja)
             gravity = Gravity.CENTER
@@ -74,7 +84,7 @@ class LearnedWordsActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@LearnedWordsActivity)
             adapter = this@LearnedWordsActivity.adapter
         }
-        val clearButton = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
+        val clearAllButton = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
             text = getString(R.string.opitut_tyhjenna)
             setOnClickListener { confirmClearAll() }
         }
@@ -83,7 +93,7 @@ class LearnedWordsActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             addView(search, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             addView(
-                clearButton,
+                clearSearch,
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -109,6 +119,14 @@ class LearnedWordsActivity : AppCompatActivity() {
             addView(
                 list,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f),
+            )
+            // Tuhoisa toiminto erillään hausta, omana painikkeenaan alareunassa.
+            addView(
+                clearAllButton,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
             )
         }
         setContentView(root)

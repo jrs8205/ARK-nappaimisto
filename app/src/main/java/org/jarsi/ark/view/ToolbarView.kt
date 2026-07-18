@@ -40,8 +40,24 @@ class ToolbarView(context: Context) : View(context) {
     var micActive = false
         set(value) {
             field = value
+            if (value) {
+                // Aloitussykäys kertoo, että nyt voi alkaa puhua.
+                micLevel = 1f
+            } else {
+                micShownLevel = 0f
+            }
             invalidate()
         }
+
+    /** Puheen voimakkuus 0–1; mikrofonin kehä sykkii sen mukana. */
+    var micLevel = 0f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            if (micActive) invalidate()
+        }
+
+    private var micShownLevel = 0f
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private var theme = KeyboardTheme.load(context)
     private var pressedIndex = -1
@@ -91,6 +107,16 @@ class ToolbarView(context: Context) : View(context) {
             val active = (tool == Tool.ARROWS && arrowsActive) ||
                 (tool == Tool.WEB && webActive) ||
                 (tool == Tool.MIC && micActive)
+            if (tool == Tool.MIC && micActive) {
+                // Kehä sykkii puheen tahdissa ja laskee itsestään hiljaisuudessa.
+                micShownLevel += (micLevel - micShownLevel) * 0.3f
+                micLevel *= 0.94f
+                val alpha = (60 + 140 * micShownLevel).toInt().coerceIn(0, 255)
+                haloPaint.color = (theme.accent and 0x00FFFFFF) or (alpha shl 24)
+                val radius = rect.height() / 2f + dp(2f) + dp(6f) * micShownLevel
+                canvas.drawCircle(rect.centerX(), rect.centerY(), radius, haloPaint)
+                postInvalidateOnAnimation()
+            }
             buttonPaint.color = when {
                 i == pressedIndex -> theme.keyPressed
                 active -> theme.accent

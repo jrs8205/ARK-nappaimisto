@@ -26,6 +26,9 @@ class DictationController(
         fun onFinalText(text: String)
         fun onDictationStateChanged(active: Boolean)
         fun onDictationError(messageResId: Int)
+
+        /** Puheen voimakkuus 0–1 mikrofonin sykettä varten. */
+        fun onSpeechLevel(level: Float)
     }
 
     var isActive = false
@@ -39,7 +42,11 @@ class DictationController(
     private val recognitionListener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() = Unit
-        override fun onRmsChanged(rmsdB: Float) = Unit
+
+        override fun onRmsChanged(rmsdB: Float) {
+            if (!isActive) return
+            listener.onSpeechLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
+        }
         override fun onBufferReceived(buffer: ByteArray?) = Unit
         override fun onEndOfSpeech() = Unit
         override fun onEvent(eventType: Int, params: Bundle?) = Unit

@@ -79,9 +79,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onFinalText(text: String) {
                     val ic = currentInputConnection ?: return
+                    // Lopullinen teksti korvaa keskeneräisen — ei sen perään,
+                    // ettei sama puhe päädy kenttään kahdesti.
                     ic.beginBatchEdit()
+                    ic.setComposingText("$text ", 1)
                     ic.finishComposingText()
-                    ic.commitText("$text ", 1)
                     ic.endBatchEdit()
                     if (learningEnabled) {
                         // Sanellut sanat oppivat samoin kuin kirjoitetut.
@@ -99,6 +101,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onDictationError(messageResId: Int) {
                     Toast.makeText(this@KeyboardService, messageResId, Toast.LENGTH_SHORT).show()
+                }
+
+                override fun onSpeechLevel(level: Float) {
+                    toolbar?.micLevel = level
                 }
             },
         )

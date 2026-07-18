@@ -15,7 +15,14 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
 import androidx.preference.PreferenceManager
+import org.jarsi.ark.data.BigramEntity
+import org.jarsi.ark.data.LearnedDatabase
+import org.jarsi.ark.data.WordEntity
 import org.jarsi.ark.engine.DictionaryEngine
+import org.jarsi.ark.engine.LearnedBigram
+import org.jarsi.ark.engine.LearnedWord
+import org.jarsi.ark.engine.LearningEngine
+import org.jarsi.ark.engine.SuggestionEngine
 import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
@@ -47,6 +54,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var vibrationEnabled = true
 
     private val dictionary = DictionaryEngine()
+    private val learning = LearningEngine()
+    private val suggestionEngine = SuggestionEngine(dictionary, learning)
+    private var database: LearnedDatabase? = null
+    private var learningEnabled = false
+    private val ioExecutor = Executors.newSingleThreadExecutor()
     private val suggestExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var suggestGeneration = 0
@@ -74,12 +86,26 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         super.onCreate()
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
         prefs.registerOnSharedPreferenceChangeListener(prefListener)
-        // Sanalista ladataan taustalla; ehdotusrivi on tyhjä kunnes lataus valmistuu.
+        // Sanalista ja oppimisdata ladataan taustalla; ehdotusrivi on tyhjä
+        // kunnes lataus valmistuu.
         Thread {
             try {
                 assets.open("sanalista.txt").bufferedReader().useLines { dictionary.load(it) }
             } catch (e: IOException) {
                 // Sanalista puuttuu tai ei aukea: ehdotusrivi jää tyhjäksi.
+            }
+            try {
+                val db = LearnedDatabase.create(this)
+                val words = db.dao().allWords()
+                    .map { LearnedWord(it.word, it.count, it.lastUsed, it.blocked, it.created) }
+                val pairs = db.dao().allBigrams()
+                    .map { LearnedBigram(it.previous, it.next, it.count, it.lastUsed) }
+                mainHandler.post {
+                    database = db
+                    learning.load(words, pairs)
+                }
+            } catch (e: Exception) {
+                // Tietokanta ei auennut: oppiminen jää pois, näppäimistö toimii silti.
             }
             mainHandler.post { updateSuggestions() }
         }.start()
@@ -87,8 +113,61 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onDestroy() {
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
+        flushLearned()
         suggestExecutor.shutdownNow()
+        // Sulkeutuu vasta kun jonossa oleva kirjoitus on valmis.
+        ioExecutor.shutdown()
         super.onDestroy()
+    }
+
+    override fun onFinishInputView(finishingInput: Boolean) {
+        flushLearned()
+        learning.resetContext()
+        super.onFinishInputView(finishingInput)
+    }
+
+    /** Kirjoittaa kertyneet oppimismuutokset tietokantaan taustasäikeessä. */
+    private fun flushLearned() {
+        val db = database ?: return
+        if (learning.dirtyCount == 0) return
+        val dirty = learning.drainDirty()
+        ioExecutor.execute {
+            try {
+                dirty.removedWords.forEach { db.dao().deleteWord(it) }
+                if (dirty.words.isNotEmpty()) {
+                    db.dao().upsertWords(
+                        dirty.words.map {
+                            WordEntity(
+                                it.word.lowercase(fiLocale), it.word,
+                                it.count, it.lastUsed, it.blocked, it.created,
+                            )
+                        }
+                    )
+                }
+                if (dirty.bigrams.isNotEmpty()) {
+                    db.dao().upsertBigrams(
+                        dirty.bigrams.map { BigramEntity(it.previous, it.next, it.count, it.lastUsed) }
+                    )
+                }
+            } catch (e: Exception) {
+                // Kirjoitusvirhe ei saa kaataa näppäimistöä; erä yritetään myöhemmin uudelleen.
+            }
+        }
+    }
+
+    private fun maybeFlush() {
+        if (learning.dirtyCount >= FLUSH_THRESHOLD) flushLearned()
+    }
+
+    /** Oppii kursorin edellä olevan keskeneräisen sanan, jos oppiminen on sallittu. */
+    private fun learnCurrentWord() {
+        if (!learningEnabled) return
+        val before = currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: return
+        val word = WordTools.currentWord(before)
+        if (word.isNotEmpty()) {
+            learning.onWordCommitted(word)
+            maybeFlush()
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -193,6 +272,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         keyboardView?.enterText = enterLabel(info)
         shiftState = ShiftState.OFF
         manualShift = false
+        // Salasanakentissä ei opita mitään; kentän vaihto katkaisee sanaketjun.
+        learningEnabled = !passwordField
+        learning.resetContext()
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
         // Salasana- ja numerokentissä ehdotusrivi on aina piilossa.
@@ -214,6 +296,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         ic.commitText(if (spaceAfterSuggestion) "$word " else word, 1)
         ic.endBatchEdit()
         autoSpaceState = if (spaceAfterSuggestion) 2 else 0
+        if (learningEnabled) {
+            // Ketju jatkuu valitun sanan kautta; määrä kasvaa vain omilla sanoilla.
+            learning.onSuggestionAccepted(word)
+            maybeFlush()
+        }
         feedback()
         updateAutoCaps()
         updateSuggestions()
@@ -233,8 +320,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         suggestExecutor.execute {
             val word = WordTools.currentWord(before)
             var result = when {
-                word.isNotEmpty() -> dictionary.suggest(word)
-                commonWordsEnabled -> dictionary.topWords()
+                word.isNotEmpty() -> suggestionEngine.suggest(word)
+                commonWordsEnabled -> suggestionEngine.topWords()
                 else -> emptyList()
             }
             val capitalize = if (word.isEmpty()) shiftActive else word.first().isUpperCase()
@@ -290,6 +377,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onText(text: String) {
         val ic = currentInputConnection ?: return
+        // Erotinmerkki päättää keskeneräisen sanan: opitaan se ennen merkin syöttöä.
+        if (text.length == 1 && !text[0].isLetterOrDigit() && text[0] != '-') {
+            learnCurrentWord()
+        }
         if (autoSpaceState > 0 && text.length == 1 && text[0] in AUTO_SPACE_PUNCTUATION &&
             ic.getTextBeforeCursor(1, 0)?.toString() == " "
         ) {
@@ -332,8 +423,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
                 feedback(AudioManager.FX_KEYPRESS_DELETE)
             }
-            KeyAction.Enter -> handleEnter()
+            KeyAction.Enter -> {
+                // Rivinvaihto päättää sanan muttei katkaise sanaketjua.
+                learnCurrentWord()
+                handleEnter()
+            }
             KeyAction.Space -> {
+                learnCurrentWord()
                 currentInputConnection?.commitText(" ", 1)
                 feedback(AudioManager.FX_KEYPRESS_SPACEBAR)
             }
@@ -356,6 +452,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             is KeyAction.Arrow -> {
                 sendDownUpKeyEvents(action.keyCode)
+                // Kursorin siirto katkaisee sanaketjun.
+                learning.resetContext()
                 feedback()
             }
             KeyAction.None -> Unit
@@ -367,6 +465,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         sendDownUpKeyEvents(
             if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
         )
+        // Kursorin siirto katkaisee sanaketjun.
+        learning.resetContext()
         // Kevyt napsaus jokaisesta askeleesta, jotta liu'utukseen saa tuntuman.
         if (vibrationEnabled) {
             keyboardView?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -458,5 +558,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val DOUBLE_TAP_CAPS_MS = 350L
         const val MAX_WORD_LOOKBACK = 48
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
+        const val FLUSH_THRESHOLD = 50
     }
 }

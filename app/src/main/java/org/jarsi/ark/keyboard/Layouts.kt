@@ -65,7 +65,7 @@ object Layouts {
             numberRow,
             listOf(
                 key("@"), key("#"), key("€", listOf("$", "£", "¥")), key("_"), key("&"),
-                key("-"), key("+"), key("("), key(")"), key("/"),
+                key("-", listOf("–", "—")), key("+"), key("("), key(")"), key("/"),
             ),
             listOf(
                 key("*"), key("\""), key("'"), key(":"), key(";"), key("!"), key("?"),
@@ -98,7 +98,28 @@ object Layouts {
             ),
             listOf(
                 Key(KeyAction.Symbols, "?123", widthWeight = 1.5f),
-                key("©"), key("®"), key("™"), key("«"), key("»"), key("„"),
+                key("<"), key(">"), key("^"), key("`"), key("©"), key("®"), key("™"),
+                Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true),
+            ),
+            listOf(
+                Key(KeyAction.Letters, "ABC", widthWeight = 1.5f),
+                Key(KeyAction.SymbolsWeb, "www"),
+                key(","),
+                Key(KeyAction.Space, "", widthWeight = 3f),
+                key("."),
+                Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
+            ),
+        )
+    )
+
+    /** Verkko-osoitesivu: osoitteiden alut ja yleisimmät päätteet. */
+    val symbols3 = KeyboardLayout(
+        listOf(
+            listOf(key("https://"), key("http://"), key("www.")),
+            listOf(key(".fi"), key(".com"), key(".net"), key(".org")),
+            listOf(
+                Key(KeyAction.Symbols, "?123", widthWeight = 1.5f),
+                key(".io"), key(".eu"), key(".info"),
                 Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true),
             ),
             listOf(

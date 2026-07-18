@@ -92,17 +92,63 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         chain(word)
     }
 
-    /** Ehdotus valittiin: ketju jatkuu aina, määrä kasvaa vain omilla sanoilla. */
+    /**
+     * Ehdotus valittiin: hyväksyntä kirjautuu (myös yleissanalle) ja nollaa
+     * ohitukset; käyttömäärä kasvaa vain omilla sanoilla. Ketju jatkuu aina.
+     */
     fun onSuggestionAccepted(word: String) {
         if (!loaded) return
-        val state = words[keyOf(word)]
-        if (state != null && state.count > 0) {
-            state.count++
-            state.lastUsed = clock()
-            dirtyWords += keyOf(word)
-        }
+        val key = keyOf(word)
+        val state = words.getOrPut(key) { WordState(word, 0, clock(), false, clock()) }
+        if (state.count > 0) state.count++
+        state.acceptedCount++
+        state.ignoredCount = 0
+        state.lastUsed = clock()
+        dirtyWords += key
         chain(word)
     }
+
+    /**
+     * Rivillä näkyneet täydennykset ohitettiin: kasvata ohituslaskuria
+     * kaikilta paitsi lopulliselta sanalta. Vaikutus pisteisiin on kevyt ja
+     * alkaa vasta toistuvista ohituksista.
+     */
+    fun onSuggestionsIgnored(shown: List<String>, finalWord: String) {
+        if (!loaded) return
+        val finalKey = keyOf(finalWord)
+        for (word in shown) {
+            val key = keyOf(word)
+            if (key == finalKey) continue
+            val state = words.getOrPut(key) { WordState(word, 0, clock(), false, clock()) }
+            state.ignoredCount++
+            dirtyWords += key
+        }
+    }
+
+    fun setPinned(word: String, pinned: Boolean) {
+        if (!loaded) return
+        val key = keyOf(word)
+        val state = words.getOrPut(key) { WordState(word, 0, clock(), false, clock()) }
+        state.pinned = pinned
+        dirtyWords += key
+    }
+
+    fun isPinned(word: String): Boolean = words[keyOf(word)]?.pinned == true
+
+    /** Sanan pisteytyssignaalit tai null, jos sanasta ei ole mitään tietoa. */
+    fun signals(word: String): WordSignals? = words[keyOf(word)]?.let {
+        WordSignals(
+            usage = it.count * recency(it.lastUsed),
+            manuallyTyped = it.count > 0,
+            acceptedCount = it.acceptedCount,
+            ignoredCount = it.ignoredCount,
+            pinned = it.pinned,
+            blocked = it.blocked,
+        )
+    }
+
+    /** Tallennettu kirjoitusasu tai avain sellaisenaan. */
+    fun displayForm(key: String): String = words[keyOf(key)]?.word ?: key
 
     private fun chain(word: String) {
         if (!isChainToken(word)) {
@@ -156,26 +202,36 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     }
 
     /**
+     * Kontekstiin täsmäävät jatkot raakapistein: bigram- ja trigramosumat
+     * eriteltyinä (määrä × tuoreuskerroin). Avaimet pienennettyinä.
+     */
+    fun contextMatches(context: List<String>): Map<String, NextMatch> {
+        if (context.isEmpty()) return emptyMap()
+        val result = HashMap<String, NextMatch>()
+        val last = keyOf(context.last())
+        bigrams[last]?.forEach { (next, state) ->
+            result[next] = NextMatch(state.count * recency(state.lastUsed), 0f)
+        }
+        if (context.size >= 2) {
+            trigrams[keyOf(context[context.size - 2]) to last]?.forEach { (next, state) ->
+                val old = result[next] ?: NextMatch(0f, 0f)
+                result[next] = old.copy(trigram = state.count * recency(state.lastUsed))
+            }
+        }
+        return result
+    }
+
+    /**
      * Todennäköisimmät seuraavat sanat. Trigramiosumat (kaksi edeltävää sanaa
      * täsmäävät) painottuvat kertoimella ×3, bigramit täydentävät.
      */
     fun predictNext(context: List<String>, max: Int = 3): List<String> {
-        if (context.isEmpty() || max <= 0) return emptyList()
-        val scores = HashMap<String, Float>()
-        val last = keyOf(context.last())
-        if (context.size >= 2) {
-            trigrams[keyOf(context[context.size - 2]) to last]?.forEach { (next, state) ->
-                scores[next] = (scores[next] ?: 0f) + state.count * recency(state.lastUsed) * 3f
-            }
-        }
-        bigrams[last]?.forEach { (next, state) ->
-            scores[next] = (scores[next] ?: 0f) + state.count * recency(state.lastUsed)
-        }
-        return scores.entries
+        if (max <= 0) return emptyList()
+        return contextMatches(context).entries
             .filter { words[it.key]?.blocked != true }
-            .sortedByDescending { it.value }
+            .sortedByDescending { it.value.bigram + it.value.trigram * 3f }
             .take(max)
-            .map { words[it.key]?.word ?: it.key }
+            .map { displayForm(it.key) }
     }
 
     fun isOwnWord(word: String): Boolean =

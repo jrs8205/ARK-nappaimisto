@@ -154,4 +154,58 @@ class LearningEngineTest {
         val dirty = e.drainDirty()
         assertTrue(dirty.trigrams.any { it.first == "a1" && it.second == "b2" && it.next == "c3" })
     }
+
+    @Test
+    fun `hyvaksynta kirjautuu ja nollaa ohitukset`() {
+        val e = engine()
+        e.onWordCommitted("sana")
+        e.onSuggestionsIgnored(listOf("sana"), "muu")
+        e.onSuggestionsIgnored(listOf("sana"), "muu")
+        assertEquals(2, e.signals("sana")!!.ignoredCount)
+        e.onSuggestionAccepted("sana")
+        assertEquals(1, e.signals("sana")!!.acceptedCount)
+        assertEquals(0, e.signals("sana")!!.ignoredCount)
+    }
+
+    @Test
+    fun `yleissana saa palautetilan muttei tule omaksi`() {
+        val e = engine()
+        e.onSuggestionAccepted("auto")
+        assertFalse(e.isOwnWord("auto"))
+        assertEquals(1, e.signals("auto")!!.acceptedCount)
+    }
+
+    @Test
+    fun `lopullinen sana ei saa ohitusta`() {
+        val e = engine()
+        e.onWordCommitted("sana")
+        e.onSuggestionsIgnored(listOf("sana", "toinen"), "Sana")
+        assertEquals(0, e.signals("sana")!!.ignoredCount)
+    }
+
+    @Test
+    fun `kiinnitys ja irrotus`() {
+        val e = engine()
+        e.setPinned("prx4", true)
+        assertTrue(e.isPinned("PRX4"))
+        e.setPinned("prx4", false)
+        assertFalse(e.isPinned("prx4"))
+    }
+
+    @Test
+    fun `contextMatches erottelee bigramin ja trigramin`() {
+        val e = engine()
+        listOf("alfa", "beeta", "cee").forEach { e.onWordCommitted(it) }
+        val matches = e.contextMatches(listOf("alfa", "beeta"))
+        assertTrue(matches.getValue("cee").bigram > 0f)
+        assertTrue(matches.getValue("cee").trigram > 0f)
+    }
+
+    @Test
+    fun `displayForm palauttaa asun tai avaimen`() {
+        val e = engine()
+        e.onWordCommitted("Jako")
+        assertEquals("Jako", e.displayForm("jako"))
+        assertEquals("20", e.displayForm("20"))
+    }
 }

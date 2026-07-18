@@ -19,9 +19,9 @@ import org.jarsi.ark.R
 class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Asetussivu noudattaa näppäimistön teemavalintaa järjestelmäteeman sijaan.
+        // Asetussivu noudattaa näppäimistön teemavalintaa.
         applyNightMode(
-            PreferenceManager.getDefaultSharedPreferences(this).getString("teema", "tumma")
+            PreferenceManager.getDefaultSharedPreferences(this).getString("teema", "jarjestelma")
         )
         super.onCreate(savedInstanceState)
         // Reunasta reunaan -tilassa sisältö menisi tila- ja navigointipalkkien
@@ -63,10 +63,10 @@ class SettingsActivity : AppCompatActivity() {
     private companion object {
         fun applyNightMode(theme: String?) {
             AppCompatDelegate.setDefaultNightMode(
-                if (theme == "vaalea") {
-                    AppCompatDelegate.MODE_NIGHT_NO
-                } else {
-                    AppCompatDelegate.MODE_NIGHT_YES
+                when (theme) {
+                    "vaalea" -> AppCompatDelegate.MODE_NIGHT_NO
+                    "tumma" -> AppCompatDelegate.MODE_NIGHT_YES
+                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
                 }
             )
         }

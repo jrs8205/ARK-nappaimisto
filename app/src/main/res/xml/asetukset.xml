@@ -21,7 +21,7 @@
             android:title="@string/asetus_teema"
             android:entries="@array/teema_nimet"
             android:entryValues="@array/teema_arvot"
-            android:defaultValue="tumma"
+            android:defaultValue="jarjestelma"
             app:singleLineTitle="false"
             app:useSimpleSummaryProvider="true" />
         <SeekBarPreference

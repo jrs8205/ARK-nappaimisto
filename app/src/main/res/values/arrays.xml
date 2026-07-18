@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="teema_nimet">
+        <item>@string/teema_jarjestelma</item>
         <item>@string/teema_tumma</item>
         <item>@string/teema_vaalea</item>
     </string-array>
     <string-array name="teema_arvot">
+        <item>jarjestelma</item>
         <item>tumma</item>
         <item>vaalea</item>
     </string-array>

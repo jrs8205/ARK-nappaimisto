@@ -26,6 +26,7 @@
     <string name="asetus_ehdotus_yleiset">Yleisimmät sanat tyhjällä syötteellä</string>
     <string name="asetus_ehdotus_numerot">Ehdotukset numerokentissä</string>
 
+    <string name="teema_jarjestelma">Järjestelmä</string>
     <string name="teema_tumma">Tumma</string>
     <string name="teema_vaalea">Vaalea</string>
 

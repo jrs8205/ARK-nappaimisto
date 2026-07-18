@@ -1,6 +1,7 @@
 package org.jarsi.ark
 
 import android.content.Intent
+import android.content.SharedPreferences
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
 import android.os.Handler
@@ -58,8 +59,20 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private val fiLocale = Locale.forLanguageTag("fi")
 
+    private lateinit var prefs: SharedPreferences
+
+    // Ulkoasuasetukset otetaan käyttöön heti asetuksissa vaihdettaessa, jotta
+    // näppäimistö on jo oikeassa teemassa kun asetuksista palataan.
+    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "teema" || key == "korkeus" || key == "esikatselu") {
+            applyVisualSettings()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
+        prefs = PreferenceManager.getDefaultSharedPreferences(this)
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
         // Sanalista ladataan taustalla; ehdotusrivi on tyhjä kunnes lataus valmistuu.
         Thread {
             try {
@@ -72,8 +85,22 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     override fun onDestroy() {
+        prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         suggestExecutor.shutdownNow()
         super.onDestroy()
+    }
+
+    private fun applyVisualSettings() {
+        val theme = KeyboardTheme.load(this, prefs.getString("teema", "jarjestelma"))
+        val heightScale = prefs.getInt("korkeus", 100) / 100f
+        keyboardView?.applySettings(
+            theme,
+            heightScale,
+            // Salasanakentässä esikatselukupla jää pois, ettei syöte näy sivullisille.
+            prefs.getBoolean("esikatselu", true) && !passwordField,
+        )
+        suggestionBar?.applySettings(theme, heightScale)
+        toolbar?.applySettings(theme)
     }
 
     override fun onCreateInputView(): View {
@@ -125,7 +152,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         soundEnabled = prefs.getBoolean("aanet", false)
         vibrationEnabled = prefs.getBoolean("varina", true)
 
@@ -133,16 +159,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val variation = info.inputType and InputType.TYPE_MASK_VARIATION
         passwordField = isPasswordField(inputClass, variation)
 
-        val theme = KeyboardTheme.load(this, prefs.getString("teema", "tumma"))
-        val heightScale = prefs.getInt("korkeus", 100) / 100f
-        keyboardView?.applySettings(
-            theme,
-            heightScale,
-            // Salasanakentässä esikatselukupla jää pois, ettei syöte näy sivullisille.
-            prefs.getBoolean("esikatselu", true) && !passwordField,
-        )
-        suggestionBar?.applySettings(theme, heightScale)
-        toolbar?.applySettings(theme)
+        applyVisualSettings()
 
         page = when (inputClass) {
             InputType.TYPE_CLASS_NUMBER,

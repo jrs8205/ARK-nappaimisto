@@ -5,6 +5,14 @@ object WordTools {
 
     private fun isCore(c: Char) = c.isLetterOrDigit() || c == '-'
 
+    private val NON_WORD = Regex("[^\\p{L}\\p{N}.-]+")
+
+    /** Pilkkoo tekstin sanoiksi esimerkiksi sanellun lauseen oppimista varten. */
+    fun words(text: CharSequence): List<String> =
+        text.split(NON_WORD)
+            .map { it.trim('-', '.') }
+            .filter { it.isNotEmpty() }
+
     /**
      * Palauttaa kursoria välittömästi edeltävän keskeneräisen sanan tai
      * tyhjän, jos kursorin edellä on sananraja. Sanassa voi olla kirjaimia,

@@ -80,4 +80,20 @@ class WordToolsTest {
     @Test
     fun `count rajaa edeltavien maaran`() =
         assertEquals(listOf("c"), WordTools.previousWords("a b c ", 1))
+
+    @Test
+    fun `words pilkkoo tekstin sanoiksi`() =
+        assertEquals(listOf("hei", "maailma"), WordTools.words("hei maailma"))
+
+    @Test
+    fun `words sailyttaa sisaiset pisteet ja siivoaa reunat`() =
+        assertEquals(listOf("käy", "jarsi.org"), WordTools.words("käy jarsi.org."))
+
+    @Test
+    fun `words tyhjasta tyhja`() =
+        assertEquals(emptyList<String>(), WordTools.words("  "))
+
+    @Test
+    fun `words pitaa numerot ja koodit`() =
+        assertEquals(listOf("prx4", "Jako", "20"), WordTools.words("prx4, Jako 20!"))
 }

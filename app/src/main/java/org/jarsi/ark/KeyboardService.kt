@@ -1,7 +1,9 @@
 package org.jarsi.ark
 
+import android.Manifest
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.media.AudioManager
@@ -14,7 +16,10 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
+import android.widget.Toast
 import androidx.preference.PreferenceManager
+import org.jarsi.ark.dictation.DictationController
+import org.jarsi.ark.dictation.RecordAudioPermissionActivity
 import org.jarsi.ark.data.BigramEntity
 import org.jarsi.ark.data.LearnedDataStamp
 import org.jarsi.ark.data.LearnedDatabase
@@ -62,6 +67,42 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var database: LearnedDatabase? = null
     private var learningEnabled = false
     private var loadedStamp = 0L
+    private var pendingDictation = false
+
+    private val dictation by lazy {
+        DictationController(
+            this,
+            object : DictationController.Listener {
+                override fun onPartialText(text: String) {
+                    currentInputConnection?.setComposingText(text, 1)
+                }
+
+                override fun onFinalText(text: String) {
+                    val ic = currentInputConnection ?: return
+                    ic.beginBatchEdit()
+                    ic.finishComposingText()
+                    ic.commitText("$text ", 1)
+                    ic.endBatchEdit()
+                    if (learningEnabled) {
+                        // Sanellut sanat oppivat samoin kuin kirjoitetut.
+                        WordTools.words(text).forEach { learning.onWordCommitted(it) }
+                        maybeFlush()
+                    }
+                }
+
+                override fun onDictationStateChanged(active: Boolean) {
+                    toolbar?.micActive = active
+                    if (!active) {
+                        currentInputConnection?.finishComposingText()
+                    }
+                }
+
+                override fun onDictationError(messageResId: Int) {
+                    Toast.makeText(this@KeyboardService, messageResId, Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+    }
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val suggestExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -119,6 +160,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     override fun onDestroy() {
+        dictation.stop()
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         flushLearned()
         suggestExecutor.shutdownNow()
@@ -128,6 +170,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        // Lupa-aktiviteetin avaus piilottaa näppäimistön hetkeksi; silloin
+        // sanelua ei pysäytetä, jotta se voi alkaa luvan myöntämisen jälkeen.
+        if (!pendingDictation) {
+            dictation.stop()
+        }
         flushLearned()
         learning.resetContext()
         super.onFinishInputView(finishingInput)
@@ -268,6 +315,27 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     feedback()
                 }
 
+                override fun onToggleDictation() {
+                    feedback()
+                    when {
+                        passwordField -> Unit
+                        dictation.isActive -> dictation.stop()
+                        checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                            PackageManager.PERMISSION_GRANTED -> dictation.start()
+                        else -> {
+                            // Lupa kysytään erillisellä aktiviteetilla; sanelu
+                            // jatkuu automaattisesti kenttään palattaessa.
+                            pendingDictation = true
+                            startActivity(
+                                Intent(
+                                    this@KeyboardService,
+                                    RecordAudioPermissionActivity::class.java,
+                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }
+                    }
+                }
+
                 override fun onOpenSettings() {
                     // Näppäimistö suljetaan ensin, ettei se jää sovelluksen
                     // ruutukaappaukseen ja välähdä vanhalla teemalla palattaessa.
@@ -355,6 +423,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         learningEnabled = !passwordField
         learning.resetContext()
         reloadLearnedIfChanged()
+        // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
+        dictation.stop()
+        if (pendingDictation) {
+            pendingDictation = false
+            if (!passwordField &&
+                checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                dictation.start()
+            }
+        }
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
         // Salasana- ja numerokentissä ehdotusrivi on aina piilossa.

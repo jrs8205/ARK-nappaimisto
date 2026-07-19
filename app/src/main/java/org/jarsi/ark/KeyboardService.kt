@@ -1418,7 +1418,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // ei opita mitään; kentän vaihto katkaisee sanaketjun.
         learningEnabled = !passwordField &&
             info.imeOptions and EditorInfoCompat.IME_FLAG_NO_PERSONALIZED_LEARNING == 0
-        // Kenttä voi kieltää sanastotoiminnot (esim. käyttäjätunnus tai koodi).
+        // NO_SUGGESTIONS-kentässä (esim. käyttäjätunnus tai koodi) tekstiä
+        // ei automaattikorjata; ehdotusrivi näkyy silti.
         noSuggestionsField = inputClass == InputType.TYPE_CLASS_TEXT &&
             info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0
         learning.resetContext()
@@ -1446,10 +1447,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         autoCorrectEnabled = prefs.getBoolean("automaattikorjaus", true)
         symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
         pendingRevert = null
-        // Salasana-, numero- ja NO_SUGGESTIONS-kentissä ehdotusrivi on piilossa.
+        // Salasana- ja numerokentissä ehdotusrivi on piilossa. NO_SUGGESTIONS
+        // EI piilota riviä: moni sovellus (esim. Google Keep) merkitsee sillä
+        // tavallisia kirjoituskenttiä, ja oma oppiminen on tämän näppäimistön
+        // ydin — lippu poistaa vain automaattikorjauksen.
         suggestionsVisible = prefs.getBoolean("ehdotukset", true) &&
             !passwordField &&
-            !noSuggestionsField &&
             page != Page.NUMERIC
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         updateLayout()

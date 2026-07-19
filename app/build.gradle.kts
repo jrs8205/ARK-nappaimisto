@@ -21,8 +21,8 @@ android {
         applicationId = "org.jarsi.ark.nappaimisto"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.7.0"
+        versionCode = 4
+        versionName = "0.8.0"
     }
 
     signingConfigs {

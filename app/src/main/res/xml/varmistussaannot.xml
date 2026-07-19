@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android 12+: oppimisdata ja leikkeet eivät siirry pilvivarmistukseen
      eivätkä laitteesta laitteeseen -siirrossa; siirto tehdään käyttäjän
-     omalla varmuuskopiotoiminnolla. -->
+     omalla varmuuskopiotoiminnolla. Device-domainit mukana varmuudeksi,
+     vaikka laitesuojattua tallennustilaa ei nyt käytetä. -->
 <data-extraction-rules xmlns:android="http://schemas.android.com/apk/res/android">
     <cloud-backup>
         <exclude domain="root" path="." />
@@ -9,6 +10,10 @@
         <exclude domain="database" path="." />
         <exclude domain="sharedpref" path="." />
         <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </cloud-backup>
     <device-transfer>
         <exclude domain="root" path="." />
@@ -16,5 +21,9 @@
         <exclude domain="database" path="." />
         <exclude domain="sharedpref" path="." />
         <exclude domain="external" path="." />
+        <exclude domain="device_root" path="." />
+        <exclude domain="device_file" path="." />
+        <exclude domain="device_database" path="." />
+        <exclude domain="device_sharedpref" path="." />
     </device-transfer>
 </data-extraction-rules>

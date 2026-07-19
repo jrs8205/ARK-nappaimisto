@@ -109,6 +109,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var translateMode = false
     private val translateBuffer = StringBuilder()
     private var translateRunnable: Runnable? = null
+
+    // Rivin sisältö, jonka viimeisin onnistunut live-käännös kattoi: sulku
+    // voi viimeistellä näkyvän käännöksen synkronisesti vain kun ne täsmäävät.
+    private var lastTranslatedText = ""
     private var translationGeneration = 0
     private var translator: Translator? = null
     private var translatorReady = false
@@ -187,6 +191,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // käännöksen viimeistely) ei saa kirjoittaa toiseen kenttään.
     private var editorSessionId = 0
 
+    // Tuhotulle palvelulle palaavat callbackit eivät saa jonottaa uutta työtä.
+    private var destroyed = false
+
     // Viimeisin oma muokkaushetki: sen jälkeiset valintamuutokset ovat
     // käyttäjän kursorihyppyjä, jotka katkaisevat sanaketjun.
     private var lastEditTime = 0L
@@ -236,6 +243,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 val clips = db.dao().allClips()
                     .map { Clip(it.id, it.text, it.imagePath, it.created, it.pinned) }
                 mainHandler.post {
+                    if (destroyed) return@post
                     database = db
                     loadedStamp = stamp
                     learning.load(words, pairs, triples)
@@ -260,6 +268,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         clipboardManager?.removePrimaryClipChangedListener(clipChangedListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         flushLearned()
+        destroyed = true
         suggestExecutor.shutdownNow()
         // Sulkeutuu vasta kun jonossa oleva kirjoitus on valmis.
         ioExecutor.shutdown()
@@ -305,6 +314,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 val clips = db.dao().allClips()
                     .map { Clip(it.id, it.text, it.imagePath, it.created, it.pinned) }
                 mainHandler.post {
+                    if (destroyed) return@post
                     learning.load(words, pairs, triples)
                     clipStore.load(clips)
                     pruneClips()
@@ -346,15 +356,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun copyImageClip(uri: Uri) {
         // Tiedostopääte säilyttää todellisen kuvatyypin liittämistä varten.
+        // Tuntematonta tyyppiä ei tallenneta väärällä nimellä eikä väitetä
+        // liitettäessä PNG:ksi — sellainen leike ohitetaan.
         val type = contentResolver.getType(uri)
         val extension = when (type) {
             "image/jpeg" -> "jpg"
             "image/webp" -> "webp"
             "image/png" -> "png"
             "image/gif" -> "gif"
-            else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(type ?: "") ?: "png"
-        }
-        ioExecutor.execute {
+            else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(type ?: "")
+        } ?: return
+        executeIo {
             val dir = File(filesDir, "clips").apply { mkdirs() }
             val file = File(dir, "leike_${System.currentTimeMillis()}.$extension")
             try {
@@ -371,7 +383,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                             output.write(buffer, 0, read)
                         }
                     }
-                } ?: return@execute
+                } ?: return@executeIo
                 mainHandler.post {
                     val saved = clipStore.addImage(file.absolutePath)
                     persistClip(saved)
@@ -392,7 +404,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             pendingClips += clip
             return
         }
-        ioExecutor.execute {
+        executeIo {
             try {
                 db.dao().upsertClip(
                     ClipEntity(clip.id, clip.text, clip.imagePath, clip.created, clip.pinned)
@@ -407,7 +419,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val prune = clipStore.prune()
         if (prune.removedIds.isEmpty()) return
         val db = database
-        ioExecutor.execute {
+        executeIo {
             try {
                 prune.removedIds.forEach { db?.dao()?.deleteClip(it) }
                 prune.removedImagePaths.forEach { File(it).delete() }
@@ -498,6 +510,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         hideAllPanels()
         translateMode = true
         translateBuffer.clear()
+        lastTranslatedText = ""
         bar.visibility = View.VISIBLE
         suggestionBar?.visibility = View.GONE
         toolbar?.translationActive = true
@@ -525,45 +538,23 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         translateBar?.visibility = View.GONE
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         toolbar?.translationActive = false
-        if (flush && text.isNotBlank() && client != null && ready) {
+        // Sulku on täysin synkroninen, jotta heti perään tulevat näppäilyt
+        // eivät voi kiilata viivästetyn kirjoituksen edelle. Kääntämättä
+        // jäänyt häntä jätetään lähdetekstinä talteen — ei arvausta.
+        if (flush) {
             val ic = currentInputConnection
-            val session = editorSessionId
-            client.translate(text)
-                .addOnSuccessListener { result ->
-                    // Kentän vaihduttua tulosta ei kirjoiteta minnekään.
-                    if (session == editorSessionId) {
-                        ic?.beginBatchEdit()
-                        ic?.setComposingText(result, 1)
-                        ic?.finishComposingText()
-                        ic?.endBatchEdit()
-                    }
-                    client.close()
-                }
-                .addOnFailureListener {
-                    if (session == editorSessionId) {
-                        // Käännös ei valmistunut: lähdeteksti jää kenttään talteen.
-                        ic?.beginBatchEdit()
-                        ic?.setComposingText(text, 1)
-                        ic?.finishComposingText()
-                        ic?.endBatchEdit()
-                    }
-                    client.close()
-                }
-        } else {
-            if (flush) {
-                val ic = currentInputConnection
-                if (text.isNotBlank()) {
-                    // Kääntäjä ei ollut valmis: lähdeteksti jää kenttään talteen.
-                    ic?.beginBatchEdit()
-                    ic?.setComposingText(text, 1)
-                    ic?.finishComposingText()
-                    ic?.endBatchEdit()
-                } else {
-                    ic?.finishComposingText()
-                }
+            if (text.isNotBlank() && text != lastTranslatedText) {
+                markOwnEdit()
+                ic?.beginBatchEdit()
+                ic?.setComposingText(text, 1)
+                ic?.finishComposingText()
+                ic?.endBatchEdit()
+            } else {
+                ic?.finishComposingText()
             }
-            client?.close()
         }
+        lastTranslatedText = ""
+        client?.close()
         updateSuggestions()
     }
 
@@ -644,7 +635,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (translateMode && generation == translationGeneration &&
                 text == translateBuffer.toString()
             ) {
-                lastEditTime = SystemClock.uptimeMillis()
+                markOwnEdit()
+                lastTranslatedText = text
                 currentInputConnection?.setComposingText(result, 1)
             }
         }
@@ -669,26 +661,32 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         val generation = ++translationGeneration
+        val session = editorSessionId
         client.translate(text)
             .addOnSuccessListener { result ->
                 // Vanhentunut tulos hylätään: käyttäjä ehti jatkaa, painaa
-                // enteriä uudelleen, sulkea tilan tai vaihtaa kenttää.
+                // enteriä uudelleen, sulkea tilan, vaihtaa kenttää tai
+                // syötenäkymä ehti sulkeutua.
                 if (!translateMode || generation != translationGeneration ||
-                    translateBuffer.toString() != text
+                    session != editorSessionId || translateBuffer.toString() != text
                 ) {
                     return@addOnSuccessListener
                 }
                 val ic = currentInputConnection ?: return@addOnSuccessListener
+                markOwnEdit()
                 ic.beginBatchEdit()
                 ic.setComposingText(result, 1)
                 ic.finishComposingText()
                 ic.endBatchEdit()
                 translateBuffer.clear()
+                lastTranslatedText = ""
                 updateTranslateBar()
                 onDone()
             }
             .addOnFailureListener {
-                if (translateMode && generation == translationGeneration) {
+                if (translateMode && generation == translationGeneration &&
+                    session == editorSessionId
+                ) {
                     Toast.makeText(this, R.string.kaannos_virhe, Toast.LENGTH_SHORT).show()
                 }
             }
@@ -856,6 +854,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun pasteClip(clip: Clip) {
         val ic = currentInputConnection ?: return
+        markOwnEdit()
         if (clip.text != null) {
             ic.commitText(clip.text, 1)
             hideClipboardPanel()
@@ -870,7 +869,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             path.endsWith(".gif") -> "image/gif"
             path.endsWith(".png") -> "image/png"
             else -> MimeTypeMap.getSingleton()
-                .getMimeTypeFromExtension(path.substringAfterLast('.', "")) ?: "image/png"
+                .getMimeTypeFromExtension(path.substringAfterLast('.', ""))
+        }
+        if (mime == null) {
+            Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+            return
         }
         val supported = EditorInfoCompat.getContentMimeTypes(info)
             .any { ClipDescription.compareMimeTypes(mime, it) }
@@ -902,7 +905,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val db = database ?: return
         if (learning.dirtyCount == 0) return
         val dirty = learning.drainDirty()
-        ioExecutor.execute {
+        executeIo {
             try {
                 // Erä kirjoitetaan transaktiossa: joko kaikki tai ei mitään.
                 db.runInTransaction {
@@ -952,9 +955,18 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // Palvelu voi tuhoutua taustalatauksen aikana; suljettuun suorittimeen
     // ei saa jonottaa uutta työtä.
     private fun executeSuggest(task: Runnable) {
-        if (suggestExecutor.isShutdown) return
+        if (destroyed || suggestExecutor.isShutdown) return
         try {
             suggestExecutor.execute(task)
+        } catch (e: RejectedExecutionException) {
+            // Palvelu on sulkeutumassa.
+        }
+    }
+
+    private fun executeIo(task: Runnable) {
+        if (destroyed || ioExecutor.isShutdown) return
+        try {
+            ioExecutor.execute(task)
         } catch (e: RejectedExecutionException) {
             // Palvelu on sulkeutumassa.
         }
@@ -1032,6 +1044,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             // Korjataan vain jos teksti on yhä ennallaan — nopea kirjoittaja
             // on voinut jo jatkaa, eikä tekstiä saa muuttaa selän takana.
             if (ic.getTextBeforeCursor(tail.length, 0)?.toString() == tail) {
+                markOwnEdit()
                 ic.beginBatchEdit()
                 ic.deleteSurroundingText(tail.length, 0)
                 ic.commitText("$display ", 1)
@@ -1053,6 +1066,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val ic = currentInputConnection ?: return false
         val tail = "$corrected "
         if (ic.getTextBeforeCursor(tail.length, 0)?.toString() != tail) return false
+        markOwnEdit()
         ic.beginBatchEdit()
         ic.deleteSurroundingText(tail.length, 0)
         ic.commitText(typed, 1)
@@ -1225,7 +1239,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onClear() {
                     feedback()
+                    markOwnEdit()
                     translateBuffer.clear()
+                    lastTranslatedText = ""
                     currentInputConnection?.setComposingText("", 1)
                     updateTranslateBar()
                 }
@@ -1299,7 +1315,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 override fun onDelete(clip: Clip) {
                     clipStore.remove(clip.id)
                     val db = database
-                    ioExecutor.execute {
+                    executeIo {
                         try {
                             db?.dao()?.deleteClip(clip.id)
                             clip.imagePath?.let { path -> File(path).delete() }
@@ -1338,6 +1354,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         emojiPanel = EmojiPanelView(this).also {
             it.listener = object : EmojiPanelView.Listener {
                 override fun onEmojiPicked(emoji: String) {
+                    markOwnEdit()
                     if (translateMode) {
                         // Emojit kulkevat käännösrivin kautta muun tekstin mukana.
                         translateBuffer.append(emoji)
@@ -1441,6 +1458,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun onSuggestionPicked(word: String) {
+        markOwnEdit()
         if (correctionPanel?.visibility == View.VISIBLE) {
             replaceCorrectionWord(word)
             return
@@ -1550,6 +1568,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onText(text: String) {
         val ic = currentInputConnection ?: return
+        markOwnEdit()
         pendingRevert = null
         if (translateMode) {
             // Käännöstilassa näppäily kertyy käännösriville; kenttään
@@ -1604,8 +1623,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     override fun onKey(action: KeyAction) {
         // Tekstiä muuttava näppäin katkaisee automaattivälin seurannan.
         when (action) {
-            KeyAction.Backspace, KeyAction.Enter, KeyAction.Space, is KeyAction.Arrow ->
+            KeyAction.Backspace, KeyAction.Enter, KeyAction.Space, is KeyAction.Arrow -> {
                 autoSpaceState = 0
+                markOwnEdit()
+            }
             else -> Unit
         }
         // Korjauksen voi perua vain heti perään; muut näppäimet mitätöivät.
@@ -1733,9 +1754,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         super.onUpdateSelection(
             oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd
         )
-        // Ilman tuoretta omaa muokkausta valinnan muutos on käyttäjän
-        // kursorihyppy (kentän napautus): sanaketju katkeaa kuten nuolissakin.
-        if (SystemClock.uptimeMillis() - lastEditTime > EXTERNAL_SELECTION_MS) {
+        // Maalaus on aina käyttäjän tekemä; muuten ilman tuoretta omaa
+        // muokkausta valinnan muutos on kursorihyppy (kentän napautus).
+        // Molemmat katkaisevat sanaketjun kuten nuolinäppäimetkin.
+        if (newSelStart != newSelEnd ||
+            SystemClock.uptimeMillis() - lastEditTime > EXTERNAL_SELECTION_MS
+        ) {
             learning.resetContext()
         }
         updateAutoCaps()
@@ -1743,10 +1767,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         updateSuggestions()
     }
 
-    private fun feedback(soundEffect: Int = AudioManager.FX_KEYPRESS_STANDARD) {
-        // Näppäilyt ovat omia muokkauksia; niiden valintamuutokset eivät
-        // katkaise sanaketjua onUpdateSelectionissa.
+    /**
+     * Kirjaa oman tekstimuokkauksen: heti perään tulevat valintamuutokset
+     * ovat omia eivätkä katkaise sanaketjua. Ei-muokkaavat näppäimet
+     * (shift, työkalurivi) eivät kutsu tätä.
+     */
+    private fun markOwnEdit() {
         lastEditTime = SystemClock.uptimeMillis()
+    }
+
+    private fun feedback(soundEffect: Int = AudioManager.FX_KEYPRESS_STANDARD) {
         if (vibrationEnabled) {
             keyboardView?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         }

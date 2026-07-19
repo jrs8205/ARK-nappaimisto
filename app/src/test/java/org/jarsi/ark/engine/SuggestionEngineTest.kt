@@ -57,6 +57,24 @@ class SuggestionEngineTest {
     }
 
     @Test
+    fun `laheinen sana voittaa usein kaytetyt pikkusanat`() {
+        val (s, l) = build(
+            "ja 552162", "on 428026", "se 89469", "nimi 2486", "nimen 1024",
+        )
+        // Käyttäjä on kirjoittanut pikkusanoja paljon: niiden omat signaalit
+        // eivät saa jyrätä kirjoitusasultaan läheisiä sanoja.
+        repeat(30) {
+            listOf("ja", "on", "se").forEach {
+                l.onWordCommitted(it)
+                l.resetContext()
+            }
+        }
+        val result = s.alternatives("nime")
+        assertEquals("nimi", result[0])
+        assertEquals("nimen", result[1])
+    }
+
+    @Test
     fun `autoCorrect korjaa tuntemattoman lahimpaan tunnettuun`() {
         val (s, _) = build("koira 100", "kissa 90")
         assertEquals("koira", s.autoCorrect("koirra"))

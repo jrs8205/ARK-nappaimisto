@@ -75,9 +75,20 @@ class SuggestionEngine(
         return rank(candidates, contextMatches, max) { candidate, base ->
             val fit = rightFit[candidate] ?: 0f
             val score = base + fit / (fit + 3f) * BIGRAM_WEIGHT
-            score / (1 + WordTools.editDistanceAtMost(key, candidate, MAX_CLOSENESS_DISTANCE))
+            score * closeness(key, candidate)
         }
     }
+
+    // Jyrkkä porrastus: yhden muokkauksen sana säilyttää pisteensä, kaukainen
+    // romahtaa — muuten usein käytetyt pikkusanat jyräisivät omilla
+    // signaaleillaan kirjoitusasultaan läheiset korjaukset.
+    private fun closeness(key: String, candidate: String): Float =
+        when (WordTools.editDistanceAtMost(key, candidate, MAX_CLOSENESS_DISTANCE)) {
+            0, 1 -> 1f
+            2 -> 0.3f
+            3 -> 0.08f
+            else -> 0.03f
+        }
 
     /**
      * Varovainen automaattikorjaus: korjaa vain kun kirjoitettu sana on

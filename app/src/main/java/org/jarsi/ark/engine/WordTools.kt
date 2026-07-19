@@ -32,6 +32,16 @@ object WordTools {
     }
 
     /**
+     * Ehdotusrivin lopullinen lista: kirjoitettava sana nousee kärkeen
+     * sellaisenaan, jos sitä ei jo ole ehdotuksissa, jotta sen voi hyväksyä
+     * napauttamalla. Asut erotellaan, jotta napautus säilyttää kirjoitetun
+     * kirjainkoon.
+     */
+    fun withTypedWord(typed: String, suggestions: List<String>): List<String> =
+        if (typed.isEmpty() || typed in suggestions) suggestions
+        else listOf(typed) + suggestions
+
+    /**
      * Palauttaa enintään [count] valmista sanaa kursorin keskeneräisen sanan
      * edeltä aikajärjestyksessä (lähin viimeisenä). Erottimet — välilyönnit,
      * rivinvaihdot ja välimerkit — ohitetaan, joten ennustus toimii myös

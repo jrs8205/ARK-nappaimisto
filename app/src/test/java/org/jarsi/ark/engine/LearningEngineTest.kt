@@ -215,4 +215,40 @@ class LearningEngineTest {
         assertEquals("Jako", e.displayForm("jako"))
         assertEquals("20", e.displayForm("20"))
     }
+
+    @Test
+    fun `rivilta hyvaksytty kirjoitettu sana opitaan ja saa hyvaksynnan`() {
+        val e = engine()
+        e.onTypedWordAccepted("chrome")
+        assertEquals(listOf("chrome"), e.suggest("ch"))
+        assertTrue(e.isOwnWord("chrome"))
+        assertEquals(1, e.signals("chrome")!!.acceptedCount)
+    }
+
+    @Test
+    fun `rivilta hyvaksytty sana nollaa ohitukset`() {
+        val e = engine()
+        e.onWordCommitted("chrome")
+        e.onSuggestionsIgnored(listOf("chrome"), "muu")
+        e.onTypedWordAccepted("chrome")
+        assertEquals(0, e.signals("chrome")!!.ignoredCount)
+    }
+
+    @Test
+    fun `rivilta hyvaksytty sana jatkaa ketjua vain kerran`() {
+        val e = engine()
+        e.onWordCommitted("eka")
+        e.onTypedWordAccepted("toka")
+        val bigrams = e.drainDirty().bigrams
+        assertEquals(1, bigrams.first { it.previous == "eka" && it.next == "toka" }.count)
+        assertTrue(bigrams.none { it.previous == "toka" && it.next == "toka" })
+    }
+
+    @Test
+    fun `rivilta hyvaksytty kelvoton sana ketjuttaa muttei opi`() {
+        val e = engine()
+        e.onTypedWordAccepted("20")
+        assertTrue(e.suggest("2").isEmpty())
+        assertFalse(e.isOwnWord("20"))
+    }
 }

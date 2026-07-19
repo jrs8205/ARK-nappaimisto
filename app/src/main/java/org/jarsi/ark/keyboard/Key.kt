@@ -29,3 +29,10 @@ data class Key(
 data class KeyboardLayout(val rows: List<List<Key>>)
 
 enum class ShiftState { OFF, SHIFT, CAPS }
+
+/** Shift-napautuksen kierto: pienet → yksi iso → isot lukossa → pienet. */
+fun ShiftState.nextOnTap(): ShiftState = when (this) {
+    ShiftState.OFF -> ShiftState.SHIFT
+    ShiftState.SHIFT -> ShiftState.CAPS
+    ShiftState.CAPS -> ShiftState.OFF
+}

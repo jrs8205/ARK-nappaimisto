@@ -109,6 +109,25 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     }
 
     /**
+     * Käyttäjä napautti rivillä näkyvää omaa kirjoitettua sanaansa: sana
+     * opitaan kuin kirjoitettuna ja hyväksyntä kirjataan samalla kertaa.
+     * Ketju jatkuu vain kerran, ettei synny sana→sana-tuplabigramia.
+     */
+    fun onTypedWordAccepted(word: String) {
+        if (!loaded) return
+        if (isEligibleWord(word)) {
+            val key = keyOf(word)
+            val state = words.getOrPut(key) { WordState(word, 0, clock(), false, clock()) }
+            state.count++
+            state.acceptedCount++
+            state.ignoredCount = 0
+            state.lastUsed = clock()
+            dirtyWords += key
+        }
+        chain(word)
+    }
+
+    /**
      * Rivillä näkyneet täydennykset ohitettiin: kasvata ohituslaskuria
      * kaikilta paitsi lopulliselta sanalta. Vaikutus pisteisiin on kevyt ja
      * alkaa vasta toistuvista ohituksista.

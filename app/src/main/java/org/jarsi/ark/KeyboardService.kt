@@ -12,7 +12,6 @@ import android.net.Uri
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.text.InputType
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
@@ -46,6 +45,7 @@ import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
+import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
 import org.jarsi.ark.view.ClipboardPanelView
@@ -70,7 +70,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var extraKey: String? = null
     private var shiftState = ShiftState.OFF
     private var manualShift = false
-    private var lastShiftTime = 0L
     private var passwordField = false
     private var soundEnabled = false
     private var vibrationEnabled = true
@@ -710,7 +709,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             // Muut näkyneet täydennykset ohitettiin; valittu sana saa hyväksynnän.
             learning.onSuggestionsIgnored(shownCompletions, word)
             shownCompletions = emptyList()
-            learning.onSuggestionAccepted(word)
+            if (word == current) {
+                // Rivin kärjessä ollut oma kirjoitettu sana opitaan kuin kirjoitettuna.
+                learning.onTypedWordAccepted(word)
+            } else {
+                learning.onSuggestionAccepted(word)
+            }
             maybeFlush()
         }
         feedback()
@@ -744,7 +748,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (generation == suggestGeneration) {
                 mainHandler.post {
                     if (generation == suggestGeneration) {
-                        bar.setSuggestions(result)
+                        bar.setSuggestions(WordTools.withTypedWord(word, result))
                         shownCompletions =
                             if (word.isNotEmpty()) result.take(SHOWN_TOP_COUNT) else emptyList()
                     }
@@ -844,6 +848,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 // Rivinvaihto päättää sanan muttei katkaise sanaketjua.
                 learnCurrentWord()
                 handleEnter()
+                // Rivinvaihdon jälkeen kirjoitus jatkuu kirjaimilla, joten
+                // erikoismerkkisivu ei saa jäädä päälle.
+                if (page == Page.SYMBOLS1 || page == Page.SYMBOLS2) {
+                    page = Page.LETTERS
+                    updateLayout()
+                    updateAutoCaps()
+                    updateSuggestions()
+                }
             }
             KeyAction.Space -> {
                 learnCurrentWord()
@@ -892,25 +904,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
 
     private fun handleShift() {
-        val now = SystemClock.uptimeMillis()
-        shiftState = when (shiftState) {
-            ShiftState.OFF -> {
-                manualShift = true
-                ShiftState.SHIFT
-            }
-            ShiftState.SHIFT ->
-                if (now - lastShiftTime < DOUBLE_TAP_CAPS_MS) {
-                    ShiftState.CAPS
-                } else {
-                    manualShift = false
-                    ShiftState.OFF
-                }
-            ShiftState.CAPS -> {
-                manualShift = false
-                ShiftState.OFF
-            }
-        }
-        lastShiftTime = now
+        shiftState = shiftState.nextOnTap()
+        manualShift = shiftState != ShiftState.OFF
         keyboardView?.shiftState = shiftState
         feedback()
     }
@@ -973,7 +968,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private companion object {
-        const val DOUBLE_TAP_CAPS_MS = 350L
         const val MAX_WORD_LOOKBACK = 48
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50

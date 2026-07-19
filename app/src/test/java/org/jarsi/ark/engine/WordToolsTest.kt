@@ -96,4 +96,29 @@ class WordToolsTest {
     @Test
     fun `words pitaa numerot ja koodit`() =
         assertEquals(listOf("prx4", "Jako", "20"), WordTools.words("prx4, Jako 20!"))
+
+    @Test
+    fun `withTypedWord lisaa puuttuvan sanan karkeen`() =
+        assertEquals(
+            listOf("chrome", "chromea", "chromen"),
+            WordTools.withTypedWord("chrome", listOf("chromea", "chromen")),
+        )
+
+    @Test
+    fun `withTypedWord ei tuplaa listalla olevaa sanaa`() =
+        assertEquals(
+            listOf("auto", "autolla"),
+            WordTools.withTypedWord("auto", listOf("auto", "autolla")),
+        )
+
+    @Test
+    fun `withTypedWord tyhja sana ei muuta listaa`() =
+        assertEquals(listOf("moi"), WordTools.withTypedWord("", listOf("moi")))
+
+    @Test
+    fun `withTypedWord kirjainkoko erottaa asut`() =
+        assertEquals(
+            listOf("CHROME", "Chrome"),
+            WordTools.withTypedWord("CHROME", listOf("Chrome")),
+        )
 }

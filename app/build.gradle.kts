@@ -48,4 +48,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)
+    // Yksikkötesteissä android.jarin org.json on pelkkä tynkä; oikea
+    // toteutus tuodaan testien luokkapolulle.
+    testImplementation(libs.json)
 }

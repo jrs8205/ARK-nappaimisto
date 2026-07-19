@@ -67,4 +67,17 @@
             android:summary="@string/opitut_sanat_kuvaus"
             app:singleLineTitle="false" />
     </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/asetukset_varmuuskopio">
+        <Preference
+            android:key="varmuuskopio_vie"
+            android:title="@string/varmuuskopio_vie"
+            android:summary="@string/varmuuskopio_vie_kuvaus"
+            app:singleLineTitle="false" />
+        <Preference
+            android:key="varmuuskopio_tuo"
+            android:title="@string/varmuuskopio_tuo"
+            android:summary="@string/varmuuskopio_tuo_kuvaus"
+            app:singleLineTitle="false" />
+    </PreferenceCategory>
 </PreferenceScreen>

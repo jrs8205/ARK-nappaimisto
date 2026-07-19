@@ -137,7 +137,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     toolbar?.micLevel = level
                 }
             },
-        )
+        ).also {
+            // Omat opitut sanat vihjeiksi tunnistimelle (prx4, jarsi.org…).
+            it.biasWords = { learning.biasWords(BIAS_WORD_MAX) }
+        }
     }
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val suggestExecutor = Executors.newSingleThreadExecutor()
@@ -150,6 +153,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // 2 = automaattinen välilyönti juuri lisätty, 1 = commitin oma kursoripäivitys
     // ohitettu, 0 = ei voimassa. Välimerkki imaisee välin vain tilassa > 0.
     private var autoSpaceState = 0
+
+    private var autoCorrectEnabled = true
+
+    // Viimeisin automaattikorjaus (kirjoitettu, korjattu): askelpalautin
+    // heti perään palauttaa kirjoitetun; mikä tahansa muu näppäin mitätöi.
+    private var pendingRevert: Pair<String, String>? = null
 
     // Viimeksi näytetyt täydennysehdotukset ohitusten kirjaamista varten.
     // Vain täydennysrivit lasketaan — ei tyhjän syötteen ennustuksia.
@@ -573,6 +582,82 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (learning.dirtyCount >= FLUSH_THRESHOLD) flushLearned()
     }
 
+    /**
+     * Välilyönti päättää sanan: sana opitaan, ja tuntematon sana korjataan
+     * taustalla lähimpään tunnettuun. Korjauksen peruu askelpalauttimella.
+     */
+    private fun commitSpaceWithAutoCorrect() {
+        val ic = currentInputConnection ?: return
+        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val typed = WordTools.currentWord(before)
+        val context = WordTools.previousWords(before)
+        val shown = shownCompletions
+        shownCompletions = emptyList()
+        ic.commitText(" ", 1)
+        if (typed.isEmpty() || !learningEnabled) return
+        if (!autoCorrectEnabled) {
+            learning.onSuggestionsIgnored(shown, typed)
+            learning.onWordCommitted(typed)
+            maybeFlush()
+            return
+        }
+        // Ratkaisu tehdään taustalla, ettei sanastohaku nyi näppäilyä.
+        suggestExecutor.execute {
+            val corrected = suggestionEngine.autoCorrect(typed, context)
+            mainHandler.post { applyAutoCorrect(typed, corrected, shown) }
+        }
+    }
+
+    private fun applyAutoCorrect(typed: String, corrected: String?, shown: List<String>) {
+        val display = corrected?.let {
+            if (typed.first().isUpperCase()) {
+                it.replaceFirstChar { c -> c.titlecase(fiLocale) }
+            } else {
+                it
+            }
+        }
+        var applied = false
+        val ic = currentInputConnection
+        if (display != null && display != typed && ic != null) {
+            val tail = "$typed "
+            // Korjataan vain jos teksti on yhä ennallaan — nopea kirjoittaja
+            // on voinut jo jatkaa, eikä tekstiä saa muuttaa selän takana.
+            if (ic.getTextBeforeCursor(tail.length, 0)?.toString() == tail) {
+                ic.beginBatchEdit()
+                ic.deleteSurroundingText(tail.length, 0)
+                ic.commitText("$display ", 1)
+                ic.endBatchEdit()
+                pendingRevert = typed to display
+                applied = true
+            }
+        }
+        val finalWord = if (applied) display ?: typed else typed
+        learning.onSuggestionsIgnored(shown, finalWord)
+        learning.onWordCommitted(finalWord)
+        maybeFlush()
+    }
+
+    /** Askelpalautin heti korjauksen jälkeen palauttaa kirjoitetun sanan. */
+    private fun revertAutoCorrect(): Boolean {
+        val (typed, corrected) = pendingRevert ?: return false
+        pendingRevert = null
+        val ic = currentInputConnection ?: return false
+        val tail = "$corrected "
+        if (ic.getTextBeforeCursor(tail.length, 0)?.toString() != tail) return false
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(tail.length, 0)
+        ic.commitText(typed, 1)
+        ic.endBatchEdit()
+        if (learningEnabled) {
+            // Peruttu sana opitaan omaksi, jottei sitä korjata enää uudestaan;
+            // ketju katkaistaan, ettei korjatusta jää väärää sanaparia.
+            learning.resetContext()
+            learning.onWordCommitted(typed)
+            maybeFlush()
+        }
+        return true
+    }
+
     /** Oppii kursorin edellä olevan keskeneräisen sanan, jos oppiminen on sallittu. */
     private fun learnCurrentWord() {
         if (!learningEnabled) return
@@ -846,7 +931,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
+        autoCorrectEnabled = prefs.getBoolean("automaattikorjaus", true)
         symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
+        pendingRevert = null
         // Salasana- ja numerokentissä ehdotusrivi on aina piilossa.
         suggestionsVisible = prefs.getBoolean("ehdotukset", true) &&
             !passwordField &&
@@ -965,6 +1052,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onText(text: String) {
         val ic = currentInputConnection ?: return
+        pendingRevert = null
         // Erotinmerkki päättää keskeneräisen sanan: opitaan se ennen merkin syöttöä.
         if (text.length == 1 && !text[0].isLetterOrDigit() && text[0] != '-') {
             learnCurrentWord()
@@ -1004,11 +1092,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 autoSpaceState = 0
             else -> Unit
         }
+        // Korjauksen voi perua vain heti perään; muut näppäimet mitätöivät.
+        if (action != KeyAction.Backspace && action != KeyAction.Shift) pendingRevert = null
         when (action) {
             KeyAction.Shift -> handleShift()
             KeyAction.Backspace -> {
-                // Näppäintapahtumana, jotta valitun tekstin poisto toimii sovelluksissa oikein.
-                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                if (!revertAutoCorrect()) {
+                    // Näppäintapahtumana, jotta valitun tekstin poisto toimii
+                    // sovelluksissa oikein.
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                }
                 feedback(AudioManager.FX_KEYPRESS_DELETE)
             }
             KeyAction.Enter -> {
@@ -1025,8 +1118,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
             }
             KeyAction.Space -> {
-                learnCurrentWord()
-                currentInputConnection?.commitText(" ", 1)
+                commitSpaceWithAutoCorrect()
                 feedback(AudioManager.FX_KEYPRESS_SPACEBAR)
             }
             KeyAction.Symbols -> {
@@ -1138,6 +1230,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val MAX_WORD_LOOKBACK = 48
         const val CORRECTION_LOOKBACK = 5000
         const val COMMON_WORD_POOL = 24
+        const val BIAS_WORD_MAX = 100
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3

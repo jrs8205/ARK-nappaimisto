@@ -79,6 +79,22 @@ class SuggestionEngine(
         }
     }
 
+    /**
+     * Varovainen automaattikorjaus: korjaa vain kun kirjoitettu sana on
+     * tuntematon, koostuu kirjaimista ja yhden muokkauksen päässä on
+     * tunnettu sana. Koodit (prx4), osoitteet ja käyttäjän omat tai
+     * estämät sanat jäävät aina rauhaan. Palauttaa null, jos ei korjata.
+     */
+    fun autoCorrect(word: String, context: List<String> = emptyList()): String? {
+        if (word.length < MIN_AUTOCORRECT_LENGTH) return null
+        if (!word.all { it.isLetter() || it == '-' }) return null
+        val key = word.lowercase(fiLocale)
+        if (dictionary.frequencyOf(key) > 0) return null
+        if (learning.isOwnWord(word) || learning.isBlocked(word)) return null
+        return alternatives(word, context, max = AUTOCORRECT_CANDIDATES)
+            .firstOrNull { WordTools.editDistanceAtMost(key, it.lowercase(fiLocale), 1) <= 1 }
+    }
+
     /** Rivi tyhjälle syötteelle: ennustukset ja halutessa yleisimmät täytteeksi. */
     fun emptyInput(context: List<String>, includeCommon: Boolean, max: Int = 8): List<String> {
         val contextMatches = learning.contextMatches(context)
@@ -157,6 +173,8 @@ class SuggestionEngine(
         const val MIN_TYPO_LENGTH = 2
         const val SHORT_WORD_LENGTH = 4
         const val MAX_CLOSENESS_DISTANCE = 3
+        const val MIN_AUTOCORRECT_LENGTH = 3
+        const val AUTOCORRECT_CANDIDATES = 3
 
         // Kokonaissuunnitelman kohdan 22 painokertoimet.
         const val FREQUENCY_WEIGHT = 1.0f

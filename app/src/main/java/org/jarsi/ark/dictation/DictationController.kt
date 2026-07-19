@@ -34,6 +34,12 @@ class DictationController(
     var isActive = false
         private set
 
+    /**
+     * Sanastovihjeet tunnistimelle: käyttäjän omat sanat, joita tavallinen
+     * kielimalli ei tunne. Luetaan jokaisen kuuntelujakson alussa.
+     */
+    var biasWords: () -> List<String> = { emptyList() }
+
     private var recognizer: SpeechRecognizer? = null
     private var useOnDevice = false
     private var lastSpeechTime = 0L
@@ -146,6 +152,16 @@ class DictationController(
             )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fi-FI")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Vihjeet ovat vain toive: tukematon tunnistin ohittaa ne.
+                val words = biasWords()
+                if (words.isNotEmpty()) {
+                    putStringArrayListExtra(
+                        RecognizerIntent.EXTRA_BIASING_STRINGS,
+                        ArrayList(words),
+                    )
+                }
+            }
         }
         recognizer?.startListening(intent)
     }

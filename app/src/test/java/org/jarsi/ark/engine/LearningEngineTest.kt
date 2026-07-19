@@ -271,6 +271,29 @@ class LearningEngineTest {
     }
 
     @Test
+    fun `biasWords antaa omat sanat kayttojarjestyksessa ilman estettyja`() {
+        val e = engine()
+        repeat(3) {
+            e.onWordCommitted("prx4")
+            e.resetContext()
+        }
+        e.onWordCommitted("kerran")
+        e.onWordCommitted("piilo")
+        e.blockWord("piilo")
+        val words = e.biasWords(10)
+        assertEquals("prx4", words.first())
+        assertTrue("kerran" in words)
+        assertFalse("piilo" in words)
+    }
+
+    @Test
+    fun `biasWords rajaa maaran`() {
+        val e = engine()
+        listOf("eka", "toka", "kolmas").forEach { e.onWordCommitted(it) }
+        assertEquals(2, e.biasWords(2).size)
+    }
+
+    @Test
     fun `previousMatches loytaa sanaa edeltaneet sanat`() {
         val e = engine()
         listOf("koira", "on", "kiva").forEach { e.onWordCommitted(it) }

@@ -57,6 +57,31 @@ class SuggestionEngineTest {
     }
 
     @Test
+    fun `autoCorrect korjaa tuntemattoman lahimpaan tunnettuun`() {
+        val (s, _) = build("koira 100", "kissa 90")
+        assertEquals("koira", s.autoCorrect("koirra"))
+    }
+
+    @Test
+    fun `autoCorrect ei koske tunnettua eika omaa sanaa`() {
+        val (s, l) = build("koira 100")
+        assertEquals(null, s.autoCorrect("koira"))
+        l.onWordCommitted("chrome")
+        assertEquals(null, s.autoCorrect("chrome"))
+        l.onWordCommitted("morjes")
+        l.blockWord("morjes")
+        assertEquals(null, s.autoCorrect("morjes"))
+    }
+
+    @Test
+    fun `autoCorrect ei koske koodeja lyhyita eika kaukaisia`() {
+        val (s, _) = build("koira 100", "prx5 90")
+        assertEquals(null, s.autoCorrect("prx4"))
+        assertEquals(null, s.autoCorrect("ab"))
+        assertEquals(null, s.autoCorrect("zzzz"))
+    }
+
+    @Test
     fun `alternatives taydentaa lyhyen sanan kontekstista`() {
         val (s, l) = build("on 100", "ei 90")
         listOf("koira", "on", "kiva").forEach { l.onWordCommitted(it) }

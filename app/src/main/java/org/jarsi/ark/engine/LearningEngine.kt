@@ -143,6 +143,16 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         dirtyWords += key
     }
 
+    /** Käytetyimmät omat sanat esim. puheentunnistuksen sanastovihjeiksi. */
+    fun biasWords(max: Int): List<String> {
+        if (!loaded || max <= 0) return emptyList()
+        return words.values
+            .filter { !it.blocked && it.count > 0 }
+            .sortedByDescending { it.count * recency(it.lastUsed) }
+            .take(max)
+            .map { it.word }
+    }
+
     /**
      * Sanat, jotka ovat aiemmin edeltäneet [next]-sanaa, bigramivahvuuksineen.
      * Käytetään paikkaan sopivien vaihtoehtojen hakuun: ehdokas kelpaa, jos

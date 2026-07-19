@@ -4,9 +4,11 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Build
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.view.WindowInsets
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -85,6 +87,25 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
                 setMargins(0, 0, dp(16), dp(16))
             },
         )
+    }
+
+    // IME-ikkuna ulottuu navigointipalkin alle; palkin korkeus varataan
+    // täytteenä, ettei +-nappi jää palkin taakse. Insetit pyydetään joka
+    // kiinnityksellä samoin kuin KeyboardView'ssa.
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        requestApplyInsets()
+    }
+
+    override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+        val bottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            insets.getInsets(WindowInsets.Type.navigationBars()).bottom
+        } else {
+            @Suppress("DEPRECATION")
+            insets.systemWindowInsetBottom
+        }
+        if (bottom != paddingBottom) setPadding(0, 0, 0, bottom)
+        return super.onApplyWindowInsets(insets)
     }
 
     fun applySettings(newTheme: KeyboardTheme) {

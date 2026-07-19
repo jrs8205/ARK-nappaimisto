@@ -45,6 +45,7 @@ import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
+import org.jarsi.ark.keyboard.SymbolOrder
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
@@ -69,6 +70,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var page = Page.LETTERS
     private var extraKey: String? = null
     private var shiftState = ShiftState.OFF
+    private var symbolOrder: List<String> = SymbolOrder.default
     private var manualShift = false
     private var passwordField = false
     private var soundEnabled = false
@@ -686,6 +688,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
+        symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
         // Salasana- ja numerokentissä ehdotusrivi on aina piilossa.
         suggestionsVisible = prefs.getBoolean("ehdotukset", true) &&
             !passwordField &&
@@ -783,8 +786,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun updateLayout() {
         val layout = when (page) {
             Page.LETTERS -> Layouts.letters(extraKey)
-            Page.SYMBOLS1 -> Layouts.symbols1
-            Page.SYMBOLS2 -> Layouts.symbols2
+            Page.SYMBOLS1 -> Layouts.symbols1(symbolOrder)
+            Page.SYMBOLS2 -> Layouts.symbols2(symbolOrder)
             Page.SYMBOLS3 -> Layouts.symbols3
             Page.NUMERIC -> Layouts.numeric
             Page.ARROWS -> Layouts.arrows

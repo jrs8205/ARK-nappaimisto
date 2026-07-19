@@ -43,6 +43,11 @@
             android:title="@string/asetus_esikatselu"
             android:defaultValue="true"
             app:singleLineTitle="false" />
+        <Preference
+            android:key="erikoismerkit"
+            android:title="@string/erikoismerkit"
+            android:summary="@string/erikoismerkit_kuvaus"
+            app:singleLineTitle="false" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_ehdotukset">

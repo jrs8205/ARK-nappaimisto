@@ -41,6 +41,11 @@
             android:label="@string/opitut_sanat" />
 
         <activity
+            android:name=".settings.SymbolOrderActivity"
+            android:exported="false"
+            android:label="@string/erikoismerkit" />
+
+        <activity
             android:name=".dictation.RecordAudioPermissionActivity"
             android:exported="false"
             android:excludeFromRecents="true"

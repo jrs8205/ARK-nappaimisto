@@ -60,56 +60,47 @@ object Layouts {
         listOf(numberRow, letterRow1, letterRow2, letterRow3, bottomRow(extraKey))
     )
 
-    val symbols1 = KeyboardLayout(
-        listOf(
-            numberRow,
-            listOf(
-                key("@"), key("#"), key("€", listOf("$", "£", "¥")), key("_"), key("&"),
-                key("-", listOf("–", "—")), key("+"), key("("), key(")"), key("/"),
-            ),
-            listOf(
-                key("*"), key("\""), key("'"), key(":"), key(";"), key("!"), key("?"),
-                key("~"), key("="),
-            ),
-            listOf(
-                Key(KeyAction.SymbolsMore, "=\\<", widthWeight = 1.5f),
-                key("%"), key("["), key("]"), key("{"), key("}"), key("\\"),
-                Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true),
-            ),
-            listOf(
-                Key(KeyAction.Letters, "ABC", widthWeight = 1.5f),
-                key(","),
-                Key(KeyAction.Space, "", widthWeight = 4f),
-                key("."),
-                Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
-            ),
-        )
+    private fun symbolKey(symbol: String) = key(symbol, SymbolOrder.alternatesFor(symbol))
+
+    private fun backspace() =
+        Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true)
+
+    private val symbolBottomRow = listOf(
+        Key(KeyAction.Letters, "ABC", widthWeight = 1.5f),
+        key(","),
+        Key(KeyAction.Space, "", widthWeight = 4f),
+        key("."),
+        Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
     )
 
-    val symbols2 = KeyboardLayout(
-        listOf(
+    /** ?123-sivu: järjestyksen ensimmäiset merkit. */
+    fun symbols1(order: List<String>): KeyboardLayout {
+        val symbols = if (order.size == SymbolOrder.default.size) order else SymbolOrder.default
+        return KeyboardLayout(
             listOf(
-                key("¹"), key("²"), key("³"), key("¼"), key("½"), key("¾"), key("§"),
-                key("°"), key("|"), key("•"),
-            ),
-            listOf(
-                key("£"), key("$"), key("¥"), key("¢"), key("±"), key("×"), key("÷"),
-                key("¬"), key("¦"), key("¶"),
-            ),
-            listOf(
-                Key(KeyAction.Symbols, "?123", widthWeight = 1.5f),
-                key("<"), key(">"), key("^"), key("`"), key("©"), key("®"), key("™"),
-                Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true),
-            ),
-            listOf(
-                Key(KeyAction.Letters, "ABC", widthWeight = 1.5f),
-                key(","),
-                Key(KeyAction.Space, "", widthWeight = 4f),
-                key("."),
-                Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
-            ),
+                numberRow,
+                symbols.subList(0, 10).map(::symbolKey),
+                symbols.subList(10, 19).map(::symbolKey),
+                listOf(Key(KeyAction.SymbolsMore, "=\\<", widthWeight = 1.5f)) +
+                    symbols.subList(19, 25).map(::symbolKey) + backspace(),
+                symbolBottomRow,
+            )
         )
-    )
+    }
+
+    /** =\<-sivu: järjestyksen loput merkit. */
+    fun symbols2(order: List<String>): KeyboardLayout {
+        val symbols = if (order.size == SymbolOrder.default.size) order else SymbolOrder.default
+        return KeyboardLayout(
+            listOf(
+                symbols.subList(25, 35).map(::symbolKey),
+                symbols.subList(35, 45).map(::symbolKey),
+                listOf(Key(KeyAction.Symbols, "?123", widthWeight = 1.5f)) +
+                    symbols.subList(45, 52).map(::symbolKey) + backspace(),
+                symbolBottomRow,
+            )
+        )
+    }
 
     /** Verkko-osoitesivu: osoitteiden alut ja yleisimmät päätteet. Avataan työkaluriviltä. */
     val symbols3 = KeyboardLayout(
@@ -119,15 +110,9 @@ object Layouts {
             listOf(
                 Key(KeyAction.Symbols, "?123", widthWeight = 1.5f),
                 key(".io"), key(".eu"), key(".info"),
-                Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true),
+                backspace(),
             ),
-            listOf(
-                Key(KeyAction.Letters, "ABC", widthWeight = 1.5f),
-                key(","),
-                Key(KeyAction.Space, "", widthWeight = 4f),
-                key("."),
-                Key(KeyAction.Enter, "⏎", widthWeight = 1.5f),
-            ),
+            symbolBottomRow,
         )
     )
 

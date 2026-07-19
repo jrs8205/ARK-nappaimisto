@@ -19,6 +19,12 @@
     <string name="asetus_varina">Värinä näppäinpainalluksesta</string>
     <string name="asetus_esikatselu">Näppäimen esikatselukupla</string>
 
+    <string name="erikoismerkit">Erikoismerkkien järjestys</string>
+    <string name="erikoismerkit_kuvaus">Järjestä symbolisivujen merkit raahaamalla</string>
+    <string name="erikoismerkit_ohje">Siirrä merkkiä pitämällä sitä pohjassa ja raahaamalla uuteen kohtaan, myös sivujen välillä.</string>
+    <string name="erikoismerkit_palauta">Palauta oletusjärjestys</string>
+    <string name="erikoismerkit_palauta_varmistus">Palautetaanko erikoismerkit oletusjärjestykseen?</string>
+
     <string name="asetukset_ehdotukset">Ehdotukset</string>
     <string name="asetus_ehdotukset">Näytä ehdotukset</string>
     <string name="asetus_ehdotus_valilyonti">Välilyönti ehdotuksen jälkeen</string>

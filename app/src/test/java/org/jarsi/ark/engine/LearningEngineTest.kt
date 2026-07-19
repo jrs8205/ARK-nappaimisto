@@ -271,6 +271,40 @@ class LearningEngineTest {
     }
 
     @Test
+    fun `ennen latausta kirjoitetut sanat opitaan latauksen jalkeen`() {
+        val e = LearningEngine { now }
+        e.onWordCommitted("eka")
+        e.onWordCommitted("toka")
+        assertEquals(0, e.dirtyCount)
+        e.load(emptyList(), emptyList(), emptyList())
+        assertEquals(listOf("eka"), e.suggest("ek"))
+        assertTrue(e.drainDirty().bigrams.any { it.previous == "eka" && it.next == "toka" })
+    }
+
+    @Test
+    fun `poistettu sana haviaa myos ketjuista`() {
+        val e = engine()
+        listOf("eka", "toka", "kolmas").forEach { e.onWordCommitted(it) }
+        e.drainDirty()
+        e.removeWord("toka")
+        assertTrue(e.predictNext(listOf("eka")).isEmpty())
+        assertTrue(e.previousMatches("kolmas").isEmpty())
+        val dirty = e.drainDirty()
+        assertTrue("toka" in dirty.removedWords)
+        assertTrue("toka" in dirty.removedChainWords)
+    }
+
+    @Test
+    fun `epaonnistunut tallennusera palaa jonoon`() {
+        val e = engine()
+        e.onWordCommitted("sana")
+        val batch = e.drainDirty()
+        assertEquals(0, e.dirtyCount)
+        e.requeueDirty(batch)
+        assertEquals(listOf("sana"), e.drainDirty().words.map { it.word })
+    }
+
+    @Test
     fun `biasWords antaa omat sanat kayttojarjestyksessa ilman estettyja`() {
         val e = engine()
         repeat(3) {

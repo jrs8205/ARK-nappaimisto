@@ -51,4 +51,6 @@ data class DirtyLearned(
     val bigrams: List<LearnedBigram>,
     val trigrams: List<LearnedTrigram>,
     val removedWords: List<String>,
+    /** Sanat, joiden kaikki sanaketjut poistetaan tietokannasta. */
+    val removedChainWords: List<String> = emptyList(),
 )

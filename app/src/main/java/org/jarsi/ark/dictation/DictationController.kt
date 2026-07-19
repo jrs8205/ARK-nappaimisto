@@ -58,6 +58,9 @@ class DictationController(
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
 
         override fun onPartialResults(partialResults: Bundle?) {
+            // Pysäytyksen jälkeen jonoon jäänyt osatulos ei saa enää
+            // kirjoittaa mahdollisesti jo vaihtuneeseen kenttään.
+            if (!isActive) return
             val text = bestResult(partialResults) ?: return
             if (text.isNotBlank()) {
                 lastSpeechTime = SystemClock.elapsedRealtime()

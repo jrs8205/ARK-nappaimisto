@@ -5,8 +5,8 @@ import java.util.Locale
 /**
  * Henkilökohtaisten sanojen oppiminen: sanat ja sanaketjut (parit ja kolmikot)
  * pidetään muistissa ja muutokset kerätään eriin, jotka kutsuja kirjoittaa
- * tietokantaan [drainDirty]-kutsulla. Kutsut tehdään päälangalta; ei
- * säieturvallinen.
+ * tietokantaan [drainDirty]-kutsulla. Julkiset metodit on synkronoitu, koska
+ * ehdotushaku lukee rakenteita taustasäikeessä samalla kun päälanka oppii.
  */
 class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) {
 
@@ -34,6 +34,10 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     private val dirtyBigrams = HashSet<Pair<String, String>>()
     private val dirtyTrigrams = HashSet<Triple<String, String, String>>()
     private val removedWords = HashSet<String>()
+    private val removedChainWords = HashSet<String>()
+
+    // Kylmäkäynnistyksessä kirjoitetut sanat odottavat tietokannan latausta.
+    private val pendingCommits = ArrayList<String>()
 
     private var previousToken: String? = null
     private var beforePreviousToken: String? = null
@@ -55,6 +59,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     private fun isChainToken(word: String) =
         word.length in 1..32 && word.all { isWordChar(it) }
 
+    @Synchronized
     fun load(
         loadedWords: List<LearnedWord>,
         loadedBigrams: List<LearnedBigram>,
@@ -77,11 +82,19 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
                 CountState(t.count, t.lastUsed)
         }
         loaded = true
+        // Latauksen aikana kirjoitetut sanat opitaan jälkikäteen järjestyksessä.
+        val pending = pendingCommits.toList()
+        pendingCommits.clear()
+        pending.forEach { onWordCommitted(it) }
     }
 
     /** Käsin kirjoitettu sana päättyi: opi sana ja kirjaa ketjut. */
+    @Synchronized
     fun onWordCommitted(word: String) {
-        if (!loaded) return
+        if (!loaded) {
+            if (pendingCommits.size < PENDING_LIMIT) pendingCommits += word
+            return
+        }
         if (isEligibleWord(word)) {
             val key = keyOf(word)
             val state = words.getOrPut(key) { WordState(word, 0, clock(), false, clock()) }
@@ -96,6 +109,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
      * Ehdotus valittiin: hyväksyntä kirjautuu (myös yleissanalle) ja nollaa
      * ohitukset; käyttömäärä kasvaa vain omilla sanoilla. Ketju jatkuu aina.
      */
+    @Synchronized
     fun onSuggestionAccepted(word: String) {
         if (!loaded) return
         val key = keyOf(word)
@@ -113,6 +127,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
      * opitaan kuin kirjoitettuna ja hyväksyntä kirjataan samalla kertaa.
      * Ketju jatkuu vain kerran, ettei synny sana→sana-tuplabigramia.
      */
+    @Synchronized
     fun onTypedWordAccepted(word: String) {
         if (!loaded) return
         if (isEligibleWord(word)) {
@@ -132,6 +147,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
      * kuten ehdotuksen valinnassa, mutta ketjua ei jatketa, koska kursori
      * on hypännyt keskelle vanhaa tekstiä.
      */
+    @Synchronized
     fun onCorrectionAccepted(word: String) {
         if (!loaded) return
         val key = keyOf(word)
@@ -144,6 +160,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     }
 
     /** Käytetyimmät omat sanat esim. puheentunnistuksen sanastovihjeiksi. */
+    @Synchronized
     fun biasWords(max: Int): List<String> {
         if (!loaded || max <= 0) return emptyList()
         return words.values
@@ -158,6 +175,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
      * Käytetään paikkaan sopivien vaihtoehtojen hakuun: ehdokas kelpaa, jos
      * se on joskus esiintynyt juuri ennen seuraavaa sanaa.
      */
+    @Synchronized
     fun previousMatches(next: String): Map<String, Float> {
         if (!loaded) return emptyMap()
         val nextKey = keyOf(next)
@@ -170,6 +188,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     }
 
     /** Omat sanat enintään [maxDistance] muokkauksen päässä, käytetyin ensin. */
+    @Synchronized
     fun near(word: String, maxDistance: Int, max: Int = 5): List<String> {
         if (word.isEmpty() || max <= 0) return emptyList()
         val key = keyOf(word)
@@ -188,6 +207,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
      * kaikilta paitsi lopulliselta sanalta. Vaikutus pisteisiin on kevyt ja
      * alkaa vasta toistuvista ohituksista.
      */
+    @Synchronized
     fun onSuggestionsIgnored(shown: List<String>, finalWord: String) {
         if (!loaded) return
         val finalKey = keyOf(finalWord)
@@ -200,6 +220,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         }
     }
 
+    @Synchronized
     fun setPinned(word: String, pinned: Boolean) {
         if (!loaded) return
         val key = keyOf(word)
@@ -208,9 +229,11 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         dirtyWords += key
     }
 
+    @Synchronized
     fun isPinned(word: String): Boolean = words[keyOf(word)]?.pinned == true
 
     /** Sanan pisteytyssignaalit tai null, jos sanasta ei ole mitään tietoa. */
+    @Synchronized
     fun signals(word: String): WordSignals? = words[keyOf(word)]?.let {
         WordSignals(
             usage = it.count * recency(it.lastUsed),
@@ -223,6 +246,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     }
 
     /** Tallennettu kirjoitusasu tai avain sellaisenaan. */
+    @Synchronized
     fun displayForm(key: String): String = words[keyOf(key)]?.word ?: key
 
     private fun chain(word: String) {
@@ -251,6 +275,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     }
 
     /** Katkaisee sanaketjun (kenttä vaihtui tai kursori siirtyi muualle). */
+    @Synchronized
     fun resetContext() {
         previousToken = null
         beforePreviousToken = null
@@ -266,6 +291,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         }
     }
 
+    @Synchronized
     fun suggest(prefix: String, max: Int = 3): List<String> {
         if (prefix.isEmpty() || max <= 0) return emptyList()
         val key = keyOf(prefix)
@@ -284,6 +310,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
      * Kontekstiin täsmäävät jatkot raakapistein: bigram- ja trigramosumat
      * eriteltyinä (määrä × tuoreuskerroin). Avaimet pienennettyinä.
      */
+    @Synchronized
     fun contextMatches(context: List<String>): Map<String, NextMatch> {
         if (context.isEmpty()) return emptyMap()
         val result = HashMap<String, NextMatch>()
@@ -304,6 +331,7 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
      * Todennäköisimmät seuraavat sanat. Trigramiosumat (kaksi edeltävää sanaa
      * täsmäävät) painottuvat kertoimella ×3, bigramit täydentävät.
      */
+    @Synchronized
     fun predictNext(context: List<String>, max: Int = 3): List<String> {
         if (max <= 0) return emptyList()
         return contextMatches(context).entries
@@ -313,20 +341,33 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
             .map { displayForm(it.key) }
     }
 
+    @Synchronized
     fun isOwnWord(word: String): Boolean =
         words[keyOf(word)]?.let { it.count > 0 && !it.blocked } == true
 
+    @Synchronized
     fun isBlocked(word: String): Boolean = words[keyOf(word)]?.blocked == true
 
+    @Synchronized
     fun removeWord(word: String) {
         val key = keyOf(word)
         if (words.remove(key) != null) {
             dirtyWords -= key
             removedWords += key
         }
+        // Myös sanaketjut siivotaan, ettei poistettu sana palaa ennustuksista.
+        bigrams.remove(key)
+        bigrams.values.forEach { it.remove(key) }
+        trigrams.keys.removeAll { it.first == key || it.second == key }
+        trigrams.values.forEach { it.remove(key) }
+        dirtyBigrams.removeAll { it.first == key || it.second == key }
+        dirtyTrigrams.removeAll { it.first == key || it.second == key || it.third == key }
+        removedChainWords += key
+        if (previousToken == key || beforePreviousToken == key) resetContext()
     }
 
     /** Estää sanan pysyvästi; toimii myös yleissanaston sanoille. */
+    @Synchronized
     fun blockWord(word: String) {
         if (!loaded) return
         val key = keyOf(word)
@@ -335,6 +376,19 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         dirtyWords += key
     }
 
+    /** Palauttaa epäonnistuneen tallennuserän takaisin jonoon uutta yritystä varten. */
+    @Synchronized
+    fun requeueDirty(batch: DirtyLearned) {
+        for (word in batch.words) dirtyWords += keyOf(word.word)
+        for (bigram in batch.bigrams) dirtyBigrams += bigram.previous to bigram.next
+        for (trigram in batch.trigrams) {
+            dirtyTrigrams += Triple(trigram.first, trigram.second, trigram.next)
+        }
+        removedWords += batch.removedWords
+        removedChainWords += batch.removedChainWords
+    }
+
+    @Synchronized
     fun drainDirty(): DirtyLearned {
         val outWords = dirtyWords.mapNotNull { key ->
             words[key]?.let {
@@ -352,10 +406,16 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
                 ?.let { LearnedTrigram(first, second, next, it.count, it.lastUsed) }
         }
         val outRemoved = removedWords.toList()
+        val outRemovedChains = removedChainWords.toList()
         dirtyWords.clear()
         dirtyBigrams.clear()
         dirtyTrigrams.clear()
         removedWords.clear()
-        return DirtyLearned(outWords, outBigrams, outTrigrams, outRemoved)
+        removedChainWords.clear()
+        return DirtyLearned(outWords, outBigrams, outTrigrams, outRemoved, outRemovedChains)
+    }
+
+    private companion object {
+        const val PENDING_LIMIT = 200
     }
 }

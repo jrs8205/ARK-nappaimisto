@@ -380,6 +380,9 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun keyAt(x: Float, y: Float): BoundedKey? {
         if (boundedKeys.isEmpty() || rowHeight <= 0f) return null
+        // Navigointipalkille varattu tyhjä alue näkymän alareunassa ei saa
+        // aktivoida alimman rivin näppäimiä.
+        if (y >= layout.rows.size * rowHeight) return null
         val row = (y / rowHeight).toInt().coerceIn(0, layout.rows.size - 1)
         val rowKeys = boundedKeys.filter { it.row == row && it.key.action != KeyAction.None }
         return rowKeys.firstOrNull { x >= it.rect.left && x < it.rect.right }

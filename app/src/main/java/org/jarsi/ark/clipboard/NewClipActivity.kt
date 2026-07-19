@@ -45,7 +45,8 @@ class NewClipActivity : AppCompatActivity() {
             finish()
             return
         }
-        Executors.newSingleThreadExecutor().execute {
+        val executor = Executors.newSingleThreadExecutor()
+        executor.execute {
             try {
                 val db = LearnedDatabase.create(this)
                 val now = System.currentTimeMillis()
@@ -57,5 +58,7 @@ class NewClipActivity : AppCompatActivity() {
             }
             runOnUiThread { finish() }
         }
+        // Säie vapautuu heti työn valmistuttua eikä vuoda tallennusta kohden.
+        executor.shutdown()
     }
 }

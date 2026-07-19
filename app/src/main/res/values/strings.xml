@@ -61,6 +61,7 @@
     <string name="kaannos_kirjoita">Kirjoita (%1$s)…</string>
     <string name="kaannos_ladataan">Valmistellaan käännösmalleja…</string>
     <string name="kaannos_lataus_virhe">Käännösmallin lataus epäonnistui – tarkista verkkoyhteys</string>
+    <string name="kaannos_virhe">Käännös epäonnistui – yritä uudelleen</string>
 
     <string name="asetukset_kaannos">Käännös</string>
     <string name="kaannoskielet">Käännöskielet</string>

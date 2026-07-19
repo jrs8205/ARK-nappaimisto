@@ -16,8 +16,11 @@ import android.text.InputType
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
+import android.icu.text.BreakIterator
+import android.os.SystemClock
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
+import android.webkit.MimeTypeMap
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -69,6 +72,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 
 /** ARK-näppäimistön pääpalvelu. */
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
@@ -97,6 +101,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var pendingClipboardPanel = false
 
     private val clipStore = ClipStore()
+    private val pendingClips = mutableListOf<Clip>()
     private var clipboardPanel: ClipboardPanelView? = null
     private var correctionPanel: CorrectionPanelView? = null
     private var emojiPanel: EmojiPanelView? = null
@@ -123,11 +128,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             this,
             object : DictationController.Listener {
                 override fun onPartialText(text: String) {
+                    lastEditTime = SystemClock.uptimeMillis()
                     currentInputConnection?.setComposingText(text, 1)
                 }
 
                 override fun onFinalText(text: String) {
                     val ic = currentInputConnection ?: return
+                    lastEditTime = SystemClock.uptimeMillis()
                     // Lopullinen teksti korvaa keskeneräisen — ei sen perään,
                     // ettei sama puhe päädy kenttään kahdesti.
                     ic.beginBatchEdit()
@@ -174,6 +181,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var autoSpaceState = 0
 
     private var autoCorrectEnabled = true
+    private var noSuggestionsField = false
+
+    // Viimeisin oma muokkaushetki: sen jälkeiset valintamuutokset ovat
+    // käyttäjän kursorihyppyjä, jotka katkaisevat sanaketjun.
+    private var lastEditTime = 0L
 
     // Viimeisin automaattikorjaus (kirjoitettu, korjattu): askelpalautin
     // heti perään palauttaa kirjoitetun; mikä tahansa muu näppäin mitätöi.
@@ -223,7 +235,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     database = db
                     loadedStamp = stamp
                     learning.load(words, pairs, triples)
-                    clipStore.load(clips)
+                    // Latauksen aikana kopioidut leikkeet säilyvät ja tallentuvat.
+                    val pending = pendingClips.toList()
+                    pendingClips.clear()
+                    clipStore.load(clips + pending)
+                    pending.forEach(::persistClip)
                     pruneClips()
                 }
             } catch (e: Exception) {
@@ -324,11 +340,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun copyImageClip(uri: Uri) {
+        // Tiedostopääte säilyttää todellisen kuvatyypin liittämistä varten.
         val type = contentResolver.getType(uri)
         val extension = when (type) {
             "image/jpeg" -> "jpg"
             "image/webp" -> "webp"
-            else -> "png"
+            "image/png" -> "png"
+            "image/gif" -> "gif"
+            else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(type ?: "") ?: "png"
         }
         ioExecutor.execute {
             try {
@@ -350,7 +369,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun persistClip(clip: Clip) {
-        val db = database ?: return
+        val db = database
+        if (db == null) {
+            // Tietokanta latautuu vielä: leike talteen, tallennus latauksen perään.
+            pendingClips += clip
+            return
+        }
         ioExecutor.execute {
             try {
                 db.dao().upsertClip(
@@ -451,6 +475,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val bar = translateBar ?: return
         // Salasanakenttiä ei käännetä.
         if (passwordField) return
+        // Sanelu ja käännös käyttävät samaa keskeneräistä tekstiä; vain
+        // toinen voi olla kerrallaan päällä.
+        dictation.stop()
         hideAllPanels()
         translateMode = true
         translateBuffer.clear()
@@ -462,20 +489,43 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         prepareTranslator()
     }
 
-    private fun hideTranslateBar() {
+    /**
+     * Sulkee käännöstilan. [flush] kääntää vielä rivin viimeisimmän sisällön
+     * ja jättää tuloksen kenttään; kentän vaihtuessa kutsutaan ilman flushia,
+     * ettei vanhaan kenttään tarkoitettu teksti valu uuteen.
+     */
+    private fun hideTranslateBar(flush: Boolean = true) {
         if (!translateMode) return
         translateMode = false
         translateRunnable?.let { mainHandler.removeCallbacks(it) }
-        // Keskeneräinen käännös jää kenttään sellaisenaan.
-        currentInputConnection?.finishComposingText()
+        translationGeneration++
+        val text = translateBuffer.toString()
+        val client = translator
+        val ready = translatorReady
+        translator = null
+        translatorReady = false
         translateBuffer.clear()
         translateBar?.visibility = View.GONE
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         toolbar?.translationActive = false
-        translationGeneration++
-        translator?.close()
-        translator = null
-        translatorReady = false
+        if (flush && text.isNotBlank() && client != null && ready) {
+            val ic = currentInputConnection
+            client.translate(text)
+                .addOnSuccessListener { result ->
+                    ic?.beginBatchEdit()
+                    ic?.setComposingText(result, 1)
+                    ic?.finishComposingText()
+                    ic?.endBatchEdit()
+                    client.close()
+                }
+                .addOnFailureListener {
+                    ic?.finishComposingText()
+                    client.close()
+                }
+        } else {
+            if (flush) currentInputConnection?.finishComposingText()
+            client?.close()
+        }
         updateSuggestions()
     }
 
@@ -556,35 +606,54 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (translateMode && generation == translationGeneration &&
                 text == translateBuffer.toString()
             ) {
+                lastEditTime = SystemClock.uptimeMillis()
                 currentInputConnection?.setComposingText(result, 1)
             }
         }
     }
 
-    /** Viimeistelee käännöksen (esim. ennen enterin toimintoa). */
+    /**
+     * Viimeistelee käännöksen ennen enterin toimintoa. Toiminto suoritetaan
+     * vain onnistuneen käännöksen jälkeen: kesken latauksen tai virheessä
+     * lähdeteksti säilyy rivillä eikä kenttä lähetä mitään vanhentunutta.
+     */
     private fun finishTranslation(onDone: () -> Unit) {
         translateRunnable?.let { mainHandler.removeCallbacks(it) }
         val text = translateBuffer.toString()
-        val client = translator
-        if (text.isBlank() || client == null || !translatorReady) {
+        if (text.isBlank()) {
             currentInputConnection?.finishComposingText()
-            translateBuffer.clear()
-            updateTranslateBar()
             onDone()
             return
         }
-        val complete = {
-            currentInputConnection?.finishComposingText()
-            translateBuffer.clear()
-            updateTranslateBar()
-            onDone()
+        val client = translator
+        if (client == null || !translatorReady) {
+            Toast.makeText(this, R.string.kaannos_ladataan, Toast.LENGTH_SHORT).show()
+            return
         }
+        val generation = ++translationGeneration
         client.translate(text)
             .addOnSuccessListener { result ->
-                currentInputConnection?.setComposingText(result, 1)
-                complete()
+                // Vanhentunut tulos hylätään: käyttäjä ehti jatkaa, painaa
+                // enteriä uudelleen, sulkea tilan tai vaihtaa kenttää.
+                if (!translateMode || generation != translationGeneration ||
+                    translateBuffer.toString() != text
+                ) {
+                    return@addOnSuccessListener
+                }
+                val ic = currentInputConnection ?: return@addOnSuccessListener
+                ic.beginBatchEdit()
+                ic.setComposingText(result, 1)
+                ic.finishComposingText()
+                ic.endBatchEdit()
+                translateBuffer.clear()
+                updateTranslateBar()
+                onDone()
             }
-            .addOnFailureListener { complete() }
+            .addOnFailureListener {
+                if (translateMode && generation == translationGeneration) {
+                    Toast.makeText(this, R.string.kaannos_virhe, Toast.LENGTH_SHORT).show()
+                }
+            }
     }
 
     /** Kielivalinnat kiertävät ladattujen mallien joukossa. */
@@ -683,7 +752,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         panel.render(correctionText, correctionWords, correctionUnknown, correctionSelected)
         val text = correctionText
         val words = correctionWords
-        suggestExecutor.execute {
+        executeSuggest {
             // Alleviivataan sanat, joita ei löydy sanastosta eikä opituista.
             val unknown = words.indices.filterTo(HashSet()) { i ->
                 val word = text.substring(words[i])
@@ -708,7 +777,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val context = WordTools.previousWords(correctionText.subSequence(0, range.first))
         val nextWord = correctionWords.getOrNull(index + 1)?.let { correctionText.substring(it) }
         val generation = ++suggestGeneration
-        suggestExecutor.execute {
+        executeSuggest {
             var result = suggestionEngine.alternatives(word, context, nextWord)
             if (word.first().isUpperCase()) {
                 result = result.map { s -> s.replaceFirstChar { it.titlecase(fiLocale) } }
@@ -758,9 +827,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val path = clip.imagePath ?: return
         val info = currentInputEditorInfo ?: return
         val mime = when {
-            path.endsWith(".jpg") -> "image/jpeg"
+            path.endsWith(".jpg") || path.endsWith(".jpeg") -> "image/jpeg"
             path.endsWith(".webp") -> "image/webp"
-            else -> "image/png"
+            path.endsWith(".gif") -> "image/gif"
+            path.endsWith(".png") -> "image/png"
+            else -> MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(path.substringAfterLast('.', "")) ?: "image/png"
         }
         val supported = EditorInfoCompat.getContentMimeTypes(info)
             .any { ClipDescription.compareMimeTypes(mime, it) }
@@ -771,12 +843,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         try {
             val uri = FileProvider.getUriForFile(this, FILE_AUTHORITY, File(path))
             val content = InputContentInfoCompat(uri, ClipDescription("leike", arrayOf(mime)), null)
-            InputConnectionCompat.commitContent(
+            val committed = InputConnectionCompat.commitContent(
                 ic, info, content,
                 InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null,
             )
-            hideClipboardPanel()
-            feedback()
+            // Kenttä voi hylätä sisällön, vaikka se ilmoitti tukevansa tyyppiä.
+            if (committed) {
+                hideClipboardPanel()
+                feedback()
+            } else {
+                Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
             Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
         }
@@ -790,6 +867,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         ioExecutor.execute {
             try {
                 dirty.removedWords.forEach { db.dao().deleteWord(it) }
+                dirty.removedChainWords.forEach {
+                    db.dao().deleteBigramsFor(it)
+                    db.dao().deleteTrigramsFor(it)
+                }
                 if (dirty.words.isNotEmpty()) {
                     db.dao().upsertWords(
                         dirty.words.map {
@@ -814,13 +895,50 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     )
                 }
             } catch (e: Exception) {
-                // Kirjoitusvirhe ei saa kaataa näppäimistöä; erä yritetään myöhemmin uudelleen.
+                // Kirjoitusvirhe ei saa kaataa näppäimistöä; erä palaa
+                // jonoon ja kirjoitetaan seuraavan tallennuksen mukana.
+                learning.requeueDirty(dirty)
             }
         }
     }
 
     private fun maybeFlush() {
         if (learning.dirtyCount >= FLUSH_THRESHOLD) flushLearned()
+    }
+
+    // Palvelu voi tuhoutua taustalatauksen aikana; suljettuun suorittimeen
+    // ei saa jonottaa uutta työtä.
+    private fun executeSuggest(task: Runnable) {
+        if (suggestExecutor.isShutdown) return
+        try {
+            suggestExecutor.execute(task)
+        } catch (e: RejectedExecutionException) {
+            // Palvelu on sulkeutumassa.
+        }
+    }
+
+    // Poistaa viimeisen grafeemin: monen koodipisteen emojit (liput,
+    // ZWJ-perheet, ihonsävyt) lähtevät yhdellä painalluksella kokonaan.
+    private fun deleteLastGrapheme(buffer: StringBuilder) {
+        if (buffer.isEmpty()) return
+        val iterator = BreakIterator.getCharacterInstance()
+        iterator.setText(buffer.toString())
+        iterator.last()
+        val start = iterator.previous()
+        buffer.setLength(if (start == BreakIterator.DONE) 0 else start)
+    }
+
+    private fun handleBackspaceKey() {
+        if (translateMode && translateBuffer.isNotEmpty()) {
+            // Poisto kohdistuu käännösriviin, ei kenttään.
+            deleteLastGrapheme(translateBuffer)
+            onTranslateBufferChanged()
+        } else if (!revertAutoCorrect()) {
+            // Näppäintapahtumana, jotta valitun tekstin poisto toimii
+            // sovelluksissa oikein.
+            sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+        }
+        feedback(AudioManager.FX_KEYPRESS_DELETE)
     }
 
     /**
@@ -836,14 +954,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         shownCompletions = emptyList()
         ic.commitText(" ", 1)
         if (typed.isEmpty() || !learningEnabled) return
-        if (!autoCorrectEnabled) {
+        if (!autoCorrectEnabled || noSuggestionsField) {
             learning.onSuggestionsIgnored(shown, typed)
             learning.onWordCommitted(typed)
             maybeFlush()
             return
         }
         // Ratkaisu tehdään taustalla, ettei sanastohaku nyi näppäilyä.
-        suggestExecutor.execute {
+        executeSuggest {
             val corrected = suggestionEngine.autoCorrect(typed, context)
             mainHandler.post { applyAutoCorrect(typed, corrected, shown) }
         }
@@ -1176,10 +1294,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     feedback()
                 }
 
-                override fun onBackspace() {
-                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
-                    feedback(AudioManager.FX_KEYPRESS_DELETE)
-                }
+                override fun onBackspace() = handleBackspaceKey()
 
                 override fun onClose() {
                     feedback()
@@ -1226,14 +1341,20 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         keyboardView?.enterText = enterLabel(info)
         shiftState = ShiftState.OFF
         manualShift = false
-        // Salasanakentissä ei opita mitään; kentän vaihto katkaisee sanaketjun.
-        learningEnabled = !passwordField
+        // Salasanakentissä ja oppimisen kieltävissä kentissä (esim. incognito)
+        // ei opita mitään; kentän vaihto katkaisee sanaketjun.
+        learningEnabled = !passwordField &&
+            info.imeOptions and EditorInfoCompat.IME_FLAG_NO_PERSONALIZED_LEARNING == 0
+        // Kenttä voi kieltää sanastotoiminnot (esim. käyttäjätunnus tai koodi).
+        noSuggestionsField = inputClass == InputType.TYPE_CLASS_TEXT &&
+            info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0
         learning.resetContext()
         reloadLearnedIfChanged()
         // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
         dictation.stop()
         hideAllPanels()
-        hideTranslateBar()
+        // Kenttä vaihtui: keskeneräistä käännöstä ei saa kirjoittaa uuteen kenttään.
+        hideTranslateBar(flush = false)
         if (pendingDictation) {
             pendingDictation = false
             if (!passwordField &&
@@ -1252,9 +1373,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         autoCorrectEnabled = prefs.getBoolean("automaattikorjaus", true)
         symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
         pendingRevert = null
-        // Salasana- ja numerokentissä ehdotusrivi on aina piilossa.
+        // Salasana-, numero- ja NO_SUGGESTIONS-kentissä ehdotusrivi on piilossa.
         suggestionsVisible = prefs.getBoolean("ehdotukset", true) &&
             !passwordField &&
+            !noSuggestionsField &&
             page != Page.NUMERIC
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         updateLayout()
@@ -1307,7 +1429,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Lauseen alussa (automaattinen iso kirjain päällä) ehdotukset alkavat isolla.
         val shiftActive = shiftState != ShiftState.OFF
         val generation = ++suggestGeneration
-        suggestExecutor.execute {
+        executeSuggest {
             val word = WordTools.currentWord(before)
             val context = WordTools.previousWords(before)
             var result = if (word.isNotEmpty()) {
@@ -1434,24 +1556,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (action != KeyAction.Backspace && action != KeyAction.Shift) pendingRevert = null
         when (action) {
             KeyAction.Shift -> handleShift()
-            KeyAction.Backspace -> {
-                if (translateMode && translateBuffer.isNotEmpty()) {
-                    // Poisto kohdistuu käännösriviin, ei kenttään.
-                    val length = translateBuffer.length
-                    val remove = if (length >= 2 &&
-                        Character.isSurrogatePair(
-                            translateBuffer[length - 2], translateBuffer[length - 1]
-                        )
-                    ) 2 else 1
-                    translateBuffer.setLength(length - remove)
-                    onTranslateBufferChanged()
-                } else if (!revertAutoCorrect()) {
-                    // Näppäintapahtumana, jotta valitun tekstin poisto toimii
-                    // sovelluksissa oikein.
-                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
-                }
-                feedback(AudioManager.FX_KEYPRESS_DELETE)
-            }
+            KeyAction.Backspace -> handleBackspaceKey()
             KeyAction.Enter -> {
                 if (translateMode) {
                     // Käännös viimeistellään kenttään ennen enterin toimintoa.
@@ -1531,11 +1636,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val ic = currentInputConnection ?: return
         val info = currentInputEditorInfo
         val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
+        // Sama sääntö kuin näppäimen nimellä: toiminto suoritetaan aina kun
+        // kenttä ei ole sitä kieltänyt — myös monirivisissä viestikentissä,
+        // joissa lähetysnappi on nimenomaan pyydetty.
         val hasAction = info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION == 0 &&
             action != EditorInfo.IME_ACTION_NONE &&
             action != EditorInfo.IME_ACTION_UNSPECIFIED
-        val multiline = info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0
-        if (hasAction && !multiline) {
+        if (hasAction) {
             ic.performEditorAction(action)
         } else {
             ic.commitText("\n", 1)
@@ -1570,12 +1677,20 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         super.onUpdateSelection(
             oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd
         )
+        // Ilman tuoretta omaa muokkausta valinnan muutos on käyttäjän
+        // kursorihyppy (kentän napautus): sanaketju katkeaa kuten nuolissakin.
+        if (SystemClock.uptimeMillis() - lastEditTime > EXTERNAL_SELECTION_MS) {
+            learning.resetContext()
+        }
         updateAutoCaps()
         if (autoSpaceState > 0) autoSpaceState--
         updateSuggestions()
     }
 
     private fun feedback(soundEffect: Int = AudioManager.FX_KEYPRESS_STANDARD) {
+        // Näppäilyt ovat omia muokkauksia; niiden valintamuutokset eivät
+        // katkaise sanaketjua onUpdateSelectionissa.
+        lastEditTime = SystemClock.uptimeMillis()
         if (vibrationEnabled) {
             keyboardView?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         }
@@ -1592,6 +1707,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_TRANSLATE_SOURCE = "kaannos_lahde"
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
         const val LIVE_TRANSLATE_DELAY_MS = 300L
+        const val EXTERNAL_SELECTION_MS = 1000L
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3

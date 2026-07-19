@@ -33,6 +33,30 @@ class SuggestionEngine(
         return rank(candidates, contextMatches, max)
     }
 
+    /**
+     * Koko sanan vaihtoehdot jälkikäteiseen korjaukseen: sanaston ja omien
+     * sanojen läheiset osumat samalla pisteytyksellä, muokkausetäisyys
+     * painaa pisteitä alaspäin. Lyhyillä sanoilla sallitaan vain yksi
+     * muokkaus, ettei rivi täyty kaukaisista arvauksista.
+     */
+    fun alternatives(word: String, context: List<String> = emptyList(), max: Int = 8): List<String> {
+        if (word.length < MIN_ALTERNATIVES_LENGTH || max <= 0) return emptyList()
+        val key = word.lowercase(fiLocale)
+        val maxDistance = if (key.length <= SHORT_WORD_LENGTH) 1 else 2
+        val candidates = LinkedHashSet<String>()
+        for (w in dictionary.near(word, maxDistance, DICTIONARY_CANDIDATES)) {
+            candidates += w.lowercase(fiLocale)
+        }
+        for (w in learning.near(word, maxDistance, OWN_CANDIDATES)) {
+            candidates += w.lowercase(fiLocale)
+        }
+        candidates -= key
+        val contextMatches = learning.contextMatches(context)
+        return rank(candidates, contextMatches, max) { candidate ->
+            1f / (1 + WordTools.editDistanceAtMost(key, candidate, maxDistance))
+        }
+    }
+
     /** Rivi tyhjälle syötteelle: ennustukset ja halutessa yleisimmät täytteeksi. */
     fun emptyInput(context: List<String>, includeCommon: Boolean, max: Int = 8): List<String> {
         val contextMatches = learning.contextMatches(context)
@@ -50,12 +74,17 @@ class SuggestionEngine(
         candidateKeys: Collection<String>,
         contextMatches: Map<String, NextMatch>,
         max: Int,
+        weight: (String) -> Float = { 1f },
     ): List<String> {
         val maxFreq = dictionary.maxFrequency()
         val candidates = candidateKeys.mapNotNull { key ->
             val signals = learning.signals(key)
             if (signals?.blocked == true) return@mapNotNull null
-            Candidate(key, baseScore(key, signals, contextMatches[key], maxFreq), signals?.pinned == true)
+            Candidate(
+                key,
+                baseScore(key, signals, contextMatches[key], maxFreq) * weight(key),
+                signals?.pinned == true,
+            )
         }
         // Kiinnitysbonus vain kahdelle parhaalle, etteivät kiinnitetyt sanat
         // täytä koko riviä, jos samalla alulla on monta kiinnitystä.
@@ -103,6 +132,8 @@ class SuggestionEngine(
         const val OWN_CANDIDATES = 10
         const val IGNORED_THRESHOLD = 2
         const val PINNED_TOP = 2
+        const val MIN_ALTERNATIVES_LENGTH = 3
+        const val SHORT_WORD_LENGTH = 4
 
         // Kokonaissuunnitelman kohdan 22 painokertoimet.
         const val FREQUENCY_WEIGHT = 1.0f

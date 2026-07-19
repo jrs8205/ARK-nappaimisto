@@ -1,5 +1,7 @@
 package org.jarsi.ark.engine
 
+import kotlin.math.abs
+
 /** Tekstityökalut: keskeneräisen sanan poiminta kursorin edeltä. */
 object WordTools {
 
@@ -40,6 +42,54 @@ object WordTools {
     fun withTypedWord(typed: String, suggestions: List<String>): List<String> =
         if (typed.isEmpty() || typed in suggestions) suggestions
         else listOf(typed) + suggestions
+
+    /**
+     * Kursoria välittömästi seuraava sanan loppuosa tai tyhjä, jos kursorin
+     * jälkeen on sananraja. Sisäinen piste kuuluu jatkoon (jarsi|.org),
+     * lauseen lopettava piste ei.
+     */
+    fun continuationAfter(textAfter: CharSequence): String {
+        var end = 0
+        while (end < textAfter.length) {
+            val c = textAfter[end]
+            val internalDot = c == '.' && end + 1 < textAfter.length &&
+                isCore(textAfter[end + 1])
+            if (isCore(c) || internalDot) end++ else break
+        }
+        return textAfter.subSequence(0, end).toString().trimEnd('-', '.')
+    }
+
+    /**
+     * Damerau–Levenshtein-etäisyys, jossa viereisten merkkien vaihdos on
+     * yksi muokkaus. Laskenta katkeaa rajaan: paluuarvo on [max] + 1 heti,
+     * kun etäisyys ylittää sen.
+     */
+    fun editDistanceAtMost(a: String, b: String, max: Int): Int {
+        if (a == b) return 0
+        val la = a.length
+        val lb = b.length
+        if (abs(la - lb) > max) return max + 1
+        var prev2 = IntArray(0)
+        var prev = IntArray(lb + 1) { it }
+        for (i in 1..la) {
+            val cur = IntArray(lb + 1)
+            cur[0] = i
+            var rowMin = i
+            for (j in 1..lb) {
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+                var value = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+                if (i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1]) {
+                    value = minOf(value, prev2[j - 2] + 1)
+                }
+                cur[j] = value
+                if (value < rowMin) rowMin = value
+            }
+            if (rowMin > max) return max + 1
+            prev2 = prev
+            prev = cur
+        }
+        return if (prev[lb] <= max) prev[lb] else max + 1
+    }
 
     /**
      * Palauttaa enintään [count] valmista sanaa kursorin keskeneräisen sanan

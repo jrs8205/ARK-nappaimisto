@@ -251,4 +251,32 @@ class LearningEngineTest {
         assertTrue(e.suggest("2").isEmpty())
         assertFalse(e.isOwnWord("20"))
     }
+
+    @Test
+    fun `near loytaa oman sanan kirjoitusvirheella`() {
+        val e = engine()
+        e.onWordCommitted("prx4")
+        e.onWordCommitted("nouto")
+        assertEquals(listOf("prx4"), e.near("prx5", 1))
+    }
+
+    @Test
+    fun `near ei anna estettya eika sanaa itseaan`() {
+        val e = engine()
+        e.onWordCommitted("moro")
+        assertTrue(e.near("Moro", 1).isEmpty())
+        e.onWordCommitted("morot")
+        e.blockWord("morot")
+        assertTrue(e.near("Moro", 1).isEmpty())
+    }
+
+    @Test
+    fun `onCorrectionAccepted kirjaa hyvaksynnan ilman ketjua`() {
+        val e = engine()
+        e.onWordCommitted("eka")
+        e.drainDirty()
+        e.onCorrectionAccepted("toka")
+        assertEquals(1, e.signals("toka")!!.acceptedCount)
+        assertTrue(e.drainDirty().bigrams.isEmpty())
+    }
 }

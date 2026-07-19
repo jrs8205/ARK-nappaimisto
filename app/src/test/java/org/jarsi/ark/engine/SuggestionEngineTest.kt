@@ -15,6 +15,32 @@ class SuggestionEngineTest {
     }
 
     @Test
+    fun `alternatives ehdottaa laheiset sanat lahin ensin`() {
+        val (s, l) = build("koira 100", "koiran 50", "kissa 80")
+        l.onWordCommitted("koirra")
+        val result = s.alternatives("koirra")
+        assertEquals("koira", result.first())
+        assertTrue("koiran" in result)
+        assertTrue("kissa" !in result)
+        assertTrue("koirra" !in result)
+    }
+
+    @Test
+    fun `alternatives ei ehdota estettya`() {
+        val (s, l) = build("talo 100", "tila 90")
+        l.blockWord("tila")
+        assertTrue("tila" !in s.alternatives("tilat"))
+        assertEquals(listOf("talo"), s.alternatives("talto"))
+    }
+
+    @Test
+    fun `alternatives lyhyt sana sallii vain yhden muokkauksen`() {
+        val (s, _) = build("talo 100")
+        assertTrue(s.alternatives("tilo").contains("talo"))
+        assertTrue(s.alternatives("tila").isEmpty())
+    }
+
+    @Test
     fun `omat sanat nousevat karkeen`() {
         val (s, l) = build("auto 100", "autio 50")
         l.onWordCommitted("autotalli")

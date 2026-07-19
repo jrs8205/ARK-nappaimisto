@@ -121,4 +121,32 @@ class WordToolsTest {
             listOf("CHROME", "Chrome"),
             WordTools.withTypedWord("CHROME", listOf("Chrome")),
         )
+
+    @Test
+    fun `editDistance tunnistaa lisayksen poiston ja vaihdon`() {
+        assertEquals(0, WordTools.editDistanceAtMost("koira", "koira", 2))
+        assertEquals(1, WordTools.editDistanceAtMost("koira", "koiraa", 2))
+        assertEquals(1, WordTools.editDistanceAtMost("koira", "kira", 2))
+        assertEquals(1, WordTools.editDistanceAtMost("koira", "koirq", 2))
+    }
+
+    @Test
+    fun `editDistance laskee viereisen vaihdoksen yhdeksi`() =
+        assertEquals(1, WordTools.editDistanceAtMost("koira", "kiora", 2))
+
+    @Test
+    fun `editDistance katkeaa rajaan`() {
+        assertEquals(3, WordTools.editDistanceAtMost("koira", "talo", 2))
+        assertEquals(1, WordTools.editDistanceAtMost("ab", "ba", 1))
+    }
+
+    @Test
+    fun `continuationAfter poimii sanan jatkon kursorista`() {
+        assertEquals("ira", WordTools.continuationAfter("ira jatkuu"))
+        assertEquals("", WordTools.continuationAfter(" heti"))
+        assertEquals("ra", WordTools.continuationAfter("ra. Sitten"))
+        assertEquals(".org", WordTools.continuationAfter(".org käy"))
+        assertEquals("", WordTools.continuationAfter(""))
+        assertEquals("ra-auto", WordTools.continuationAfter("ra-auto x"))
+    }
 }

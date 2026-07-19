@@ -59,6 +59,23 @@ class DictionaryEngine {
     /** Yleisimmät sanat tyhjälle syötteelle. */
     fun topWords(): List<String> = common
 
+    /** Sanat enintään [maxDistance] muokkauksen päässä; lähin ja yleisin ensin. */
+    fun near(word: String, maxDistance: Int, max: Int = 8): List<String> {
+        val list = entries
+        if (list.isEmpty() || word.isEmpty() || max <= 0) return emptyList()
+        val key = word.lowercase(fiLocale)
+        val hits = ArrayList<Pair<Entry, Int>>()
+        for (entry in list) {
+            if (entry.key == key) continue
+            val d = WordTools.editDistanceAtMost(entry.key, key, maxDistance)
+            if (d <= maxDistance) hits += entry to d
+        }
+        return hits
+            .sortedWith(compareBy({ it.second }, { -it.first.freq }))
+            .take(max)
+            .map { it.first.word }
+    }
+
     /** Etuliitteellä alkavat sanat yleisyysjärjestyksessä, enintään [max] kpl. */
     fun suggest(prefix: String, max: Int = 8): List<String> {
         val list = entries

@@ -128,6 +128,36 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     }
 
     /**
+     * Sana korvattiin vaihtoehtolistasta jälkikäteen: hyväksyntä kirjautuu
+     * kuten ehdotuksen valinnassa, mutta ketjua ei jatketa, koska kursori
+     * on hypännyt keskelle vanhaa tekstiä.
+     */
+    fun onCorrectionAccepted(word: String) {
+        if (!loaded) return
+        val key = keyOf(word)
+        val state = words.getOrPut(key) { WordState(word, 0, clock(), false, clock()) }
+        if (state.count > 0) state.count++
+        state.acceptedCount++
+        state.ignoredCount = 0
+        state.lastUsed = clock()
+        dirtyWords += key
+    }
+
+    /** Omat sanat enintään [maxDistance] muokkauksen päässä, käytetyin ensin. */
+    fun near(word: String, maxDistance: Int, max: Int = 5): List<String> {
+        if (word.isEmpty() || max <= 0) return emptyList()
+        val key = keyOf(word)
+        return words.entries
+            .filter { (k, state) ->
+                !state.blocked && (state.count > 0 || state.pinned) && k != key &&
+                    WordTools.editDistanceAtMost(k, key, maxDistance) <= maxDistance
+            }
+            .sortedByDescending { it.value.count * recency(it.value.lastUsed) }
+            .take(max)
+            .map { it.value.word }
+    }
+
+    /**
      * Rivillä näkyneet täydennykset ohitettiin: kasvata ohituslaskuria
      * kaikilta paitsi lopulliselta sanalta. Vaikutus pisteisiin on kevyt ja
      * alkaa vasta toistuvista ohituksista.

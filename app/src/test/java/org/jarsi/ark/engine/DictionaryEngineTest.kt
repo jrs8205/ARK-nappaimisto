@@ -16,6 +16,18 @@ class DictionaryEngineTest {
     }
 
     @Test
+    fun `near loytaa laheiset lahin ja yleisin ensin`() {
+        val e = engine("koira 100", "koiran 50", "kissa 80", "kaira 200")
+        assertEquals(listOf("koira", "kaira", "koiran"), e.near("koirra", 2))
+    }
+
+    @Test
+    fun `near ei palauta sanaa itseaan`() {
+        val e = engine("koira 100", "koiran 50")
+        assertEquals(listOf("koiran"), e.near("Koira", 2))
+    }
+
+    @Test
     fun `haku toimii aakkosilla`() {
         val e = engine("äiti 10", "äijä 5", "auto 100")
         assertEquals(listOf("äiti", "äijä"), e.suggest("äi"))

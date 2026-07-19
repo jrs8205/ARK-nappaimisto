@@ -702,7 +702,27 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun onSuggestionPicked(word: String) {
         val ic = currentInputConnection ?: return
         val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val after = ic.getTextAfterCursor(MAX_WORD_LOOKBACK, 0) ?: ""
         val current = WordTools.currentWord(before)
+        val continuation = WordTools.continuationAfter(after)
+        if (current.isNotEmpty() && continuation.isNotEmpty()) {
+            // Sanan sisältä valittu vaihtoehto korvaa koko sanan paikallaan;
+            // ympäröivä teksti ja välit säilyvät ennallaan.
+            ic.beginBatchEdit()
+            ic.deleteSurroundingText(current.length, continuation.length)
+            ic.commitText(word, 1)
+            ic.endBatchEdit()
+            autoSpaceState = 0
+            shownCompletions = emptyList()
+            if (learningEnabled) {
+                learning.onCorrectionAccepted(word)
+                maybeFlush()
+            }
+            feedback()
+            updateAutoCaps()
+            updateSuggestions()
+            return
+        }
         ic.beginBatchEdit()
         if (current.isNotEmpty()) ic.deleteSurroundingText(current.length, 0)
         ic.commitText(if (spaceAfterSuggestion) "$word " else word, 1)
@@ -733,11 +753,32 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         val before = currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val after = currentInputConnection?.getTextAfterCursor(MAX_WORD_LOOKBACK, 0) ?: ""
         // Lauseen alussa (automaattinen iso kirjain päällä) ehdotukset alkavat isolla.
         val shiftActive = shiftState != ShiftState.OFF
         val generation = ++suggestGeneration
         suggestExecutor.execute {
             val word = WordTools.currentWord(before)
+            val continuation = WordTools.continuationAfter(after)
+            if (word.isNotEmpty() && continuation.isNotEmpty()) {
+                // Kursori on sanan sisällä: rivi näyttää koko sanan vaihtoehdot
+                // ja valinta korvaa sanan (jälkikäteinen korjaus).
+                val whole = word + continuation
+                var result = suggestionEngine.alternatives(whole, WordTools.previousWords(before))
+                if (whole.first().isUpperCase()) {
+                    result = result.map { s -> s.replaceFirstChar { it.titlecase(fiLocale) } }
+                }
+                if (generation == suggestGeneration) {
+                    mainHandler.post {
+                        if (generation == suggestGeneration) {
+                            bar.setSuggestions(result)
+                            // Vaihtoehdot eivät ole täydennyksiä: ohitussakkoa ei kirjata.
+                            shownCompletions = emptyList()
+                        }
+                    }
+                }
+                return@execute
+            }
             val context = WordTools.previousWords(before)
             var result = if (word.isNotEmpty()) {
                 suggestionEngine.suggest(word, context)

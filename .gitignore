@@ -13,3 +13,8 @@ local.properties
 .kotlin
 /.remember
 /HANDOFF.md
+
+# Julkaisuallekirjoitus: salaisuudet eivät kuulu repoon.
+/keystore.properties
+*.keystore
+*.jks

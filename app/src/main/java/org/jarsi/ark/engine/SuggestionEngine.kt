@@ -59,6 +59,14 @@ class SuggestionEngine(
                 candidates += w.lowercase(fiLocale)
             }
         }
+        if (key.length <= SHORT_WORD_LENGTH) {
+            // Lyhyet sanat ovat yleensä pikkusanoja, joiden vaihtoehdot ovat
+            // toisia pikkusanoja — yleisimmät sanat pohjaehdokkaiksi, jotta
+            // rivi ei jää tyhjäksi ennen kuin omia sanapareja on kertynyt.
+            for (w in dictionary.topWords()) {
+                candidates += w.lowercase(fiLocale)
+            }
+        }
         val contextMatches = learning.contextMatches(context)
         candidates += contextMatches.keys
         val rightFit = nextWord?.let { learning.previousMatches(it) } ?: emptyMap()
@@ -146,7 +154,7 @@ class SuggestionEngine(
         const val OWN_CANDIDATES = 10
         const val IGNORED_THRESHOLD = 2
         const val PINNED_TOP = 2
-        const val MIN_TYPO_LENGTH = 3
+        const val MIN_TYPO_LENGTH = 2
         const val SHORT_WORD_LENGTH = 4
         const val MAX_CLOSENESS_DISTANCE = 3
 

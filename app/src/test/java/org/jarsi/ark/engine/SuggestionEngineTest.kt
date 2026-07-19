@@ -1,6 +1,7 @@
 package org.jarsi.ark.engine
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,10 +35,25 @@ class SuggestionEngineTest {
     }
 
     @Test
-    fun `alternatives lyhyt sana sallii vain yhden muokkauksen`() {
+    fun `alternatives lyhyt sana sallii vain yhden muokkauksen kirjoitusvirheena`() {
         val (s, _) = build("talo 100")
-        assertTrue(s.alternatives("tilo").contains("talo"))
-        assertTrue(s.alternatives("tila").isEmpty())
+        assertTrue("talo" in s.alternatives("tilo"))
+    }
+
+    @Test
+    fun `lyhyt sana saa yleiset sanat vaihtoehdoiksi`() {
+        val (s, _) = build("ja 100", "on 90", "tai 80")
+        val result = s.alternatives("ei")
+        assertTrue("ja" in result)
+        assertTrue("on" in result)
+        assertTrue("tai" in result)
+        assertFalse("ei" in result)
+    }
+
+    @Test
+    fun `pitkalle sanalle ei tarjota yleisia sanoja`() {
+        val (s, _) = build("ja 100", "koira 90")
+        assertEquals(listOf("koira"), s.alternatives("koirra"))
     }
 
     @Test

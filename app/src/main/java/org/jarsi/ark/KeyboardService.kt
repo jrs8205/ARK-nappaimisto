@@ -177,7 +177,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // kunnes lataus valmistuu.
         Thread {
             try {
-                assets.open("sanalista.txt").bufferedReader().useLines { dictionary.load(it) }
+                assets.open("sanalista.txt").bufferedReader().useLines {
+                    // Laajempi yleisten sanojen joukko palvelee myös
+                    // korjausnäkymän pikkusanavaihtoehtoja.
+                    dictionary.load(it, topWordCount = COMMON_WORD_POOL)
+                }
             } catch (e: IOException) {
                 // Sanalista puuttuu tai ei aukea: ehdotusrivi jää tyhjäksi.
             }
@@ -1133,6 +1137,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private companion object {
         const val MAX_WORD_LOOKBACK = 48
         const val CORRECTION_LOOKBACK = 5000
+        const val COMMON_WORD_POOL = 24
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3

@@ -11,6 +11,13 @@
         <item name="colorOnSurfaceVariant">@color/vaalea_vihje</item>
     </style>
 
+    <!-- Emojivalitsin: valitun kategorian merkkiviiva näppäimistön korostusvärillä. -->
+    <style name="Theme.Ark.EmojiValitsin">
+        <item name="colorAccent">@color/vaalea_korostus</item>
+        <item name="colorControlActivated">@color/vaalea_korostus</item>
+        <item name="colorSecondary">@color/vaalea_korostus</item>
+    </style>
+
     <!-- Läpinäkyvä teema lupakyselylle: näppäimistön alla oleva sovellus jää näkyviin. -->
     <style name="Theme.Ark.Lapinakyva">
         <item name="android:windowIsTranslucent">true</item>

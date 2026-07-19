@@ -58,11 +58,8 @@
 
     <string name="korjaus_tyhja">Kentässä ei ole tekstiä</string>
 
-    <string name="kaannos_korvaa">Korvaa kentän teksti</string>
-    <string name="kaannos_tyhja">Kentässä ei ole käännettävää tekstiä</string>
+    <string name="kaannos_kirjoita">Kirjoita (%1$s)…</string>
     <string name="kaannos_ladataan">Valmistellaan käännösmalleja…</string>
-    <string name="kaannos_kaannetaan">Käännetään…</string>
-    <string name="kaannos_virhe">Käännös epäonnistui</string>
     <string name="kaannos_lataus_virhe">Käännösmallin lataus epäonnistui – tarkista verkkoyhteys</string>
 
     <string name="asetukset_kaannos">Käännös</string>

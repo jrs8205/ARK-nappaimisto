@@ -32,8 +32,11 @@ class EmojiPanelView(context: Context) : LinearLayout(context) {
     private val density = resources.displayMetrics.density
     private fun dp(value: Int) = (value * density).roundToInt()
 
-    // Valitsin tarvitsee AppCompat-pohjaisen teeman; palvelun konteksti kääritään.
-    private val picker = EmojiPickerView(ContextThemeWrapper(context, R.style.Theme_Ark)).apply {
+    // Valitsin tarvitsee AppCompat-pohjaisen teeman; palvelun konteksti
+    // kääritään, ja päällysteteema värjää valitun kategorian viivan.
+    private val picker = EmojiPickerView(
+        ContextThemeWrapper(context, R.style.Theme_Ark_EmojiValitsin)
+    ).apply {
         setOnEmojiPickedListener { item -> listener?.onEmojiPicked(item.emoji) }
     }
 

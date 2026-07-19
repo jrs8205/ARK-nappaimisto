@@ -1,5 +1,8 @@
 # ARK-näppäimistö
 
+[![Lataukset](https://img.shields.io/github/downloads/jrs8205/ARK-nappaimisto/total?label=lataukset)](https://github.com/jrs8205/ARK-nappaimisto/releases)
+[![Uusin versio](https://img.shields.io/github/v/release/jrs8205/ARK-nappaimisto?label=uusin%20versio)](https://github.com/jrs8205/ARK-nappaimisto/releases/latest)
+
 Oma suomalainen näppäimistösovellus Androidille (IME, Input Method Editor).
 
 ARK-näppäimistö toimii Androidin järjestelmätason näppäimistönä, jonka voi ottaa

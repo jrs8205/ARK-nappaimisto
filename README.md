@@ -42,11 +42,11 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 | 3 | Henkilökohtaisten sanojen oppiminen | Valmis |
 | 4 | Sanaparit ja trigrammit, seuraavan sanan ennustus | Valmis |
 | 5 | Palautteesta oppiminen (hyväksynnät, hylkäykset, korjausten peruutukset) | Valmis |
-| 6 | Sovelluskohtainen oppiminen | — |
-| 7 | Oikeinkirjoitus ja varovainen automaattikorjaus | — |
-| 8 | Fraasit ja tekstipohjat | — |
+| 6 | Sovelluskohtainen oppiminen | Poistettu suunnitelmasta |
+| 7 | Oikeinkirjoitus ja varovainen automaattikorjaus | Valmis |
+| 8 | Fraasit ja tekstipohjat | Katettu kiinnitetyillä leikkeillä |
 | 9 | Paikallinen kielimalli ehdotusten uudelleenjärjestämiseen | — |
-| 10 | Edistyneet ominaisuudet (pyyhkäisykirjoitus ym.) | — |
+| 10 | Edistyneet ominaisuudet | — |
 
 ## Ominaisuudet (vaihe 1)
 
@@ -110,6 +110,18 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 * korjausten peruutuksista oppiminen tulee automaattikorjauksen mukana
   (vaihe 7)
 
+## Ominaisuudet (vaihe 7)
+
+* varovainen automaattikorjaus: välilyönti korjaa tuntemattoman sanan
+  lähimpään tunnettuun; omat sanat, koodit ja estetyt jäävät aina rauhaan
+* askelpalautin heti korjauksen jälkeen peruu sen — peruttu sana opitaan,
+  eikä sitä korjata enää uudestaan
+* korjausnäkymä työkaluriviltä: kentän koko teksti sanoina ja
+  tuntemattomat sanat alleviivattuna; sanaa napauttamalla ehdotusrivi
+  näyttää vaihtoehdot (kirjoitusvirheet ja paikkaan sopivat sanat) ja
+  valinta korvaa sanan paikallaan — kätevä myös sanellun tekstin
+  oikolukuun
+
 ## Muut ominaisuudet
 
 * opittujen sanojen hallinta asetuksissa: haku, kiinnitys, eston purku,
@@ -127,6 +139,13 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   haku verkosta ja poisto, sekä oman kiinnitetyn leikkeen luonti
   plus-napista. Kiinnittämättömät vanhenevat tunnissa, ja
   arkaluonteisiksi merkityt kopiot ohitetaan kokonaan.
+* varmuuskopio asetuksista: opitut sanat, sanaketjut ja kiinnitetyt
+  tekstileikkeet JSON-tiedostoon ja takaisin; tuonti yhdistää tiedot
+  turvallisesti, joten saman tiedoston voi tuoda useankin kerran
+* erikoismerkkien järjestys: symbolisivujen merkit voi järjestää
+  asetuksissa raahaamalla, myös sivujen välillä
+* sanelun sanastovihjeet: käytetyimmät omat sanat ohjaavat
+  puheentunnistusta (Android 13 tai uudempi)
 
 ## Yksityisyys
 

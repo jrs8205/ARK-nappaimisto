@@ -7,6 +7,19 @@ käyttöön puhelimen asetuksista ja käyttää lähes kaikissa sovelluksissa:
 viestisovelluksissa, selaimessa, sähköpostissa, muistiinpanoissa ja muissa
 tekstikentissä.
 
+## Lataus ja asennus
+
+Uusin versio on [Releases-sivulla](https://github.com/jrs8205/ARK-nappaimisto/releases/latest)
+(`ark-nappaimisto-vX.Y.Z.apk`).
+
+1. Lataa APK puhelimella ja avaa se; salli asennus kysyttäessä.
+2. Avaa ARK-näppäimistö-sovellus ja valitse **Ota näppäimistö käyttöön**.
+3. Valitse **Vaihda näppäimistöksi** ja poimi ARK-näppäimistö listasta.
+
+Päivitykset asentuvat vanhan version päälle ja opitut sanat säilyvät.
+Oppimisdatan voi siirtää laitteelta toiselle varmuuskopiolla
+(Asetukset → Varmuuskopio).
+
 ## Tavoite
 
 Näppäimistön keskeinen tarkoitus on oppia käyttäjän oma kirjoitustapa
@@ -52,12 +65,12 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 
 * suomalainen QWERTY-asettelu Å-, Ä- ja Ö-kirjaimilla
 * numerorivi aina näkyvissä
-* Shift, Caps Lock (kaksoisnapautus), automaattinen iso alkukirjain
-* pitkä painallus erikoismerkeille ja tarkkeellisille kirjaimille
+* Shift, isot lukkoon toisella napautuksella, automaattinen iso alkukirjain
+* pitkä painallus lisämerkeille numerorivillä ja välimerkeissä
 * kaksi symbolisivua ja numeronäppäimistö numerokentille
 * kenttäkohtainen mukautus: @ sähköpostikentässä, / osoitekentässä,
   Enter-näppäimen toiminto kentän mukaan (Hae, Lähetä, Siirry…)
-* tumma, vaalea ja AMOLED-teema
+* vaalea ja tumma teema järjestelmän asetuksen mukaan
 * säädettävä näppäimistön korkeus
 * näppäinäänet, värinä ja esikatselukupla
 * välilyönnin pyyhkäisy siirtää kursoria
@@ -66,9 +79,10 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 ## Ominaisuudet (vaihe 2)
 
 * vieritettävä ehdotusrivi: täydennykset yleisestä suomen sanalistasta
-  (80 000 sanamuotoa taajuuksineen, ks. [docs/sanalista.md](docs/sanalista.md))
-* työkalurivi: kursorinsiirtotila (isot nuolinäppäimet), verkko-osoitesivu
-  (https://, www., .fi …) ja asetukset
+  (nykyisin 170 100 sanamuotoa taajuuksineen, ks.
+  [docs/sanalista.md](docs/sanalista.md))
+* työkalurivi: kursorinsiirtotila, verkko-osoitesivu, sanelu, emojit,
+  leikepöytä, korjausnäkymä, käännös ja asetukset
 * välimerkki siirtyy ehdotuksen lisäämän välilyönnin eteen
 * isot alkukirjaimet ehdotuksissa lauseen alussa
 * ehdotusten asetukset: näkyvyys, välilyönti hyväksynnän jälkeen,

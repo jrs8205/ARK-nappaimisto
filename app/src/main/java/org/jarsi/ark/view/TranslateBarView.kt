@@ -7,6 +7,7 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
+import org.jarsi.ark.R
 import org.jarsi.ark.theme.KeyboardTheme
 import kotlin.math.roundToInt
 
@@ -41,6 +42,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         text = "⇄"
         textSize = 16f
         setPadding(dp(4), dp(8), dp(4), dp(8))
+        contentDescription = context.getString(R.string.cd_vaihda_suunta)
         setOnClickListener { listener?.onSwap() }
     }
 
@@ -64,6 +66,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         textSize = 16f
         setPadding(dp(12), dp(8), dp(12), dp(8))
         visibility = GONE
+        contentDescription = context.getString(R.string.cd_tyhjenna_rivi)
         setOnClickListener { listener?.onClear() }
     }
 

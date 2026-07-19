@@ -65,6 +65,7 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
 
     private val addButton = ImageView(context).apply {
         setPadding(dp(14), dp(14), dp(14), dp(14))
+        contentDescription = context.getString(R.string.leike_uusi)
         setOnClickListener { listener?.onCreatePin() }
     }
 

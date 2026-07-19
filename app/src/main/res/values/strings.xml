@@ -58,6 +58,11 @@
 
     <string name="korjaus_tyhja">Kentässä ei ole tekstiä</string>
 
+    <!-- Saavutettavuuskuvaukset kuvakenapeille -->
+    <string name="cd_poista_merkki">Poista merkki</string>
+    <string name="cd_vaihda_suunta">Vaihda käännössuunta</string>
+    <string name="cd_tyhjenna_rivi">Tyhjennä käännösrivi</string>
+
     <string name="kaannos_kirjoita">Kirjoita (%1$s)…</string>
     <string name="kaannos_ladataan">Valmistellaan käännösmalleja…</string>
     <string name="kaannos_lataus_virhe">Käännösmallin lataus epäonnistui – tarkista verkkoyhteys</string>

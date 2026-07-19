@@ -36,8 +36,9 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     private val removedWords = HashSet<String>()
     private val removedChainWords = HashSet<String>()
 
-    // Kylmäkäynnistyksessä kirjoitetut sanat odottavat tietokannan latausta.
-    private val pendingCommits = ArrayList<String>()
+    // Kylmäkäynnistyksessä kirjoitetut sanat odottavat tietokannan latausta;
+    // null-merkintä on kenttäraja, ettei eri kenttien sanoista synny ketjua.
+    private val pendingCommits = ArrayList<String?>()
 
     private var previousToken: String? = null
     private var beforePreviousToken: String? = null
@@ -45,7 +46,10 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
 
     val isLoaded: Boolean get() = loaded
     val dirtyCount: Int
-        get() = dirtyWords.size + dirtyBigrams.size + dirtyTrigrams.size + removedWords.size
+        get() = synchronized(this) {
+            dirtyWords.size + dirtyBigrams.size + dirtyTrigrams.size +
+                removedWords.size + removedChainWords.size
+        }
 
     private fun keyOf(word: String) = word.lowercase(fiLocale)
 
@@ -82,10 +86,13 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
                 CountState(t.count, t.lastUsed)
         }
         loaded = true
-        // Latauksen aikana kirjoitetut sanat opitaan jälkikäteen järjestyksessä.
+        // Latauksen aikana kirjoitetut sanat opitaan jälkikäteen järjestyksessä;
+        // kenttärajat katkaisevat ketjun kuten kirjoitushetkelläkin.
         val pending = pendingCommits.toList()
         pendingCommits.clear()
-        pending.forEach { onWordCommitted(it) }
+        pending.forEach { word ->
+            if (word == null) resetContext() else onWordCommitted(word)
+        }
     }
 
     /** Käsin kirjoitettu sana päättyi: opi sana ja kirjaa ketjut. */
@@ -277,6 +284,11 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     /** Katkaisee sanaketjun (kenttä vaihtui tai kursori siirtyi muualle). */
     @Synchronized
     fun resetContext() {
+        if (!loaded && pendingCommits.isNotEmpty() && pendingCommits.last() != null &&
+            pendingCommits.size < PENDING_LIMIT
+        ) {
+            pendingCommits += null
+        }
         previousToken = null
         beforePreviousToken = null
     }

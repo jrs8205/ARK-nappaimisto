@@ -11,7 +11,8 @@ room = "2.8.4"
 ksp = "2.2.20-2.0.4"
 recyclerview = "1.4.0"
 emojipicker = "1.5.0"
-mlkitTranslate = "17.0.2"
+# 17.0.3 tuo 16 kt -sivukokoyhteensopivan natiivikirjaston (Play-vaatimus).
+mlkitTranslate = "17.0.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }

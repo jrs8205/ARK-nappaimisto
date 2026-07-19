@@ -45,12 +45,18 @@ class DictationController(
     private var lastSpeechTime = 0L
     private var retried = false
 
-    private val recognitionListener = object : RecognitionListener {
+    // Kuuntelukerran tunniste: nopeassa stop–start-sarjassa vanhan
+    // tunnistimen jonoon jäänyt callback ei kelpaa uudelle kerralle.
+    private var session = 0
+
+    private fun makeListener(mySession: Int) = object : RecognitionListener {
+        private fun stale() = mySession != session || !isActive
+
         override fun onReadyForSpeech(params: Bundle?) = Unit
         override fun onBeginningOfSpeech() = Unit
 
         override fun onRmsChanged(rmsdB: Float) {
-            if (!isActive) return
+            if (stale()) return
             listener.onSpeechLevel(((rmsdB + 2f) / 12f).coerceIn(0f, 1f))
         }
         override fun onBufferReceived(buffer: ByteArray?) = Unit
@@ -60,7 +66,7 @@ class DictationController(
         override fun onPartialResults(partialResults: Bundle?) {
             // Pysäytyksen jälkeen jonoon jäänyt osatulos ei saa enää
             // kirjoittaa mahdollisesti jo vaihtuneeseen kenttään.
-            if (!isActive) return
+            if (stale()) return
             val text = bestResult(partialResults) ?: return
             if (text.isNotBlank()) {
                 lastSpeechTime = SystemClock.elapsedRealtime()
@@ -69,7 +75,7 @@ class DictationController(
         }
 
         override fun onResults(results: Bundle?) {
-            if (!isActive) return
+            if (stale()) return
             val text = bestResult(results)
             if (!text.isNullOrBlank()) {
                 lastSpeechTime = SystemClock.elapsedRealtime()
@@ -79,7 +85,7 @@ class DictationController(
         }
 
         override fun onError(error: Int) {
-            if (!isActive) return
+            if (stale()) return
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH,
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
@@ -139,11 +145,12 @@ class DictationController(
 
     private fun recreateRecognizer() {
         recognizer?.destroy()
+        session++
         recognizer = if (useOnDevice && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
         } else {
             SpeechRecognizer.createSpeechRecognizer(context)
-        }.also { it.setRecognitionListener(recognitionListener) }
+        }.also { it.setRecognitionListener(makeListener(session)) }
     }
 
     private fun restartListening() {

@@ -53,6 +53,7 @@ class EmojiPanelView(context: Context) : LinearLayout(context) {
         textSize = 20f
         gravity = Gravity.CENTER
         setPadding(dp(20), dp(4), dp(20), dp(4))
+        contentDescription = context.getString(R.string.cd_poista_merkki)
         setOnClickListener { listener?.onBackspace() }
     }
 

@@ -50,9 +50,23 @@ abstract class LearnedDatabase : RoomDatabase() {
             }
         }
 
+        @Volatile private var instance: LearnedDatabase? = null
+
+        /**
+         * Sovelluksen yhteinen instanssi: palvelu ja asetusnäkymät jakavat
+         * saman yhteyden, eikä avoimia Room-instansseja vuoda. Instanssia ei
+         * suljeta — se elää prosessin ajan.
+         */
         fun create(context: Context): LearnedDatabase =
-            Room.databaseBuilder(context, LearnedDatabase::class.java, "oppiminen.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                .build()
+            instance ?: synchronized(this) {
+                instance ?: Room.databaseBuilder(
+                    context.applicationContext,
+                    LearnedDatabase::class.java,
+                    "oppiminen.db",
+                )
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .build()
+                    .also { instance = it }
+            }
     }
 }

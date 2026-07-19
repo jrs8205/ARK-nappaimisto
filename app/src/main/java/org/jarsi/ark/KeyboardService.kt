@@ -183,6 +183,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var autoCorrectEnabled = true
     private var noSuggestionsField = false
 
+    // Editori-istunnon tunniste: viivästynyt callback (automaattikorjaus,
+    // käännöksen viimeistely) ei saa kirjoittaa toiseen kenttään.
+    private var editorSessionId = 0
+
     // Viimeisin oma muokkaushetki: sen jälkeiset valintamuutokset ovat
     // käyttäjän kursorihyppyjä, jotka katkaisevat sanaketjun.
     private var lastEditTime = 0L
@@ -250,6 +254,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     override fun onDestroy() {
+        editorSessionId++
         dictation.stop()
         translator?.close()
         clipboardManager?.removePrimaryClipChangedListener(clipChangedListener)
@@ -350,11 +355,22 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(type ?: "") ?: "png"
         }
         ioExecutor.execute {
+            val dir = File(filesDir, "clips").apply { mkdirs() }
+            val file = File(dir, "leike_${System.currentTimeMillis()}.$extension")
             try {
-                val dir = File(filesDir, "clips").apply { mkdirs() }
-                val file = File(dir, "leike_${System.currentTimeMillis()}.$extension")
                 contentResolver.openInputStream(uri)?.use { input ->
-                    FileOutputStream(file).use { output -> input.copyTo(output) }
+                    FileOutputStream(file).use { output ->
+                        // Kokoraja suojaa tallennustilaa jättikuvilta.
+                        val buffer = ByteArray(8192)
+                        var total = 0L
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read < 0) break
+                            total += read
+                            if (total > MAX_IMAGE_CLIP_BYTES) error("kuvaleike on liian suuri")
+                            output.write(buffer, 0, read)
+                        }
+                    }
                 } ?: return@execute
                 mainHandler.post {
                     val saved = clipStore.addImage(file.absolutePath)
@@ -363,7 +379,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     refreshClipboardPanel()
                 }
             } catch (e: Exception) {
-                // Kuvan kopiointi epäonnistui: leike jää tallentamatta.
+                // Epäonnistunut tai liian suuri kopio siivotaan levyltä pois.
+                file.delete()
             }
         }
     }
@@ -510,20 +527,41 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         toolbar?.translationActive = false
         if (flush && text.isNotBlank() && client != null && ready) {
             val ic = currentInputConnection
+            val session = editorSessionId
             client.translate(text)
                 .addOnSuccessListener { result ->
-                    ic?.beginBatchEdit()
-                    ic?.setComposingText(result, 1)
-                    ic?.finishComposingText()
-                    ic?.endBatchEdit()
+                    // Kentän vaihduttua tulosta ei kirjoiteta minnekään.
+                    if (session == editorSessionId) {
+                        ic?.beginBatchEdit()
+                        ic?.setComposingText(result, 1)
+                        ic?.finishComposingText()
+                        ic?.endBatchEdit()
+                    }
                     client.close()
                 }
                 .addOnFailureListener {
-                    ic?.finishComposingText()
+                    if (session == editorSessionId) {
+                        // Käännös ei valmistunut: lähdeteksti jää kenttään talteen.
+                        ic?.beginBatchEdit()
+                        ic?.setComposingText(text, 1)
+                        ic?.finishComposingText()
+                        ic?.endBatchEdit()
+                    }
                     client.close()
                 }
         } else {
-            if (flush) currentInputConnection?.finishComposingText()
+            if (flush) {
+                val ic = currentInputConnection
+                if (text.isNotBlank()) {
+                    // Kääntäjä ei ollut valmis: lähdeteksti jää kenttään talteen.
+                    ic?.beginBatchEdit()
+                    ic?.setComposingText(text, 1)
+                    ic?.finishComposingText()
+                    ic?.endBatchEdit()
+                } else {
+                    ic?.finishComposingText()
+                }
+            }
             client?.close()
         }
         updateSuggestions()
@@ -866,33 +904,38 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val dirty = learning.drainDirty()
         ioExecutor.execute {
             try {
-                dirty.removedWords.forEach { db.dao().deleteWord(it) }
-                dirty.removedChainWords.forEach {
-                    db.dao().deleteBigramsFor(it)
-                    db.dao().deleteTrigramsFor(it)
-                }
-                if (dirty.words.isNotEmpty()) {
-                    db.dao().upsertWords(
-                        dirty.words.map {
-                            WordEntity(
-                                it.word.lowercase(fiLocale), it.word,
-                                it.count, it.lastUsed, it.blocked, it.created,
-                                it.acceptedCount, it.ignoredCount, it.pinned,
-                            )
-                        }
-                    )
-                }
-                if (dirty.bigrams.isNotEmpty()) {
-                    db.dao().upsertBigrams(
-                        dirty.bigrams.map { BigramEntity(it.previous, it.next, it.count, it.lastUsed) }
-                    )
-                }
-                if (dirty.trigrams.isNotEmpty()) {
-                    db.dao().upsertTrigrams(
-                        dirty.trigrams.map {
-                            TrigramEntity(it.first, it.second, it.next, it.count, it.lastUsed)
-                        }
-                    )
+                // Erä kirjoitetaan transaktiossa: joko kaikki tai ei mitään.
+                db.runInTransaction {
+                    dirty.removedWords.forEach { db.dao().deleteWord(it) }
+                    dirty.removedChainWords.forEach {
+                        db.dao().deleteBigramsFor(it)
+                        db.dao().deleteTrigramsFor(it)
+                    }
+                    if (dirty.words.isNotEmpty()) {
+                        db.dao().upsertWords(
+                            dirty.words.map {
+                                WordEntity(
+                                    it.word.lowercase(fiLocale), it.word,
+                                    it.count, it.lastUsed, it.blocked, it.created,
+                                    it.acceptedCount, it.ignoredCount, it.pinned,
+                                )
+                            }
+                        )
+                    }
+                    if (dirty.bigrams.isNotEmpty()) {
+                        db.dao().upsertBigrams(
+                            dirty.bigrams.map {
+                                BigramEntity(it.previous, it.next, it.count, it.lastUsed)
+                            }
+                        )
+                    }
+                    if (dirty.trigrams.isNotEmpty()) {
+                        db.dao().upsertTrigrams(
+                            dirty.trigrams.map {
+                                TrigramEntity(it.first, it.second, it.next, it.count, it.lastUsed)
+                            }
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 // Kirjoitusvirhe ei saa kaataa näppäimistöä; erä palaa
@@ -961,13 +1004,19 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         // Ratkaisu tehdään taustalla, ettei sanastohaku nyi näppäilyä.
+        val session = editorSessionId
         executeSuggest {
             val corrected = suggestionEngine.autoCorrect(typed, context)
-            mainHandler.post { applyAutoCorrect(typed, corrected, shown) }
+            mainHandler.post { applyAutoCorrect(typed, corrected, shown, session) }
         }
     }
 
-    private fun applyAutoCorrect(typed: String, corrected: String?, shown: List<String>) {
+    private fun applyAutoCorrect(
+        typed: String,
+        corrected: String?,
+        shown: List<String>,
+        session: Int,
+    ) {
         val display = corrected?.let {
             if (typed.first().isUpperCase()) {
                 it.replaceFirstChar { c -> c.titlecase(fiLocale) }
@@ -977,7 +1026,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         var applied = false
         val ic = currentInputConnection
-        if (display != null && display != typed && ic != null) {
+        // Kenttä ei saa olla vaihtunut: sama häntä toisessa kentässä ei riitä.
+        if (display != null && display != typed && ic != null && session == editorSessionId) {
             val tail = "$typed "
             // Korjataan vain jos teksti on yhä ennallaan — nopea kirjoittaja
             // on voinut jo jatkaa, eikä tekstiä saa muuttaa selän takana.
@@ -1081,9 +1131,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onToggleDictation() {
                     feedback()
-                    // Sanelu kirjoittaa keskeneräistä tekstiä samalla
-                    // mekanismilla kuin käännös; tilat eivät voi olla yhtä aikaa.
-                    hideTranslateBar()
+                    if (translateMode) {
+                        // Käännöstila suljetaan ensin; sanelu käynnistetään
+                        // uudella painalluksella, ettei viimeistely ja sanelu
+                        // kirjoita kenttään yhtä aikaa.
+                        hideTranslateBar()
+                        return
+                    }
                     when {
                         passwordField -> Unit
                         dictation.isActive -> dictation.stop()
@@ -1339,6 +1393,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
 
         keyboardView?.enterText = enterLabel(info)
+        editorSessionId++
+        shownCompletions = emptyList()
         shiftState = ShiftState.OFF
         manualShift = false
         // Salasanakentissä ja oppimisen kieltävissä kentissä (esim. incognito)
@@ -1708,6 +1764,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
         const val LIVE_TRANSLATE_DELAY_MS = 300L
         const val EXTERNAL_SELECTION_MS = 1000L
+        const val MAX_IMAGE_CLIP_BYTES = 10L * 1024 * 1024
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3

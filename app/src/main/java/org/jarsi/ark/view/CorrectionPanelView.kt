@@ -69,6 +69,7 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
 
     private val doneButton = ImageView(context).apply {
         setPadding(dp(14), dp(14), dp(14), dp(14))
+        contentDescription = context.getString(R.string.enter_valmis)
         setOnClickListener { listener?.onDone() }
     }
 

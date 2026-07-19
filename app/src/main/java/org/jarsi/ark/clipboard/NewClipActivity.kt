@@ -51,7 +51,6 @@ class NewClipActivity : AppCompatActivity() {
                 val db = LearnedDatabase.create(this)
                 val now = System.currentTimeMillis()
                 db.dao().upsertClip(ClipEntity(now, text, null, now, pinned = true))
-                db.close()
                 LearnedDataStamp.bump()
             } catch (e: Exception) {
                 // Tallennusvirhe: leike jää luomatta.

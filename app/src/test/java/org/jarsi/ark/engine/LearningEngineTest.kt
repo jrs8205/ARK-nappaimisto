@@ -282,6 +282,26 @@ class LearningEngineTest {
     }
 
     @Test
+    fun `eri kenttiin ennen latausta kirjoitetut sanat eivat ketjuunnu`() {
+        val e = LearningEngine { now }
+        e.onWordCommitted("eka")
+        e.resetContext()
+        e.onWordCommitted("toka")
+        e.load(emptyList(), emptyList(), emptyList())
+        assertTrue(e.drainDirty().bigrams.isEmpty())
+    }
+
+    @Test
+    fun `ketjupoisto nakyy tallennusjonossa`() {
+        val e = engine()
+        listOf("Jako", "20", "nouto").forEach { e.onWordCommitted(it) }
+        e.drainDirty()
+        e.removeWord("20")
+        assertTrue(e.dirtyCount > 0)
+        assertTrue("20" in e.drainDirty().removedChainWords)
+    }
+
+    @Test
     fun `poistettu sana haviaa myos ketjuista`() {
         val e = engine()
         listOf("eka", "toka", "kolmas").forEach { e.onWordCommitted(it) }

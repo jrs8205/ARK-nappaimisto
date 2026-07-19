@@ -79,6 +79,14 @@
             app:singleLineTitle="false" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/asetukset_kaannos">
+        <Preference
+            android:key="kaannoskielet"
+            android:title="@string/kaannoskielet"
+            android:summary="@string/kaannoskielet_kuvaus"
+            app:singleLineTitle="false" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/asetukset_varmuuskopio">
         <Preference
             android:key="varmuuskopio_vie"

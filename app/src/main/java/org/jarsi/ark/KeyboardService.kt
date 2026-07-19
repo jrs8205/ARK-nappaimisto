@@ -50,9 +50,18 @@ import org.jarsi.ark.keyboard.SymbolOrder
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.common.model.RemoteModelManager
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.TranslateRemoteModel
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.Translator
+import com.google.mlkit.nl.translate.TranslatorOptions
 import org.jarsi.ark.view.ClipboardPanelView
 import org.jarsi.ark.view.CorrectionPanelView
+import org.jarsi.ark.view.EmojiPanelView
 import org.jarsi.ark.view.KeyboardView
+import org.jarsi.ark.view.TranslationPanelView
 import org.jarsi.ark.view.SuggestionBarView
 import org.jarsi.ark.view.ToolbarView
 import java.io.File
@@ -90,6 +99,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private val clipStore = ClipStore()
     private var clipboardPanel: ClipboardPanelView? = null
     private var correctionPanel: CorrectionPanelView? = null
+    private var emojiPanel: EmojiPanelView? = null
+    private var translationPanel: TranslationPanelView? = null
+    private var translationOriginal = ""
+    private var translationStartOffset = 0
+    private var translationResult: String? = null
+    private var translationGeneration = 0
+    private var translator: Translator? = null
+    private var translationLangs: List<String> =
+        listOf(TranslateLanguage.FINNISH, TranslateLanguage.ENGLISH)
     private var correctionText = ""
     private var correctionWords: List<IntRange> = emptyList()
     private var correctionUnknown: Set<Int> = emptySet()
@@ -216,6 +234,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onDestroy() {
         dictation.stop()
+        translator?.close()
         clipboardManager?.removePrimaryClipChangedListener(clipChangedListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         flushLearned()
@@ -366,6 +385,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val panel = clipboardPanel ?: return
         val kb = keyboardView ?: return
         hideCorrectionPanel()
+        hideEmojiPanel()
+        hideTranslationPanel()
         if (kb.height > 0) {
             panel.layoutParams = panel.layoutParams.apply { height = kb.height }
         }
@@ -384,12 +405,182 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         toolbar?.clipboardActive = false
     }
 
+    private fun hideAllPanels() {
+        hideClipboardPanel()
+        hideCorrectionPanel()
+        hideEmojiPanel()
+        hideTranslationPanel()
+    }
+
+    private fun showEmojiPanel() {
+        val panel = emojiPanel ?: return
+        val kb = keyboardView ?: return
+        hideAllPanels()
+        if (kb.height > 0) {
+            panel.layoutParams = panel.layoutParams.apply { height = kb.height }
+        }
+        kb.visibility = View.GONE
+        panel.visibility = View.VISIBLE
+        toolbar?.emojiActive = true
+    }
+
+    private fun hideEmojiPanel() {
+        val panel = emojiPanel ?: return
+        if (panel.visibility != View.VISIBLE) return
+        panel.visibility = View.GONE
+        keyboardView?.visibility = View.VISIBLE
+        toolbar?.emojiActive = false
+    }
+
+    private fun translationSource(): String =
+        prefs.getString(PREF_TRANSLATE_SOURCE, TranslateLanguage.FINNISH)
+            ?: TranslateLanguage.FINNISH
+
+    private fun translationTarget(): String =
+        prefs.getString(PREF_TRANSLATE_TARGET, TranslateLanguage.ENGLISH)
+            ?: TranslateLanguage.ENGLISH
+
+    private fun languageName(code: String): String =
+        Locale(code).getDisplayLanguage(fiLocale).replaceFirstChar { it.titlecase(fiLocale) }
+
+    private fun showTranslationPanel() {
+        val panel = translationPanel ?: return
+        val kb = keyboardView ?: return
+        // Salasanakentän sisältöä ei näytetä eikä käännetä.
+        if (passwordField) return
+        hideAllPanels()
+        if (kb.height > 0) {
+            panel.layoutParams = panel.layoutParams.apply { height = kb.height }
+        }
+        kb.visibility = View.GONE
+        panel.visibility = View.VISIBLE
+        toolbar?.translationActive = true
+        refreshTranslationLanguages()
+        startTranslation()
+    }
+
+    private fun hideTranslationPanel() {
+        val panel = translationPanel ?: return
+        if (panel.visibility != View.VISIBLE) return
+        panel.visibility = View.GONE
+        keyboardView?.visibility = View.VISIBLE
+        toolbar?.translationActive = false
+        translationGeneration++
+        translator?.close()
+        translator = null
+    }
+
+    /** Kielivalinnat kiertävät ladattujen mallien joukossa. */
+    private fun refreshTranslationLanguages() {
+        RemoteModelManager.getInstance()
+            .getDownloadedModels(TranslateRemoteModel::class.java)
+            .addOnSuccessListener { models ->
+                translationLangs = (
+                    models.map { it.language } +
+                        listOf(TranslateLanguage.FINNISH, TranslateLanguage.ENGLISH)
+                    )
+                    .distinct()
+                    .sortedBy { languageName(it) }
+            }
+    }
+
+    private fun cycleTranslationLanguage(sourceSide: Boolean) {
+        val langs = translationLangs
+        if (langs.size < 2) return
+        val current = if (sourceSide) translationSource() else translationTarget()
+        val other = if (sourceSide) translationTarget() else translationSource()
+        var index = langs.indexOf(current)
+        repeat(langs.size) {
+            index = (index + 1) % langs.size
+            val candidate = langs[index]
+            if (candidate != other) {
+                prefs.edit()
+                    .putString(
+                        if (sourceSide) PREF_TRANSLATE_SOURCE else PREF_TRANSLATE_TARGET,
+                        candidate,
+                    )
+                    .apply()
+                startTranslation()
+                return
+            }
+        }
+    }
+
+    private fun startTranslation() {
+        val panel = translationPanel ?: return
+        val source = translationSource()
+        val target = translationTarget()
+        panel.setLanguages(languageName(source), languageName(target))
+        val full = readFullText()
+        translationOriginal = full?.first ?: ""
+        translationStartOffset = full?.second ?: 0
+        translationResult = null
+        panel.setOriginal(translationOriginal)
+        if (translationOriginal.isBlank()) {
+            panel.setStatus(getString(R.string.kaannos_tyhja))
+            return
+        }
+        panel.setStatus(getString(R.string.kaannos_ladataan))
+        val generation = ++translationGeneration
+        translator?.close()
+        val client = Translation.getClient(
+            TranslatorOptions.Builder()
+                .setSourceLanguage(source)
+                .setTargetLanguage(target)
+                .build()
+        )
+        translator = client
+        client.downloadModelIfNeeded(DownloadConditions.Builder().build())
+            .addOnSuccessListener {
+                if (generation != translationGeneration) return@addOnSuccessListener
+                translationPanel?.setStatus(getString(R.string.kaannos_kaannetaan))
+                client.translate(translationOriginal)
+                    .addOnSuccessListener { result ->
+                        if (generation == translationGeneration &&
+                            translationPanel?.visibility == View.VISIBLE
+                        ) {
+                            translationResult = result
+                            translationPanel?.setTranslation(result)
+                        }
+                    }
+                    .addOnFailureListener {
+                        if (generation == translationGeneration) {
+                            translationPanel?.setStatus(getString(R.string.kaannos_virhe))
+                        }
+                    }
+            }
+            .addOnFailureListener {
+                if (generation == translationGeneration) {
+                    translationPanel?.setStatus(getString(R.string.kaannos_lataus_virhe))
+                }
+            }
+    }
+
+    private fun applyTranslation() {
+        val result = translationResult ?: return
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        ic.setSelection(
+            translationStartOffset,
+            translationStartOffset + translationOriginal.length,
+        )
+        ic.commitText(result, 1)
+        ic.endBatchEdit()
+        // Käännetty teksti ei ole käyttäjän kirjoittamaa: ketju katkaistaan
+        // eikä siitä opita mitään.
+        learning.resetContext()
+        feedback()
+        hideTranslationPanel()
+    }
+
     private fun showCorrectionPanel() {
         val panel = correctionPanel ?: return
         val kb = keyboardView ?: return
         // Salasanakentän sisältöä ei näytetä avoimena tekstinä.
         if (passwordField) return
         hideClipboardPanel()
+        hideEmojiPanel()
+        hideTranslationPanel()
         if (kb.height > 0) {
             panel.layoutParams = panel.layoutParams.apply { height = kb.height }
         }
@@ -692,6 +883,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         toolbar?.applySettings(theme)
         clipboardPanel?.applySettings(theme)
         correctionPanel?.applySettings(theme)
+        emojiPanel?.applySettings(theme)
+        translationPanel?.applySettings(theme)
     }
 
     override fun onCreateInputView(): View {
@@ -754,6 +947,24 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         hideCorrectionPanel()
                     } else {
                         showCorrectionPanel()
+                    }
+                }
+
+                override fun onToggleEmoji() {
+                    feedback()
+                    if (emojiPanel?.visibility == View.VISIBLE) {
+                        hideEmojiPanel()
+                    } else {
+                        showEmojiPanel()
+                    }
+                }
+
+                override fun onToggleTranslation() {
+                    feedback()
+                    if (translationPanel?.visibility == View.VISIBLE) {
+                        hideTranslationPanel()
+                    } else {
+                        showTranslationPanel()
                     }
                 }
 
@@ -871,6 +1082,53 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             it.visibility = View.GONE
             container.addView(it, LinearLayout.LayoutParams(params))
         }
+        emojiPanel = EmojiPanelView(this).also {
+            it.listener = object : EmojiPanelView.Listener {
+                override fun onEmojiPicked(emoji: String) {
+                    currentInputConnection?.commitText(emoji, 1)
+                    feedback()
+                }
+
+                override fun onBackspace() {
+                    sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+                    feedback(AudioManager.FX_KEYPRESS_DELETE)
+                }
+
+                override fun onClose() {
+                    feedback()
+                    hideEmojiPanel()
+                }
+            }
+            it.visibility = View.GONE
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
+        translationPanel = TranslationPanelView(this).also {
+            it.listener = object : TranslationPanelView.Listener {
+                override fun onCycleSource() {
+                    feedback()
+                    cycleTranslationLanguage(sourceSide = true)
+                }
+
+                override fun onSwap() {
+                    feedback()
+                    val source = translationSource()
+                    prefs.edit()
+                        .putString(PREF_TRANSLATE_SOURCE, translationTarget())
+                        .putString(PREF_TRANSLATE_TARGET, source)
+                        .apply()
+                    startTranslation()
+                }
+
+                override fun onCycleTarget() {
+                    feedback()
+                    cycleTranslationLanguage(sourceSide = false)
+                }
+
+                override fun onApply() = applyTranslation()
+            }
+            it.visibility = View.GONE
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
         return container
     }
 
@@ -914,8 +1172,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         reloadLearnedIfChanged()
         // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
         dictation.stop()
-        hideClipboardPanel()
-        hideCorrectionPanel()
+        hideAllPanels()
         if (pendingDictation) {
             pendingDictation = false
             if (!passwordField &&
@@ -1231,6 +1488,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val CORRECTION_LOOKBACK = 5000
         const val COMMON_WORD_POOL = 24
         const val BIAS_WORD_MAX = 100
+        const val PREF_TRANSLATE_SOURCE = "kaannos_lahde"
+        const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3

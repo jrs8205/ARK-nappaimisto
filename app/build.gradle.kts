@@ -66,6 +66,9 @@ dependencies {
     implementation(libs.androidx.preference)
     implementation(libs.material)
     implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.emojipicker)
+    // Paikallinen käännös: mallit ladataan kerran, käännös tapahtuu laitteella.
+    implementation(libs.mlkit.translate)
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
     testImplementation(libs.junit)

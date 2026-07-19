@@ -58,6 +58,25 @@
 
     <string name="korjaus_tyhja">Kentässä ei ole tekstiä</string>
 
+    <string name="kaannos_korvaa">Korvaa kentän teksti</string>
+    <string name="kaannos_tyhja">Kentässä ei ole käännettävää tekstiä</string>
+    <string name="kaannos_ladataan">Valmistellaan käännösmalleja…</string>
+    <string name="kaannos_kaannetaan">Käännetään…</string>
+    <string name="kaannos_virhe">Käännös epäonnistui</string>
+    <string name="kaannos_lataus_virhe">Käännösmallin lataus epäonnistui – tarkista verkkoyhteys</string>
+
+    <string name="asetukset_kaannos">Käännös</string>
+    <string name="kaannoskielet">Käännöskielet</string>
+    <string name="kaannoskielet_kuvaus">Lataa ja poista käännösmalleja (noin 30 Mt kieltä kohden)</string>
+    <string name="kieli_ladattu">Ladattu</string>
+    <string name="kieli_ladataan">Ladataan…</string>
+    <string name="kieli_lataa_otsikko">Ladataanko käännösmalli?</string>
+    <string name="kieli_lataa_varmistus">Malli on noin 30 Mt ja se ladataan kerran; käännökset tehdään sen jälkeen laitteella.</string>
+    <string name="kieli_poista_varmistus">Poistetaanko kielen käännösmalli laitteelta?</string>
+    <string name="kieli_lataa">Lataa</string>
+    <string name="kieli_poista">Poista</string>
+    <string name="kieli_virhe">Toiminto epäonnistui – tarkista verkkoyhteys</string>
+
     <string name="leikepoyta_tyhja">Kopioi tekstiä tai kuva, niin se ilmestyy tähän</string>
     <string name="leike_liita">Liitä</string>
     <string name="leike_hae_verkosta">Hae verkosta</string>

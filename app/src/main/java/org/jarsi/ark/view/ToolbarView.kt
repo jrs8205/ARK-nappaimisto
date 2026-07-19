@@ -17,8 +17,10 @@ class ToolbarView(context: Context) : View(context) {
         fun onToggleArrows()
         fun onToggleWeb()
         fun onToggleDictation()
+        fun onToggleEmoji()
         fun onToggleClipboard()
         fun onToggleCorrection()
+        fun onToggleTranslation()
         fun onOpenSettings()
     }
 
@@ -75,6 +77,20 @@ class ToolbarView(context: Context) : View(context) {
             invalidate()
         }
 
+    /** Korostaa emojinapin, kun emojipaneeli on auki. */
+    var emojiActive = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /** Korostaa käännösnapin, kun käännösnäkymä on auki. */
+    var translationActive = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private var theme = KeyboardTheme.load(context)
     private var pressedIndex = -1
 
@@ -86,15 +102,19 @@ class ToolbarView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER
     }
 
-    private enum class Tool { ARROWS, WEB, MIC, CLIPBOARD, CORRECTION, SETTINGS }
+    private enum class Tool { ARROWS, WEB, MIC, EMOJI, CLIPBOARD, CORRECTION, TRANSLATE, SETTINGS }
 
-    private val tools =
-        listOf(Tool.ARROWS, Tool.WEB, Tool.MIC, Tool.CLIPBOARD, Tool.CORRECTION, Tool.SETTINGS)
+    private val tools = listOf(
+        Tool.ARROWS, Tool.WEB, Tool.MIC, Tool.EMOJI,
+        Tool.CLIPBOARD, Tool.CORRECTION, Tool.TRANSLATE, Tool.SETTINGS,
+    )
 
     private val cursorIcon = context.getDrawable(R.drawable.ic_cursor_move)?.mutate()
     private val micIcon = context.getDrawable(R.drawable.ic_mic)?.mutate()
+    private val emojiIcon = context.getDrawable(R.drawable.ic_emoji)?.mutate()
     private val clipboardIcon = context.getDrawable(R.drawable.ic_clipboard)?.mutate()
     private val correctionIcon = context.getDrawable(R.drawable.ic_spellcheck)?.mutate()
+    private val translateIcon = context.getDrawable(R.drawable.ic_translate)?.mutate()
     private val settingsIcon = context.getDrawable(R.drawable.ic_settings)?.mutate()
 
     fun applySettings(newTheme: KeyboardTheme) {
@@ -110,13 +130,28 @@ class ToolbarView(context: Context) : View(context) {
     private fun buttonWidth(tool: Tool, size: Float): Float =
         if (tool == Tool.WEB) size * 1.6f else size
 
+    // Kapealla näytöllä nappien leveydet kutistuvat suhteessa, jotta koko
+    // rivi mahtuu aina näkyviin.
+    private fun widthScale(): Float {
+        val size = height - dp(8f)
+        var natural = dp(6f)
+        for (tool in tools) natural += buttonWidth(tool, size) + dp(6f)
+        return if (natural > width && natural > 0f) width / natural else 1f
+    }
+
     private fun buttonRect(index: Int): RectF {
         val size = height - dp(8f)
-        var left = dp(6f)
+        val scale = widthScale()
+        var left = dp(6f) * scale
         for (i in 0 until index) {
-            left += buttonWidth(tools[i], size) + dp(6f)
+            left += (buttonWidth(tools[i], size) + dp(6f)) * scale
         }
-        return RectF(left, dp(4f), left + buttonWidth(tools[index], size), dp(4f) + size)
+        return RectF(
+            left,
+            dp(4f),
+            left + buttonWidth(tools[index], size) * scale,
+            dp(4f) + size,
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -126,8 +161,10 @@ class ToolbarView(context: Context) : View(context) {
             val active = (tool == Tool.ARROWS && arrowsActive) ||
                 (tool == Tool.WEB && webActive) ||
                 (tool == Tool.MIC && micActive) ||
+                (tool == Tool.EMOJI && emojiActive) ||
                 (tool == Tool.CLIPBOARD && clipboardActive) ||
-                (tool == Tool.CORRECTION && correctionActive)
+                (tool == Tool.CORRECTION && correctionActive) ||
+                (tool == Tool.TRANSLATE && translationActive)
             if (tool == Tool.MIC && micActive) {
                 // Kehä sykkii puheen tahdissa ja laskee itsestään hiljaisuudessa.
                 micShownLevel += (micLevel - micShownLevel) * 0.3f
@@ -159,12 +196,14 @@ class ToolbarView(context: Context) : View(context) {
             val icon = when (tool) {
                 Tool.ARROWS -> cursorIcon
                 Tool.MIC -> micIcon
+                Tool.EMOJI -> emojiIcon
                 Tool.CLIPBOARD -> clipboardIcon
                 Tool.CORRECTION -> correctionIcon
+                Tool.TRANSLATE -> translateIcon
                 else -> settingsIcon
             } ?: return@forEachIndexed
             icon.setTint(contentColor)
-            val iconSize = (rect.height() * 0.62f).roundToInt()
+            val iconSize = (minOf(rect.height(), rect.width()) * 0.62f).roundToInt()
             val cx = rect.centerX().roundToInt()
             val cy = rect.centerY().roundToInt()
             icon.setBounds(cx - iconSize / 2, cy - iconSize / 2, cx + iconSize / 2, cy + iconSize / 2)
@@ -185,8 +224,10 @@ class ToolbarView(context: Context) : View(context) {
                         Tool.ARROWS -> listener?.onToggleArrows()
                         Tool.WEB -> listener?.onToggleWeb()
                         Tool.MIC -> listener?.onToggleDictation()
+                        Tool.EMOJI -> listener?.onToggleEmoji()
                         Tool.CLIPBOARD -> listener?.onToggleClipboard()
                         Tool.CORRECTION -> listener?.onToggleCorrection()
+                        Tool.TRANSLATE -> listener?.onToggleTranslation()
                         Tool.SETTINGS -> listener?.onOpenSettings()
                     }
                 }

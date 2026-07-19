@@ -146,15 +146,20 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   asetuksissa raahaamalla, myös sivujen välillä
 * sanelun sanastovihjeet: käytetyimmät omat sanat ohjaavat
   puheentunnistusta (Android 13 tai uudempi)
+* emojipaneeli työkaluriviltä: kategoriat, viimeksi käytetyt ja
+  laitetuen mukainen valikoima
+* käännös työkaluriviltä: kentän tekstin käännös laitteella (Google
+  ML Kit), kielipari vaihdettavissa ja suunta käännettävissä;
+  kielimallit ladataan ja poistetaan asetuksista (~30 Mt/kieli)
 
 ## Yksityisyys
 
 Oppiminen ja ehdotukset ovat kokonaan paikallisia, eikä sovelluksessa ole
-analytiikkaa tai mainoksia. Sovelluksella ei tällä hetkellä ole
-internet-oikeutta; jos jokin tuleva ominaisuus tarvitsee verkkoa, oikeus
-lisätään ja asia dokumentoidaan avoimesti — kirjoitettua tekstiä ei
-silloinkaan lähetetä minnekään ilman käyttäjän omaa toimintoa. Oppiminen
-kytkeytyy kokonaan pois salasana- ja muissa arkaluonteisissa kentissä.
+analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus yhtä
+tarkoitusta varten: käännöskielten mallien kertalataus (Google ML Kit).
+Itse käännös tehdään laitteella, eikä kirjoitettua tekstiä lähetetä
+minnekään ilman käyttäjän omaa, tietoista toimintoa. Oppiminen kytkeytyy
+kokonaan pois salasana- ja muissa arkaluonteisissa kentissä.
 
 ## Kääntäminen
 

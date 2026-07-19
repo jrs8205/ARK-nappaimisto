@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Ei internet-oikeutta toistaiseksi: mikään nykyinen ominaisuus ei tarvitse sitä. -->
+    <!-- Käännösmallien kertalataus; itse käännös ja kaikki oppiminen
+         tapahtuvat laitteella, eikä kirjoitettua tekstiä lähetetä minnekään. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Sanelun mikrofoni; puhe käsitellään laitteen puheentunnistuspalvelussa. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -44,6 +46,11 @@
             android:name=".settings.SymbolOrderActivity"
             android:exported="false"
             android:label="@string/erikoismerkit" />
+
+        <activity
+            android:name=".settings.TranslationLanguagesActivity"
+            android:exported="false"
+            android:label="@string/kaannoskielet" />
 
         <activity
             android:name=".dictation.RecordAudioPermissionActivity"

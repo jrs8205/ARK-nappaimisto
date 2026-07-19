@@ -83,6 +83,10 @@ class SettingsActivity : AppCompatActivity() {
                 startActivity(Intent(requireContext(), SymbolOrderActivity::class.java))
                 true
             }
+            findPreference<Preference>("kaannoskielet")?.setOnPreferenceClickListener {
+                startActivity(Intent(requireContext(), TranslationLanguagesActivity::class.java))
+                true
+            }
             findPreference<Preference>("varmuuskopio_vie")?.setOnPreferenceClickListener {
                 val date = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date())
                 exportLauncher.launch("ark-varmuuskopio-$date.json")

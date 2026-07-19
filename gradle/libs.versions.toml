@@ -10,6 +10,8 @@ json = "20240303"
 room = "2.8.4"
 ksp = "2.2.20-2.0.4"
 recyclerview = "1.4.0"
+emojipicker = "1.5.0"
+mlkitTranslate = "17.0.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -21,6 +23,8 @@ json = { group = "org.json", name = "json", version.ref = "json" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
+androidx-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emojipicker" }
+mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

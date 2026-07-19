@@ -143,6 +143,22 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         dirtyWords += key
     }
 
+    /**
+     * Sanat, jotka ovat aiemmin edeltäneet [next]-sanaa, bigramivahvuuksineen.
+     * Käytetään paikkaan sopivien vaihtoehtojen hakuun: ehdokas kelpaa, jos
+     * se on joskus esiintynyt juuri ennen seuraavaa sanaa.
+     */
+    fun previousMatches(next: String): Map<String, Float> {
+        if (!loaded) return emptyMap()
+        val nextKey = keyOf(next)
+        val result = HashMap<String, Float>()
+        for ((previous, followers) in bigrams) {
+            val state = followers[nextKey] ?: continue
+            result[previous] = state.count * recency(state.lastUsed)
+        }
+        return result
+    }
+
     /** Omat sanat enintään [maxDistance] muokkauksen päässä, käytetyin ensin. */
     fun near(word: String, maxDistance: Int, max: Int = 5): List<String> {
         if (word.isEmpty() || max <= 0) return emptyList()

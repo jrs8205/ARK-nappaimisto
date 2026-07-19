@@ -452,9 +452,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         correctionPanel?.render(correctionText, correctionWords, correctionUnknown, index)
         val word = correctionText.substring(range)
         val context = WordTools.previousWords(correctionText.subSequence(0, range.first))
+        val nextWord = correctionWords.getOrNull(index + 1)?.let { correctionText.substring(it) }
         val generation = ++suggestGeneration
         suggestExecutor.execute {
-            var result = suggestionEngine.alternatives(word, context)
+            var result = suggestionEngine.alternatives(word, context, nextWord)
             if (word.first().isUpperCase()) {
                 result = result.map { s -> s.replaceFirstChar { it.titlecase(fiLocale) } }
             }

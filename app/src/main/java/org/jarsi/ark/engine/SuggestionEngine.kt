@@ -34,26 +34,40 @@ class SuggestionEngine(
     }
 
     /**
-     * Koko sanan vaihtoehdot jälkikäteiseen korjaukseen: sanaston ja omien
-     * sanojen läheiset osumat samalla pisteytyksellä, muokkausetäisyys
-     * painaa pisteitä alaspäin. Lyhyillä sanoilla sallitaan vain yksi
-     * muokkaus, ettei rivi täyty kaukaisista arvauksista.
+     * Koko sanan vaihtoehdot jälkikäteiseen korjaukseen. Ehdolle pääsevät
+     * kirjoitusasultaan läheiset sanat (kirjoitusvirheet) sekä sanat, jotka
+     * sopivat paikkaan ympäröivien sanojen perusteella (omat sanaparit) —
+     * siksi lyhyetkin sanat saavat vaihtoehtoja. Kaikki pisteytetään samalla
+     * mallilla; muokkausetäisyys painaa kaukaisempia alaspäin ja sopivuus
+     * seuraavan sanan eteen nostaa.
      */
-    fun alternatives(word: String, context: List<String> = emptyList(), max: Int = 8): List<String> {
-        if (word.length < MIN_ALTERNATIVES_LENGTH || max <= 0) return emptyList()
+    fun alternatives(
+        word: String,
+        context: List<String> = emptyList(),
+        nextWord: String? = null,
+        max: Int = 8,
+    ): List<String> {
+        if (word.isEmpty() || max <= 0) return emptyList()
         val key = word.lowercase(fiLocale)
-        val maxDistance = if (key.length <= SHORT_WORD_LENGTH) 1 else 2
         val candidates = LinkedHashSet<String>()
-        for (w in dictionary.near(word, maxDistance, DICTIONARY_CANDIDATES)) {
-            candidates += w.lowercase(fiLocale)
+        if (key.length >= MIN_TYPO_LENGTH) {
+            val maxDistance = if (key.length <= SHORT_WORD_LENGTH) 1 else 2
+            for (w in dictionary.near(word, maxDistance, DICTIONARY_CANDIDATES)) {
+                candidates += w.lowercase(fiLocale)
+            }
+            for (w in learning.near(word, maxDistance, OWN_CANDIDATES)) {
+                candidates += w.lowercase(fiLocale)
+            }
         }
-        for (w in learning.near(word, maxDistance, OWN_CANDIDATES)) {
-            candidates += w.lowercase(fiLocale)
-        }
-        candidates -= key
         val contextMatches = learning.contextMatches(context)
-        return rank(candidates, contextMatches, max) { candidate ->
-            1f / (1 + WordTools.editDistanceAtMost(key, candidate, maxDistance))
+        candidates += contextMatches.keys
+        val rightFit = nextWord?.let { learning.previousMatches(it) } ?: emptyMap()
+        candidates += rightFit.keys
+        candidates -= key
+        return rank(candidates, contextMatches, max) { candidate, base ->
+            val fit = rightFit[candidate] ?: 0f
+            val score = base + fit / (fit + 3f) * BIGRAM_WEIGHT
+            score / (1 + WordTools.editDistanceAtMost(key, candidate, MAX_CLOSENESS_DISTANCE))
         }
     }
 
@@ -74,7 +88,7 @@ class SuggestionEngine(
         candidateKeys: Collection<String>,
         contextMatches: Map<String, NextMatch>,
         max: Int,
-        weight: (String) -> Float = { 1f },
+        adjust: (String, Float) -> Float = { _, base -> base },
     ): List<String> {
         val maxFreq = dictionary.maxFrequency()
         val candidates = candidateKeys.mapNotNull { key ->
@@ -82,7 +96,7 @@ class SuggestionEngine(
             if (signals?.blocked == true) return@mapNotNull null
             Candidate(
                 key,
-                baseScore(key, signals, contextMatches[key], maxFreq) * weight(key),
+                adjust(key, baseScore(key, signals, contextMatches[key], maxFreq)),
                 signals?.pinned == true,
             )
         }
@@ -132,8 +146,9 @@ class SuggestionEngine(
         const val OWN_CANDIDATES = 10
         const val IGNORED_THRESHOLD = 2
         const val PINNED_TOP = 2
-        const val MIN_ALTERNATIVES_LENGTH = 3
+        const val MIN_TYPO_LENGTH = 3
         const val SHORT_WORD_LENGTH = 4
+        const val MAX_CLOSENESS_DISTANCE = 3
 
         // Kokonaissuunnitelman kohdan 22 painokertoimet.
         const val FREQUENCY_WEIGHT = 1.0f

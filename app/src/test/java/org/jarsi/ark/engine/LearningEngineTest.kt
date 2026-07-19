@@ -271,6 +271,18 @@ class LearningEngineTest {
     }
 
     @Test
+    fun `previousMatches loytaa sanaa edeltaneet sanat`() {
+        val e = engine()
+        listOf("koira", "on", "kiva").forEach { e.onWordCommitted(it) }
+        e.resetContext()
+        listOf("talo", "on").forEach { e.onWordCommitted(it) }
+        val matches = e.previousMatches("on")
+        assertTrue(matches.getValue("koira") > 0f)
+        assertTrue(matches.getValue("talo") > 0f)
+        assertFalse("kiva" in matches)
+    }
+
+    @Test
     fun `onCorrectionAccepted kirjaa hyvaksynnan ilman ketjua`() {
         val e = engine()
         e.onWordCommitted("eka")

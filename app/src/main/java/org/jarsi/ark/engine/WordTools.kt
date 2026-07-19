@@ -44,19 +44,33 @@ object WordTools {
         else listOf(typed) + suggestions
 
     /**
-     * Kursoria välittömästi seuraava sanan loppuosa tai tyhjä, jos kursorin
-     * jälkeen on sananraja. Sisäinen piste kuuluu jatkoon (jarsi|.org),
-     * lauseen lopettava piste ei.
+     * Kaikkien sanojen sijainnit tekstissä samoilla säännöillä kuin
+     * [currentWord]: sisäiset pisteet kuuluvat sanaan, reunojen
+     * yhdysmerkit ja pisteet eivät.
      */
-    fun continuationAfter(textAfter: CharSequence): String {
-        var end = 0
-        while (end < textAfter.length) {
-            val c = textAfter[end]
-            val internalDot = c == '.' && end + 1 < textAfter.length &&
-                isCore(textAfter[end + 1])
-            if (isCore(c) || internalDot) end++ else break
+    fun wordRanges(text: CharSequence): List<IntRange> {
+        val ranges = mutableListOf<IntRange>()
+        var i = 0
+        while (i < text.length) {
+            if (!isCore(text[i])) {
+                i++
+                continue
+            }
+            var end = i
+            while (end < text.length) {
+                val c = text[end]
+                val internalDot = c == '.' && end + 1 < text.length &&
+                    isCore(text[end + 1]) && end > 0 && isCore(text[end - 1])
+                if (isCore(c) || internalDot) end++ else break
+            }
+            var start = i
+            while (start < end && (text[start] == '-' || text[start] == '.')) start++
+            var last = end - 1
+            while (last >= start && (text[last] == '-' || text[last] == '.')) last--
+            if (last >= start) ranges += start..last
+            i = end
         }
-        return textAfter.subSequence(0, end).toString().trimEnd('-', '.')
+        return ranges
     }
 
     /**

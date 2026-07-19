@@ -18,6 +18,7 @@ class ToolbarView(context: Context) : View(context) {
         fun onToggleWeb()
         fun onToggleDictation()
         fun onToggleClipboard()
+        fun onToggleCorrection()
         fun onOpenSettings()
     }
 
@@ -67,6 +68,13 @@ class ToolbarView(context: Context) : View(context) {
             invalidate()
         }
 
+    /** Korostaa korjausnapin, kun korjausnäkymä on auki. */
+    var correctionActive = false
+        set(value) {
+            field = value
+            invalidate()
+        }
+
     private var theme = KeyboardTheme.load(context)
     private var pressedIndex = -1
 
@@ -78,13 +86,15 @@ class ToolbarView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER
     }
 
-    private enum class Tool { ARROWS, WEB, MIC, CLIPBOARD, SETTINGS }
+    private enum class Tool { ARROWS, WEB, MIC, CLIPBOARD, CORRECTION, SETTINGS }
 
-    private val tools = listOf(Tool.ARROWS, Tool.WEB, Tool.MIC, Tool.CLIPBOARD, Tool.SETTINGS)
+    private val tools =
+        listOf(Tool.ARROWS, Tool.WEB, Tool.MIC, Tool.CLIPBOARD, Tool.CORRECTION, Tool.SETTINGS)
 
     private val cursorIcon = context.getDrawable(R.drawable.ic_cursor_move)?.mutate()
     private val micIcon = context.getDrawable(R.drawable.ic_mic)?.mutate()
     private val clipboardIcon = context.getDrawable(R.drawable.ic_clipboard)?.mutate()
+    private val correctionIcon = context.getDrawable(R.drawable.ic_spellcheck)?.mutate()
     private val settingsIcon = context.getDrawable(R.drawable.ic_settings)?.mutate()
 
     fun applySettings(newTheme: KeyboardTheme) {
@@ -116,7 +126,8 @@ class ToolbarView(context: Context) : View(context) {
             val active = (tool == Tool.ARROWS && arrowsActive) ||
                 (tool == Tool.WEB && webActive) ||
                 (tool == Tool.MIC && micActive) ||
-                (tool == Tool.CLIPBOARD && clipboardActive)
+                (tool == Tool.CLIPBOARD && clipboardActive) ||
+                (tool == Tool.CORRECTION && correctionActive)
             if (tool == Tool.MIC && micActive) {
                 // Kehä sykkii puheen tahdissa ja laskee itsestään hiljaisuudessa.
                 micShownLevel += (micLevel - micShownLevel) * 0.3f
@@ -149,6 +160,7 @@ class ToolbarView(context: Context) : View(context) {
                 Tool.ARROWS -> cursorIcon
                 Tool.MIC -> micIcon
                 Tool.CLIPBOARD -> clipboardIcon
+                Tool.CORRECTION -> correctionIcon
                 else -> settingsIcon
             } ?: return@forEachIndexed
             icon.setTint(contentColor)
@@ -174,6 +186,7 @@ class ToolbarView(context: Context) : View(context) {
                         Tool.WEB -> listener?.onToggleWeb()
                         Tool.MIC -> listener?.onToggleDictation()
                         Tool.CLIPBOARD -> listener?.onToggleClipboard()
+                        Tool.CORRECTION -> listener?.onToggleCorrection()
                         Tool.SETTINGS -> listener?.onOpenSettings()
                     }
                 }

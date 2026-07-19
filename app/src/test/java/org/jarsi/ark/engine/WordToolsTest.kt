@@ -141,12 +141,33 @@ class WordToolsTest {
     }
 
     @Test
-    fun `continuationAfter poimii sanan jatkon kursorista`() {
-        assertEquals("ira", WordTools.continuationAfter("ira jatkuu"))
-        assertEquals("", WordTools.continuationAfter(" heti"))
-        assertEquals("ra", WordTools.continuationAfter("ra. Sitten"))
-        assertEquals(".org", WordTools.continuationAfter(".org käy"))
-        assertEquals("", WordTools.continuationAfter(""))
-        assertEquals("ra-auto", WordTools.continuationAfter("ra-auto x"))
+    fun `wordRanges poimii sanat paikkoineen`() {
+        val text = "moi jarsi.org, prx4!"
+        assertEquals(
+            listOf("moi", "jarsi.org", "prx4"),
+            WordTools.wordRanges(text).map { text.substring(it) },
+        )
     }
+
+    @Test
+    fun `wordRanges ohittaa valimerkit ja rivinvaihdot`() {
+        val text = "eka\ntoka. Kolmas"
+        assertEquals(
+            listOf("eka", "toka", "Kolmas"),
+            WordTools.wordRanges(text).map { text.substring(it) },
+        )
+    }
+
+    @Test
+    fun `wordRanges siivoaa reunojen yhdysmerkit`() {
+        val text = "x -abc- y"
+        assertEquals(
+            listOf("x", "abc", "y"),
+            WordTools.wordRanges(text).map { text.substring(it) },
+        )
+    }
+
+    @Test
+    fun `wordRanges tyhjasta tyhja`() =
+        assertEquals(emptyList<IntRange>(), WordTools.wordRanges(""))
 }

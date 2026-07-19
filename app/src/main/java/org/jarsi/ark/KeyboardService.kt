@@ -17,6 +17,7 @@ import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.core.content.FileProvider
@@ -50,6 +51,7 @@ import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
 import org.jarsi.ark.view.ClipboardPanelView
+import org.jarsi.ark.view.CorrectionPanelView
 import org.jarsi.ark.view.KeyboardView
 import org.jarsi.ark.view.SuggestionBarView
 import org.jarsi.ark.view.ToolbarView
@@ -87,6 +89,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private val clipStore = ClipStore()
     private var clipboardPanel: ClipboardPanelView? = null
+    private var correctionPanel: CorrectionPanelView? = null
+    private var correctionText = ""
+    private var correctionWords: List<IntRange> = emptyList()
+    private var correctionUnknown: Set<Int> = emptySet()
+    private var correctionStartOffset = 0
+    private var correctionSelected = -1
     private var clipboardManager: ClipboardManager? = null
     private val clipChangedListener =
         ClipboardManager.OnPrimaryClipChangedListener { handleClipChanged() }
@@ -344,6 +352,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun showClipboardPanel() {
         val panel = clipboardPanel ?: return
         val kb = keyboardView ?: return
+        hideCorrectionPanel()
         if (kb.height > 0) {
             panel.layoutParams = panel.layoutParams.apply { height = kb.height }
         }
@@ -360,6 +369,127 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         panel.visibility = View.GONE
         keyboardView?.visibility = View.VISIBLE
         toolbar?.clipboardActive = false
+    }
+
+    private fun showCorrectionPanel() {
+        val panel = correctionPanel ?: return
+        val kb = keyboardView ?: return
+        // Salasanakentän sisältöä ei näytetä avoimena tekstinä.
+        if (passwordField) return
+        hideClipboardPanel()
+        if (kb.height > 0) {
+            panel.layoutParams = panel.layoutParams.apply { height = kb.height }
+        }
+        kb.visibility = View.GONE
+        panel.visibility = View.VISIBLE
+        toolbar?.correctionActive = true
+        // Rivi tyhjenee kunnes sanaa napautetaan; vireillä olevat
+        // rivipäivitykset mitätöidään.
+        suggestGeneration++
+        suggestionBar?.setSuggestions(emptyList())
+        shownCompletions = emptyList()
+        refreshCorrectionPanel()
+    }
+
+    private fun hideCorrectionPanel() {
+        val panel = correctionPanel ?: return
+        if (panel.visibility != View.VISIBLE) return
+        panel.visibility = View.GONE
+        keyboardView?.visibility = View.VISIBLE
+        toolbar?.correctionActive = false
+        correctionSelected = -1
+        updateSuggestions()
+    }
+
+    /** Lukee kentän koko tekstin ja sen alkusiirtymän korvauksia varten. */
+    private fun readFullText(): Pair<String, Int>? {
+        val ic = currentInputConnection ?: return null
+        val extracted = try {
+            ic.getExtractedText(ExtractedTextRequest(), 0)
+        } catch (e: Exception) {
+            null
+        }
+        extracted?.text?.let { return it.toString() to extracted.startOffset }
+        // Varareitti kentille, jotka eivät tue poimintaa: kelpaa vain kun
+        // tekstin alku mahtuu ikkunaan, muuten korvauskohta ei olisi tiedossa.
+        val before = ic.getTextBeforeCursor(CORRECTION_LOOKBACK, 0) ?: return null
+        if (before.length >= CORRECTION_LOOKBACK) return null
+        val after = ic.getTextAfterCursor(CORRECTION_LOOKBACK, 0) ?: ""
+        return (before.toString() + after) to 0
+    }
+
+    private fun refreshCorrectionPanel(selected: Int = -1) {
+        val panel = correctionPanel ?: return
+        val full = readFullText()
+        correctionText = full?.first ?: ""
+        correctionStartOffset = full?.second ?: 0
+        correctionWords = WordTools.wordRanges(correctionText)
+        correctionUnknown = emptySet()
+        correctionSelected = selected
+        panel.render(correctionText, correctionWords, correctionUnknown, correctionSelected)
+        val text = correctionText
+        val words = correctionWords
+        suggestExecutor.execute {
+            // Alleviivataan sanat, joita ei löydy sanastosta eikä opituista.
+            val unknown = words.indices.filterTo(HashSet()) { i ->
+                val word = text.substring(words[i])
+                word.any { it.isLetter() } &&
+                    dictionary.frequencyOf(word) == 0L &&
+                    !learning.isOwnWord(word)
+            }
+            mainHandler.post {
+                if (text == correctionText && correctionPanel?.visibility == View.VISIBLE) {
+                    correctionUnknown = unknown
+                    panel.render(correctionText, correctionWords, unknown, correctionSelected)
+                }
+            }
+        }
+    }
+
+    private fun onCorrectionWordTapped(index: Int) {
+        val range = correctionWords.getOrNull(index) ?: return
+        correctionSelected = index
+        correctionPanel?.render(correctionText, correctionWords, correctionUnknown, index)
+        val word = correctionText.substring(range)
+        val context = WordTools.previousWords(correctionText.subSequence(0, range.first))
+        val generation = ++suggestGeneration
+        suggestExecutor.execute {
+            var result = suggestionEngine.alternatives(word, context)
+            if (word.first().isUpperCase()) {
+                result = result.map { s -> s.replaceFirstChar { it.titlecase(fiLocale) } }
+            }
+            if (generation == suggestGeneration) {
+                mainHandler.post {
+                    if (generation == suggestGeneration && correctionSelected == index) {
+                        suggestionBar?.setSuggestions(result)
+                        // Vaihtoehdot eivät ole täydennyksiä: ohitussakkoa ei kirjata.
+                        shownCompletions = emptyList()
+                    }
+                }
+            }
+        }
+        feedback()
+    }
+
+    /** Korvaa korjausnäkymässä valitun sanan kentässä ja päivittää näkymän. */
+    private fun replaceCorrectionWord(word: String) {
+        val range = correctionWords.getOrNull(correctionSelected) ?: return
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        ic.setSelection(
+            correctionStartOffset + range.first,
+            correctionStartOffset + range.last + 1,
+        )
+        ic.commitText(word, 1)
+        ic.endBatchEdit()
+        if (learningEnabled) {
+            learning.onCorrectionAccepted(word)
+            maybeFlush()
+        }
+        feedback()
+        suggestGeneration++
+        suggestionBar?.setSuggestions(emptyList())
+        refreshCorrectionPanel()
     }
 
     private fun pasteClip(clip: Clip) {
@@ -471,6 +601,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         suggestionBar?.applySettings(theme, heightScale)
         toolbar?.applySettings(theme)
         clipboardPanel?.applySettings(theme)
+        correctionPanel?.applySettings(theme)
     }
 
     override fun onCreateInputView(): View {
@@ -524,6 +655,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         hideClipboardPanel()
                     } else {
                         showClipboardPanel()
+                    }
+                }
+
+                override fun onToggleCorrection() {
+                    feedback()
+                    if (correctionPanel?.visibility == View.VISIBLE) {
+                        hideCorrectionPanel()
+                    } else {
+                        showCorrectionPanel()
                     }
                 }
 
@@ -629,6 +769,18 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             it.visibility = View.GONE
             container.addView(it, LinearLayout.LayoutParams(params))
         }
+        correctionPanel = CorrectionPanelView(this).also {
+            it.listener = object : CorrectionPanelView.Listener {
+                override fun onWordTapped(index: Int) = onCorrectionWordTapped(index)
+
+                override fun onDone() {
+                    feedback()
+                    hideCorrectionPanel()
+                }
+            }
+            it.visibility = View.GONE
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
         return container
     }
 
@@ -673,6 +825,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
         dictation.stop()
         hideClipboardPanel()
+        hideCorrectionPanel()
         if (pendingDictation) {
             pendingDictation = false
             if (!passwordField &&
@@ -700,29 +853,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun onSuggestionPicked(word: String) {
-        val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
-        val after = ic.getTextAfterCursor(MAX_WORD_LOOKBACK, 0) ?: ""
-        val current = WordTools.currentWord(before)
-        val continuation = WordTools.continuationAfter(after)
-        if (current.isNotEmpty() && continuation.isNotEmpty()) {
-            // Sanan sisältä valittu vaihtoehto korvaa koko sanan paikallaan;
-            // ympäröivä teksti ja välit säilyvät ennallaan.
-            ic.beginBatchEdit()
-            ic.deleteSurroundingText(current.length, continuation.length)
-            ic.commitText(word, 1)
-            ic.endBatchEdit()
-            autoSpaceState = 0
-            shownCompletions = emptyList()
-            if (learningEnabled) {
-                learning.onCorrectionAccepted(word)
-                maybeFlush()
-            }
-            feedback()
-            updateAutoCaps()
-            updateSuggestions()
+        if (correctionPanel?.visibility == View.VISIBLE) {
+            replaceCorrectionWord(word)
             return
         }
+        val ic = currentInputConnection ?: return
+        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val current = WordTools.currentWord(before)
         ic.beginBatchEdit()
         if (current.isNotEmpty()) ic.deleteSurroundingText(current.length, 0)
         ic.commitText(if (spaceAfterSuggestion) "$word " else word, 1)
@@ -747,38 +884,19 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun updateSuggestions() {
         val bar = suggestionBar ?: return
+        // Korjausnäkymä hallitsee riviä itse; tavalliset päivitykset ohitetaan.
+        if (correctionPanel?.visibility == View.VISIBLE) return
         // Nuolitilassa kursoria liikutellaan tekstin yli; ehdotukset olisivat vain häiriöksi.
         if (!suggestionsVisible || page == Page.ARROWS) {
             bar.setSuggestions(emptyList())
             return
         }
         val before = currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
-        val after = currentInputConnection?.getTextAfterCursor(MAX_WORD_LOOKBACK, 0) ?: ""
         // Lauseen alussa (automaattinen iso kirjain päällä) ehdotukset alkavat isolla.
         val shiftActive = shiftState != ShiftState.OFF
         val generation = ++suggestGeneration
         suggestExecutor.execute {
             val word = WordTools.currentWord(before)
-            val continuation = WordTools.continuationAfter(after)
-            if (word.isNotEmpty() && continuation.isNotEmpty()) {
-                // Kursori on sanan sisällä: rivi näyttää koko sanan vaihtoehdot
-                // ja valinta korvaa sanan (jälkikäteinen korjaus).
-                val whole = word + continuation
-                var result = suggestionEngine.alternatives(whole, WordTools.previousWords(before))
-                if (whole.first().isUpperCase()) {
-                    result = result.map { s -> s.replaceFirstChar { it.titlecase(fiLocale) } }
-                }
-                if (generation == suggestGeneration) {
-                    mainHandler.post {
-                        if (generation == suggestGeneration) {
-                            bar.setSuggestions(result)
-                            // Vaihtoehdot eivät ole täydennyksiä: ohitussakkoa ei kirjata.
-                            shownCompletions = emptyList()
-                        }
-                    }
-                }
-                return@execute
-            }
             val context = WordTools.previousWords(before)
             var result = if (word.isNotEmpty()) {
                 suggestionEngine.suggest(word, context)
@@ -1013,6 +1131,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private companion object {
         const val MAX_WORD_LOOKBACK = 48
+        const val CORRECTION_LOOKBACK = 5000
         const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3

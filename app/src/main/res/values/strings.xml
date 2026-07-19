@@ -54,6 +54,8 @@
     <string name="sanelu_virhe">Sanelu ei onnistunut</string>
     <string name="sanelu_ei_saatavilla">Sanelu ei ole käytettävissä tällä laitteella</string>
 
+    <string name="korjaus_tyhja">Kentässä ei ole tekstiä</string>
+
     <string name="leikepoyta_tyhja">Kopioi tekstiä tai kuva, niin se ilmestyy tähän</string>
     <string name="leike_liita">Liitä</string>
     <string name="leike_hae_verkosta">Hae verkosta</string>

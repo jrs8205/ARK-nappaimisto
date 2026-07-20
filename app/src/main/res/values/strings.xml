@@ -22,9 +22,7 @@
     <string name="erikoismerkit">Erikoismerkkien järjestys</string>
     <string name="tyokalurivi">Työkalurivi</string>
     <string name="tyokalurivi_kuvaus">Järjestä napit ja valitse mitkä näkyvät</string>
-    <string name="tyokalurivi_ohje">Raahaa nappia pitkällä painalluksella. Piilotettu-osioon vedetyt napit eivät näy työkalurivillä. Asetukset näkyy aina viimeisenä.</string>
-    <string name="tyokalurivi_piilotetut">Piilotettu</string>
-    <string name="tyokalurivi_piilotetut_vihje">Vedä nappi tähän, niin se ei näy työkalurivillä</string>
+    <string name="tyokalurivi_ohje">Raahaa nappia pitkällä painalluksella järjestyksen muuttamiseksi. Kytkimestä valitset, näkyykö nappi työkalurivillä. Asetukset näkyy aina viimeisenä.</string>
     <string name="tyokalurivi_palauta">Palauta oletukset</string>
     <string name="tyokalurivi_palauta_varmistus">Palautetaanko työkalurivin oletusjärjestys ja kaikki napit näkyviin?</string>
     <string name="tyokalu_nuolet">Kursorin siirto</string>

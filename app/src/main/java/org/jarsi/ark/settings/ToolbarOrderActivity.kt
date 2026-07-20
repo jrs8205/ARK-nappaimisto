@@ -2,7 +2,6 @@ package org.jarsi.ark.settings
 
 import android.content.SharedPreferences
 import android.content.res.ColorStateList
-import android.graphics.Typeface
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
@@ -17,21 +16,21 @@ import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
 import org.jarsi.ark.R
 import org.jarsi.ark.keyboard.ToolbarOrder
 import org.jarsi.ark.keyboard.ToolbarTool
 
 /**
  * Työkalurivin muokkaus: nappia raahataan pitkällä painalluksella uuteen
- * kohtaan, ja Piilotettu-osioon vedetyt napit jäävät pois työkaluriviltä.
+ * kohtaan, ja rivin kytkimestä valitaan, näkyykö nappi työkalurivillä.
  * Asetusnappi ei ole listalla, koska se näkyy aina viimeisenä.
  */
 class ToolbarOrderActivity : AppCompatActivity() {
 
-    private object Divider
-
     private lateinit var prefs: SharedPreferences
-    private val items = mutableListOf<Any>()
+    private val items = mutableListOf<ToolbarTool>()
+    private val hidden = mutableSetOf<ToolbarTool>()
     private val adapter = ToolAdapter()
     private var density = 1f
 
@@ -84,21 +83,15 @@ class ToolbarOrderActivity : AppCompatActivity() {
 
     private fun loadItems() {
         val config = ToolbarOrder.load(prefs.getString(ToolbarOrder.PREF_KEY, null))
-        val editable = config.order.filter { it != ToolbarTool.SETTINGS }
         items.clear()
-        items.addAll(editable.filter { it !in config.hidden })
-        items.add(Divider)
-        items.addAll(editable.filter { it in config.hidden })
+        items.addAll(config.order.filter { it != ToolbarTool.SETTINGS })
+        hidden.clear()
+        hidden.addAll(config.hidden)
     }
 
-    private fun dividerIndex() = items.indexOfFirst { it is Divider }
-
     private fun save() {
-        val divider = dividerIndex()
-        val visible = items.take(divider).filterIsInstance<ToolbarTool>()
-        val hidden = items.drop(divider + 1).filterIsInstance<ToolbarTool>()
         // Asetusnappi on aina järjestyksen viimeisenä ja aina näkyvissä.
-        val order = visible + hidden + ToolbarTool.SETTINGS
+        val order = items + ToolbarTool.SETTINGS
         prefs.edit()
             .putString(ToolbarOrder.PREF_KEY, ToolbarOrder.serialize(order, hidden.toSet()))
             .apply()
@@ -145,11 +138,7 @@ class ToolbarOrderActivity : AppCompatActivity() {
 
     private val touchCallback = object : ItemTouchHelper.Callback() {
         override fun getMovementFlags(rv: RecyclerView, vh: RecyclerView.ViewHolder) =
-            if (items.getOrNull(vh.bindingAdapterPosition) is ToolbarTool) {
-                makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0)
-            } else {
-                makeMovementFlags(0, 0)
-            }
+            makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0)
 
         override fun onMove(
             rv: RecyclerView,
@@ -169,80 +158,72 @@ class ToolbarOrderActivity : AppCompatActivity() {
         override fun clearView(rv: RecyclerView, vh: RecyclerView.ViewHolder) {
             super.clearView(rv, vh)
             save()
-            // Piilotetut rivit himmennetään paikan mukaan; siirron jälkeen
-            // koko lista piirretään uusiksi.
-            adapter.notifyDataSetChanged()
         }
     }
 
-    private inner class ToolAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+    private inner class ToolHolder(
+        row: LinearLayout,
+        val label: TextView,
+        val toggle: MaterialSwitch,
+    ) : RecyclerView.ViewHolder(row)
 
-        override fun getItemViewType(position: Int) =
-            if (items[position] is ToolbarTool) TYPE_TOOL else TYPE_DIVIDER
+    private inner class ToolAdapter : RecyclerView.Adapter<ToolHolder>() {
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-            return if (viewType == TYPE_DIVIDER) {
-                val column = LinearLayout(parent.context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(16), dp(20), dp(16), dp(8))
-                    layoutParams = RecyclerView.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                    )
-                    addView(
-                        TextView(parent.context).apply {
-                            text = context.getString(R.string.tyokalurivi_piilotetut)
-                            textSize = 14f
-                            setTypeface(typeface, Typeface.BOLD)
-                        }
-                    )
-                    addView(
-                        TextView(parent.context).apply {
-                            text = context.getString(R.string.tyokalurivi_piilotetut_vihje)
-                            textSize = 12f
-                            alpha = 0.7f
-                        }
-                    )
-                }
-                object : RecyclerView.ViewHolder(column) {}
-            } else {
-                val view = TextView(parent.context).apply {
-                    textSize = 16f
-                    gravity = Gravity.CENTER_VERTICAL
-                    compoundDrawablePadding = dp(12)
-                    setPadding(dp(16), dp(14), dp(16), dp(14))
-                    layoutParams = RecyclerView.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                    )
-                }
-                object : RecyclerView.ViewHolder(view) {}
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ToolHolder {
+            val label = TextView(parent.context).apply {
+                textSize = 16f
+                gravity = Gravity.CENTER_VERTICAL
+                compoundDrawablePadding = dp(12)
             }
+            val toggle = MaterialSwitch(parent.context)
+            val row = LinearLayout(parent.context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(8), dp(16), dp(8))
+                layoutParams = RecyclerView.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
+                addView(
+                    label,
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                )
+                addView(
+                    toggle,
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+            }
+            return ToolHolder(row, label, toggle)
         }
 
-        override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-            val tool = items[position] as? ToolbarTool ?: return
-            val text = holder.itemView as TextView
-            text.text = toolName(tool)
+        override fun onBindViewHolder(holder: ToolHolder, position: Int) {
+            val tool = items[position]
+            holder.label.text = toolName(tool)
             val icon = toolIcon(tool)
             if (icon != null) {
-                text.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
-                text.compoundDrawableTintList = ColorStateList.valueOf(text.currentTextColor)
-                text.setPadding(dp(16), dp(14), dp(16), dp(14))
+                holder.label.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
+                holder.label.compoundDrawableTintList =
+                    ColorStateList.valueOf(holder.label.currentTextColor)
+                holder.label.setPadding(0, 0, 0, 0)
             } else {
                 // www-napilla ei ole kuvaketta; sisennys pitää rivit tasassa.
-                text.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
-                text.setPadding(dp(16) + dp(24) + dp(12), dp(14), dp(16), dp(14))
+                holder.label.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
+                holder.label.setPadding(dp(24) + dp(12), 0, 0, 0)
             }
-            // Piilotetut napit himmennetään.
-            text.alpha = if (position > dividerIndex()) 0.5f else 1f
+            holder.label.alpha = if (tool in hidden) 0.5f else 1f
+            holder.toggle.contentDescription = toolName(tool)
+            holder.toggle.setOnCheckedChangeListener(null)
+            holder.toggle.isChecked = tool !in hidden
+            holder.toggle.setOnCheckedChangeListener { _, checked ->
+                if (checked) hidden.remove(tool) else hidden.add(tool)
+                holder.label.alpha = if (checked) 1f else 0.5f
+                save()
+            }
         }
 
         override fun getItemCount() = items.size
-    }
-
-    private companion object {
-        const val TYPE_TOOL = 0
-        const val TYPE_DIVIDER = 1
     }
 }

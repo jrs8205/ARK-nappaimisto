@@ -51,6 +51,7 @@ import org.jarsi.ark.keyboard.ShiftState
 import org.jarsi.ark.keyboard.SmartSpace
 import org.jarsi.ark.keyboard.SymbolOrder
 import org.jarsi.ark.keyboard.TextUndo
+import org.jarsi.ark.keyboard.ToolbarOrder
 import org.jarsi.ark.keyboard.TranslateBuffer
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
@@ -1536,6 +1537,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
         autoCorrectEnabled = prefs.getBoolean("automaattikorjaus", true)
         symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
+        toolbar?.tools = ToolbarOrder.load(prefs.getString(ToolbarOrder.PREF_KEY, null)).visible
         pendingRevert = null
         // Osoitteissa, sähköposteissa ja koodikentissä pisteet kuuluvat
         // tekstiin, eikä väliä saa lisätä niiden perään automaattisesti.

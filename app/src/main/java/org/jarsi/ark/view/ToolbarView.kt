@@ -7,6 +7,8 @@ import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import org.jarsi.ark.R
+import org.jarsi.ark.keyboard.ToolbarOrder
+import org.jarsi.ark.keyboard.ToolbarTool
 import org.jarsi.ark.theme.KeyboardTheme
 import kotlin.math.roundToInt
 
@@ -103,12 +105,12 @@ class ToolbarView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER
     }
 
-    private enum class Tool { ARROWS, WEB, MIC, EMOJI, CLIPBOARD, CORRECTION, TRANSLATE, UNDO, SETTINGS }
-
-    private val tools = listOf(
-        Tool.ARROWS, Tool.WEB, Tool.MIC, Tool.EMOJI,
-        Tool.CLIPBOARD, Tool.CORRECTION, Tool.TRANSLATE, Tool.UNDO, Tool.SETTINGS,
-    )
+    /** Näkyvät napit järjestyksessä; asetuksista muokattavissa. */
+    var tools: List<ToolbarTool> = ToolbarOrder.default
+        set(value) {
+            field = value
+            invalidate()
+        }
 
     private val cursorIcon = context.getDrawable(R.drawable.ic_cursor_move)?.mutate()
     private val micIcon = context.getDrawable(R.drawable.ic_mic)?.mutate()
@@ -129,8 +131,8 @@ class ToolbarView(context: Context) : View(context) {
     }
 
     // www-nappi on tekstin vuoksi leveämpi kuin kuvakenapit.
-    private fun buttonWidth(tool: Tool, size: Float): Float =
-        if (tool == Tool.WEB) size * 1.6f else size
+    private fun buttonWidth(tool: ToolbarTool, size: Float): Float =
+        if (tool == ToolbarTool.WEB) size * 1.6f else size
 
     // Kapealla näytöllä nappien leveydet kutistuvat suhteessa, jotta koko
     // rivi mahtuu aina näkyviin.
@@ -160,14 +162,14 @@ class ToolbarView(context: Context) : View(context) {
         canvas.drawColor(theme.background)
         tools.forEachIndexed { i, tool ->
             val rect = buttonRect(i)
-            val active = (tool == Tool.ARROWS && arrowsActive) ||
-                (tool == Tool.WEB && webActive) ||
-                (tool == Tool.MIC && micActive) ||
-                (tool == Tool.EMOJI && emojiActive) ||
-                (tool == Tool.CLIPBOARD && clipboardActive) ||
-                (tool == Tool.CORRECTION && correctionActive) ||
-                (tool == Tool.TRANSLATE && translationActive)
-            if (tool == Tool.MIC && micActive) {
+            val active = (tool == ToolbarTool.ARROWS && arrowsActive) ||
+                (tool == ToolbarTool.WEB && webActive) ||
+                (tool == ToolbarTool.MIC && micActive) ||
+                (tool == ToolbarTool.EMOJI && emojiActive) ||
+                (tool == ToolbarTool.CLIPBOARD && clipboardActive) ||
+                (tool == ToolbarTool.CORRECTION && correctionActive) ||
+                (tool == ToolbarTool.TRANSLATE && translationActive)
+            if (tool == ToolbarTool.MIC && micActive) {
                 // Kehä sykkii puheen tahdissa ja laskee itsestään hiljaisuudessa.
                 micShownLevel += (micLevel - micShownLevel) * 0.3f
                 micLevel *= 0.94f
@@ -184,7 +186,7 @@ class ToolbarView(context: Context) : View(context) {
             }
             canvas.drawRoundRect(rect, dp(8f), dp(8f), buttonPaint)
             val contentColor = if (active) theme.accentText else theme.text
-            if (tool == Tool.WEB) {
+            if (tool == ToolbarTool.WEB) {
                 labelPaint.color = contentColor
                 labelPaint.textSize = rect.height() * 0.42f
                 canvas.drawText(
@@ -196,13 +198,13 @@ class ToolbarView(context: Context) : View(context) {
                 return@forEachIndexed
             }
             val icon = when (tool) {
-                Tool.ARROWS -> cursorIcon
-                Tool.MIC -> micIcon
-                Tool.EMOJI -> emojiIcon
-                Tool.CLIPBOARD -> clipboardIcon
-                Tool.CORRECTION -> correctionIcon
-                Tool.TRANSLATE -> translateIcon
-                Tool.UNDO -> undoIcon
+                ToolbarTool.ARROWS -> cursorIcon
+                ToolbarTool.MIC -> micIcon
+                ToolbarTool.EMOJI -> emojiIcon
+                ToolbarTool.CLIPBOARD -> clipboardIcon
+                ToolbarTool.CORRECTION -> correctionIcon
+                ToolbarTool.TRANSLATE -> translateIcon
+                ToolbarTool.UNDO -> undoIcon
                 else -> settingsIcon
             } ?: return@forEachIndexed
             icon.setTint(contentColor)
@@ -224,15 +226,15 @@ class ToolbarView(context: Context) : View(context) {
                 val index = indexAt(event.x, event.y)
                 if (index >= 0 && index == pressedIndex) {
                     when (tools[index]) {
-                        Tool.ARROWS -> listener?.onToggleArrows()
-                        Tool.WEB -> listener?.onToggleWeb()
-                        Tool.MIC -> listener?.onToggleDictation()
-                        Tool.EMOJI -> listener?.onToggleEmoji()
-                        Tool.CLIPBOARD -> listener?.onToggleClipboard()
-                        Tool.CORRECTION -> listener?.onToggleCorrection()
-                        Tool.TRANSLATE -> listener?.onToggleTranslation()
-                        Tool.UNDO -> listener?.onUndo()
-                        Tool.SETTINGS -> listener?.onOpenSettings()
+                        ToolbarTool.ARROWS -> listener?.onToggleArrows()
+                        ToolbarTool.WEB -> listener?.onToggleWeb()
+                        ToolbarTool.MIC -> listener?.onToggleDictation()
+                        ToolbarTool.EMOJI -> listener?.onToggleEmoji()
+                        ToolbarTool.CLIPBOARD -> listener?.onToggleClipboard()
+                        ToolbarTool.CORRECTION -> listener?.onToggleCorrection()
+                        ToolbarTool.TRANSLATE -> listener?.onToggleTranslation()
+                        ToolbarTool.UNDO -> listener?.onUndo()
+                        ToolbarTool.SETTINGS -> listener?.onOpenSettings()
                     }
                 }
                 pressedIndex = -1

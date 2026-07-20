@@ -83,6 +83,10 @@ class SettingsActivity : AppCompatActivity() {
                 startActivity(Intent(requireContext(), SymbolOrderActivity::class.java))
                 true
             }
+            findPreference<Preference>("tyokalurivi")?.setOnPreferenceClickListener {
+                startActivity(Intent(requireContext(), ToolbarOrderActivity::class.java))
+                true
+            }
             findPreference<Preference>("kaannoskielet")?.setOnPreferenceClickListener {
                 startActivity(Intent(requireContext(), TranslationLanguagesActivity::class.java))
                 true

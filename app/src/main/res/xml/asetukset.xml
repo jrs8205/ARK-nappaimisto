@@ -48,6 +48,11 @@
             android:title="@string/erikoismerkit"
             android:summary="@string/erikoismerkit_kuvaus"
             app:singleLineTitle="false" />
+        <Preference
+            android:key="tyokalurivi"
+            android:title="@string/tyokalurivi"
+            android:summary="@string/tyokalurivi_kuvaus"
+            app:singleLineTitle="false" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_ehdotukset">

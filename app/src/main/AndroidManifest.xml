@@ -53,6 +53,11 @@
             android:label="@string/erikoismerkit" />
 
         <activity
+            android:name=".settings.ToolbarOrderActivity"
+            android:exported="false"
+            android:label="@string/tyokalurivi" />
+
+        <activity
             android:name=".settings.TranslationLanguagesActivity"
             android:exported="false"
             android:label="@string/kaannoskielet" />

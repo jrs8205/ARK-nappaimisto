@@ -4,15 +4,17 @@
 <resources>
     <color name="ic_launcher_background">#1B6EF3</color>
 
-    <!-- Vaalea teema -->
+    <!-- Vaalea teema. Kontrastit WCAG AAA -tasoa: teksti- ja vihjevärit
+         vähintään 7:1 omilla pinnoillaan, korostusparit samoin. -->
     <color name="vaalea_tausta">#E9EBEF</color>
     <color name="vaalea_nappain">#FFFFFF</color>
     <color name="vaalea_erikoisnappain">#D4D8E0</color>
     <color name="vaalea_painettu">#BFC6D1</color>
     <color name="vaalea_teksti">#1B1D22</color>
-    <color name="vaalea_vihje">#6E7480</color>
-    <color name="vaalea_korostus">#1B6EF3</color>
+    <color name="vaalea_vihje">#444A53</color>
+    <color name="vaalea_korostus">#0946AC</color>
     <color name="vaalea_korostusteksti">#FFFFFF</color>
+    <color name="vaalea_kortti">#FFFFFF</color>
 
     <!-- Tumma teema -->
     <color name="tumma_tausta">#14161B</color>
@@ -20,7 +22,8 @@
     <color name="tumma_erikoisnappain">#20232B</color>
     <color name="tumma_painettu">#3D4350</color>
     <color name="tumma_teksti">#E8EAF0</color>
-    <color name="tumma_vihje">#8A8F9C</color>
-    <color name="tumma_korostus">#4C8DFF</color>
-    <color name="tumma_korostusteksti">#FFFFFF</color>
+    <color name="tumma_vihje">#BAC0CC</color>
+    <color name="tumma_korostus">#A9C7FF</color>
+    <color name="tumma_korostusteksti">#122E52</color>
+    <color name="tumma_kortti">#333944</color>
 </resources>

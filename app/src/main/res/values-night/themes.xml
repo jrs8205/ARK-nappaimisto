@@ -10,6 +10,7 @@
         <item name="colorSurfaceVariant">@color/tumma_erikoisnappain</item>
         <item name="colorOnSurfaceVariant">@color/tumma_vihje</item>
         <item name="colorSurfaceContainer">@color/tumma_nappain</item>
+        <item name="colorSurfaceContainerHighest">@color/tumma_kortti</item>
     </style>
 
     <!-- Emojivalitsin: valitun kategorian merkkiviiva näppäimistön korostusvärillä. -->

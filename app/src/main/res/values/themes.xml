@@ -10,6 +10,7 @@
         <item name="colorSurfaceVariant">@color/vaalea_erikoisnappain</item>
         <item name="colorOnSurfaceVariant">@color/vaalea_vihje</item>
         <item name="colorSurfaceContainer">@color/vaalea_nappain</item>
+        <item name="colorSurfaceContainerHighest">@color/vaalea_kortti</item>
     </style>
 
     <!-- Asetusrivit pyöristettyinä kortteina ja modernit M3-kytkimet.

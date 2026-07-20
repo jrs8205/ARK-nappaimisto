@@ -45,6 +45,13 @@ class SettingsActivity : AppCompatActivity() {
 
     class SettingsFragment : PreferenceFragmentCompat() {
 
+        // Korttirivit erottuvat raoillaan; kirjaston jakoviivat pois.
+        override fun onViewCreated(view: android.view.View, savedInstanceState: Bundle?) {
+            super.onViewCreated(view, savedInstanceState)
+            setDivider(null)
+            setDividerHeight(0)
+        }
+
         private val ioExecutor = Executors.newSingleThreadExecutor()
         private var database: LearnedDatabase? = null
 

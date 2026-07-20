@@ -34,10 +34,29 @@ class EmojiPanelView(context: Context) : LinearLayout(context) {
 
     // Valitsin tarvitsee AppCompat-pohjaisen teeman; palvelun konteksti
     // kääritään, ja päällysteteema värjää valitun kategorian viivan.
-    private val picker = EmojiPickerView(
+    private var picker = buildPicker()
+
+    // Kirjasto lukee viimeksi käytetyt prefsseistä vain valitsinta
+    // luotaessa, eikä tarjoa julkista päivityskutsua — siksi valitsin
+    // rakennetaan uudelleen seuraavalla avauksella, jos emojia on käytetty.
+    private var recentsDirty = false
+
+    private fun buildPicker() = EmojiPickerView(
         ContextThemeWrapper(context, R.style.Theme_Ark_EmojiValitsin)
     ).apply {
-        setOnEmojiPickedListener { item -> listener?.onEmojiPicked(item.emoji) }
+        setOnEmojiPickedListener { item ->
+            recentsDirty = true
+            listener?.onEmojiPicked(item.emoji)
+        }
+    }
+
+    fun refreshRecentsIfNeeded() {
+        if (!recentsDirty) return
+        recentsDirty = false
+        val params = picker.layoutParams
+        removeView(picker)
+        picker = buildPicker()
+        addView(picker, 0, params)
     }
 
     private val abcButton = TextView(context).apply {

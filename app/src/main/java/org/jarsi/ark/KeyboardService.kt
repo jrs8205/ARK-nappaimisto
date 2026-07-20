@@ -490,6 +490,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val panel = emojiPanel ?: return
         val kb = keyboardView ?: return
         hideAllPanels()
+        panel.refreshRecentsIfNeeded()
         if (kb.height > 0) {
             panel.layoutParams = panel.layoutParams.apply { height = kb.height }
         }

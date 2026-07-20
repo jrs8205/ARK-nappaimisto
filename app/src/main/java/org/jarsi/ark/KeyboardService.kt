@@ -601,6 +601,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         } else {
             getString(R.string.kaannos_ladataan)
         }
+        bar.pasteAvailable = clipboardManager?.hasPrimaryClip() == true
         bar.setBuffer(translateBuffer.text, translateBuffer.cursor, hint)
     }
 
@@ -663,6 +664,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val client = translator ?: return
         val generation = translationGeneration
         val prepared = TranslatePrep.prepare(text)
+        val english = translationTarget() == TranslateLanguage.ENGLISH
         client.translate(prepared.text).addOnSuccessListener { result ->
             // Tulos kelpaa vain, jos rivi ei ehtinyt muuttua välissä.
             if (translateMode && generation == translationGeneration &&
@@ -671,7 +673,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 markOwnEdit()
                 lastTranslatedText = text
                 currentInputConnection?.setComposingText(
-                    TranslatePrep.clean(result, prepared), 1
+                    TranslatePrep.clean(result, prepared, english), 1
                 )
             }
         }
@@ -698,6 +700,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val generation = ++translationGeneration
         val session = editorSessionId
         val prepared = TranslatePrep.prepare(text)
+        val english = translationTarget() == TranslateLanguage.ENGLISH
         client.translate(prepared.text)
             .addOnSuccessListener { result ->
                 // Vanhentunut tulos hylätään: käyttäjä ehti jatkaa, painaa
@@ -709,7 +712,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     return@addOnSuccessListener
                 }
                 val ic = currentInputConnection ?: return@addOnSuccessListener
-                val cleaned = TranslatePrep.clean(result, prepared)
+                val cleaned = TranslatePrep.clean(result, prepared, english)
                 markOwnEdit()
                 ic.beginBatchEdit()
                 ic.setComposingText(cleaned, 1)
@@ -1441,6 +1444,18 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         ).show()
                     }
                 }
+
+                override fun onPaste() {
+                    feedback()
+                    val clipText = clipboardManager?.primaryClip
+                        ?.takeIf { it.itemCount > 0 }
+                        ?.getItemAt(0)?.coerceToText(this@KeyboardService)
+                        ?.toString()
+                    if (clipText.isNullOrEmpty()) return
+                    markOwnEdit()
+                    translateBuffer.insert(clipText)
+                    onTranslateBufferChanged()
+                }
             }
             it.visibility = View.GONE
             container.addView(it, LinearLayout.LayoutParams(params))
@@ -1812,7 +1827,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             } else {
                 text
             }
-            translateBuffer.insert(output)
+            translateBuffer.smartInsert(output)
             if (shiftState == ShiftState.SHIFT) {
                 shiftState = ShiftState.OFF
                 manualShift = false

@@ -1,6 +1,7 @@
 package org.jarsi.ark.keyboard
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -102,5 +103,69 @@ class TranslateBufferTest {
         val b = TranslateBuffer()
         b.insert("moi")
         assertEquals("moi", b.toString())
+    }
+
+    @Test
+    fun `smartInsert lisaa valin ja ison kirjaimen valimerkin jalkeen`() {
+        val b = TranslateBuffer()
+        b.insert("voinko tulla?")
+        b.smartInsert("s")
+        assertEquals("voinko tulla? S", b.text)
+        assertEquals(15, b.cursor)
+    }
+
+    @Test
+    fun `smartInsert kapitalisoi valmiin valin jalkeen`() {
+        val b = TranslateBuffer()
+        b.insert("moi. ")
+        b.smartInsert("h")
+        assertEquals("moi. H", b.text)
+    }
+
+    @Test
+    fun `askelpalautin peruu alykkaan lisayksen`() {
+        val b = TranslateBuffer()
+        b.insert("jarsi.")
+        b.smartInsert("o")
+        assertEquals("jarsi. O", b.text)
+        assertTrue(b.backspace())
+        assertEquals("jarsi.o", b.text)
+        assertEquals(7, b.cursor)
+    }
+
+    @Test
+    fun `numeron jalkeinen piste ei laukaise saantoa`() {
+        val b = TranslateBuffer()
+        b.insert("3.")
+        b.smartInsert("a")
+        assertEquals("3.a", b.text)
+    }
+
+    @Test
+    fun `rivin alku alkaa isolla ja peruutus palauttaa`() {
+        val b = TranslateBuffer()
+        b.smartInsert("m")
+        assertEquals("M", b.text)
+        assertTrue(b.backspace())
+        assertEquals("m", b.text)
+    }
+
+    @Test
+    fun `tavallinen lisays ei muutu`() {
+        val b = TranslateBuffer()
+        b.insert("moi hei")
+        b.smartInsert("t")
+        assertEquals("moi heit", b.text)
+    }
+
+    @Test
+    fun `kursorin siirto mitatoi peruutuksen`() {
+        val b = TranslateBuffer()
+        b.insert("moi.")
+        b.smartInsert("h")
+        b.moveLeft()
+        b.moveRight()
+        assertTrue(b.backspace())
+        assertEquals("moi. ", b.text)
     }
 }

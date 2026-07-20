@@ -45,9 +45,15 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
         /** Käyttäjä kopioi valitun lähdetekstin. */
         fun onCopy(text: String)
+
+        /** Käyttäjä liittää leikepöydän tekstin käännösriville. */
+        fun onPaste()
     }
 
     var listener: Listener? = null
+
+    /** Onko leikepöydällä liitettävää tekstiä; palvelu päivittää. */
+    var pasteAvailable = false
 
     private var theme = KeyboardTheme.load(context)
     private val density = resources.displayMetrics.density
@@ -153,25 +159,44 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val longPressRunnable = Runnable { onBufferLongPressed() }
 
+    // Valintakahvan raahaus: 0 = ei mikään, 1 = alkukahva, 2 = loppukahva.
+    private var draggingHandle = 0
+    private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
     @SuppressLint("ClickableViewAccessibility")
-    private val bufferView = TextView(context).apply {
+    private val bufferView = object : TextView(context) {
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            drawSelectionHandles(canvas, this)
+        }
+    }.apply {
         textSize = 16f
         maxLines = 1
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(8), dp(8), dp(8), dp(8))
         setOnTouchListener { view, event ->
+            val textView = view as TextView
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = event.x
                     downY = event.y
                     longPressFired = false
-                    view.postDelayed(
-                        longPressRunnable,
-                        ViewConfiguration.getLongPressTimeout().toLong(),
-                    )
+                    draggingHandle = hitHandle(textView, event.x)
+                    if (draggingHandle != 0) {
+                        // Kahvan veto ei saa käynnistää vieritystä eikä valikkoa.
+                        view.parent?.requestDisallowInterceptTouchEvent(true)
+                        dismissSelectionPopup()
+                    } else {
+                        view.postDelayed(
+                            longPressRunnable,
+                            ViewConfiguration.getLongPressTimeout().toLong(),
+                        )
+                    }
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (abs(event.x - downX) > touchSlop ||
+                    if (draggingHandle != 0) {
+                        dragHandleTo(textView, event.x, event.y)
+                    } else if (abs(event.x - downX) > touchSlop ||
                         abs(event.y - downY) > touchSlop
                     ) {
                         view.removeCallbacks(longPressRunnable)
@@ -179,20 +204,27 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
                 }
                 MotionEvent.ACTION_UP -> {
                     view.removeCallbacks(longPressRunnable)
-                    if (!longPressFired) {
+                    if (draggingHandle != 0) {
+                        draggingHandle = 0
+                        showSelectionPopup()
+                    } else if (!longPressFired) {
                         if (selection != null) {
                             clearSelection()
                             render()
                         }
-                        onBufferTapped(view as TextView, event.x, event.y)
+                        onBufferTapped(textView, event.x, event.y)
                         view.performClick()
                     }
                 }
-                MotionEvent.ACTION_CANCEL -> view.removeCallbacks(longPressRunnable)
+                MotionEvent.ACTION_CANCEL -> {
+                    view.removeCallbacks(longPressRunnable)
+                    draggingHandle = 0
+                }
             }
             // Kosketus kuluu tässä, ettei vieritys nappaa napautusta;
-            // liike jää vierityksen siepattavaksi kuten ennenkin.
-            event.actionMasked == MotionEvent.ACTION_UP ||
+            // liike jää vierityksen siepattavaksi paitsi kahvaa raahatessa.
+            draggingHandle != 0 ||
+                event.actionMasked == MotionEvent.ACTION_UP ||
                 event.actionMasked == MotionEvent.ACTION_DOWN
         }
     }
@@ -289,7 +321,8 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             bufferView.setTextColor(theme.text)
             clearLabel.visibility = VISIBLE
             restartBlink()
-            scrollCursorIntoView(position)
+            // Kahvaa raahatessa näkymä ei saa hyppiä kursorin perässä.
+            if (draggingHandle == 0) scrollCursorIntoView(position)
         }
     }
 
@@ -341,9 +374,77 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         listener?.onCursorTap(position)
     }
 
+    /** Näyttöindeksin x-koordinaatti lähdetekstin kohdalle; paikkamerkki
+     *  siirtää indeksejä kursorin kohdalla. [boundaryAfter] koskee
+     *  valinnan loppurajaa, joka osuu paikkamerkin jälkeen. */
+    private fun handleX(text: TextView, sourceIndex: Int, boundaryAfter: Boolean): Float? {
+        val layout = text.layout ?: return null
+        val display = if (boundaryAfter) {
+            sourceIndex + if (sourceIndex > shownCursor) 1 else 0
+        } else {
+            sourceIndex + if (sourceIndex >= shownCursor) 1 else 0
+        }
+        val clamped = display.coerceIn(0, layout.text.length)
+        return layout.getPrimaryHorizontal(clamped) + text.totalPaddingLeft
+    }
+
+    private fun hitHandle(text: TextView, x: Float): Int {
+        val sel = selection ?: return 0
+        val startX = handleX(text, sel.first, false) ?: return 0
+        val endX = handleX(text, sel.last + 1, true) ?: return 0
+        val slop = dp(20)
+        val toStart = abs(x - startX)
+        val toEnd = abs(x - endX)
+        return when {
+            toStart <= slop && toStart <= toEnd -> 1
+            toEnd <= slop -> 2
+            else -> 0
+        }
+    }
+
+    private fun dragHandleTo(text: TextView, x: Float, y: Float) {
+        val sel = selection ?: return
+        val offset = text.getOffsetForPosition(x, y)
+        if (offset < 0) return
+        val position = (if (offset > shownCursor) offset - 1 else offset)
+            .coerceIn(0, shownText.length)
+        val updated = if (draggingHandle == 1) {
+            minOf(position, sel.last)..sel.last
+        } else {
+            sel.first..maxOf(position - 1, sel.first)
+        }
+        if (updated != sel) {
+            selection = updated
+            render()
+        }
+    }
+
+    private fun drawSelectionHandles(canvas: Canvas, text: TextView) {
+        val sel = selection ?: return
+        val layout = text.layout ?: return
+        val startX = handleX(text, sel.first, false) ?: return
+        val endX = handleX(text, sel.last + 1, true) ?: return
+        handlePaint.color = theme.accent
+        val bottom = text.totalPaddingTop + layout.getLineBottom(0).toFloat()
+        val cy = minOf(bottom + dp(3), text.height - dp(5).toFloat())
+        val radius = dp(5).toFloat()
+        canvas.drawCircle(startX, cy, radius, handlePaint)
+        canvas.drawCircle(endX, cy, radius, handlePaint)
+    }
+
     /** Pitkä painallus maalaa sanan ja avaa Kopioi-valikon sen ylle. */
     private fun onBufferLongPressed() {
-        if (shownCursor < 0) return
+        if (shownCursor < 0) {
+            // Tyhjälläkin rivillä voi liittää leikepöydän tekstin.
+            if (pasteAvailable) {
+                longPressFired = true
+                val location = IntArray(2)
+                bufferView.getLocationInWindow(location)
+                popupAnchorX = location[0] + downX.roundToInt()
+                showSelectionPopup()
+            }
+            return
+        }
         val offset = bufferView.getOffsetForPosition(downX, downY)
         if (offset < 0) return
         val position = if (offset > shownCursor) offset - 1 else offset
@@ -360,8 +461,8 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     private fun showSelectionPopup() {
         dismissSelectionPopup()
-        val sel = selection ?: return
-        val allSelected = sel.first == 0 && sel.last >= shownText.length - 1
+        val sel = selection
+        if (sel == null && !pasteAvailable) return
 
         val container = LinearLayout(context).apply {
             orientation = HORIZONTAL
@@ -386,18 +487,29 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
                 ),
             )
         }
-        addItem(context.getString(R.string.kaannos_kopioi)) {
-            selection?.let { s ->
-                listener?.onCopy(shownText.substring(s.first, s.last + 1))
-            }
-            clearSelection()
-            render()
-        }
-        if (!allSelected) {
-            addItem(context.getString(R.string.kaannos_valitse_kaikki)) {
-                selection = 0 until shownText.length
+        if (sel != null) {
+            addItem(context.getString(R.string.kaannos_kopioi)) {
+                selection?.let { s ->
+                    listener?.onCopy(shownText.substring(s.first, s.last + 1))
+                }
+                clearSelection()
                 render()
-                showSelectionPopup()
+            }
+            val allSelected = sel.first == 0 && sel.last >= shownText.length - 1
+            if (!allSelected) {
+                addItem(context.getString(R.string.kaannos_valitse_kaikki)) {
+                    selection = 0 until shownText.length
+                    render()
+                    showSelectionPopup()
+                }
+            }
+        }
+        if (pasteAvailable) {
+            addItem(context.getString(R.string.leike_liita)) {
+                dismissSelectionPopup()
+                clearSelection()
+                render()
+                listener?.onPaste()
             }
         }
 

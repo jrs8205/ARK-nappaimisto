@@ -79,4 +79,31 @@ class TranslatePrepTest {
         val prep = TranslatePrep.prepare("moi kaikille")
         assertEquals("Hi everyone!", TranslatePrep.clean("Hi everyone!", prep))
     }
+
+    @Test
+    fun `clean kapitalisoi tuloksen lauseiden alut`() {
+        val prep = TranslatePrep.prepare("voinko saada kissan? pehmeän.")
+        assertEquals(
+            "Can I get a cat? Soft.",
+            TranslatePrep.clean("can i get a cat? soft.", prep, englishTarget = true),
+        )
+    }
+
+    @Test
+    fun `englannin i korjataan vain englanniksi`() {
+        val prep = TranslatePrep.prepare("asun ruotsissa.")
+        assertEquals(
+            "Jag bor i Sverige.",
+            TranslatePrep.clean("jag bor i Sverige.", prep, englishTarget = false),
+        )
+    }
+
+    @Test
+    fun `englannin i toimii lyhenteissa`() {
+        val prep = TranslatePrep.prepare("olen iloinen.")
+        assertEquals(
+            "I'm happy, I think.",
+            TranslatePrep.clean("i'm happy, i think.", prep, englishTarget = true),
+        )
+    }
 }

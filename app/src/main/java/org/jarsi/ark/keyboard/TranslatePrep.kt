@@ -20,11 +20,23 @@ object TranslatePrep {
         return Prepared(if (addStop) "$capitalized." else capitalized, addStop)
     }
 
-    fun clean(result: String, prepared: Prepared): String {
-        if (!prepared.addedStop) return result
-        val trimmed = result.trimEnd()
-        return if (trimmed.endsWith(".")) trimmed.dropLast(1) else result
+    /**
+     * Siistii käännöstuloksen: riisuu [prepare]-vaiheessa lisätyn
+     * loppupisteen, kapitalisoi lauseiden alut ja englanniksi
+     * käännettäessä yksinäisen i-sanan. Konekäännös palauttaa nämä
+     * ajoittain väärin.
+     */
+    fun clean(result: String, prepared: Prepared, englishTarget: Boolean = false): String {
+        var out = result.trimEnd()
+        if (prepared.addedStop && out.endsWith(".")) out = out.dropLast(1)
+        out = capitalizeSentences(out)
+        // Ruotsin tapaisissa kielissä "i" on oma sanansa; korjaus vain
+        // englantiin, jossa pikkukirjaiminen minä-sana on aina virhe.
+        if (englishTarget) out = ENGLISH_I.replace(out, "I")
+        return out
     }
+
+    private val ENGLISH_I = Regex("\\bi\\b")
 
     private fun capitalizeSentences(text: String): String {
         val out = StringBuilder(text.length)

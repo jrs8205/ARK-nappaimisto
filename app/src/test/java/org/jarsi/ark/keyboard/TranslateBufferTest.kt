@@ -134,6 +134,16 @@ class TranslateBufferTest {
     }
 
     @Test
+    fun `pilkun jalkeen tulee vali ilman isoa kirjainta`() {
+        val b = TranslateBuffer()
+        b.insert("moi,")
+        b.smartInsert("h")
+        assertEquals("moi, h", b.text)
+        assertTrue(b.backspace())
+        assertEquals("moi,h", b.text)
+    }
+
+    @Test
     fun `numeron jalkeinen piste ei laukaise saantoa`() {
         val b = TranslateBuffer()
         b.insert("3.")

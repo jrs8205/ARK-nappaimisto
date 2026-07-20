@@ -47,11 +47,16 @@ class TranslateBuffer {
     fun smartInsert(s: String) {
         if (s.length == 1 && s[0].isLetter()) {
             val before = builder.substring(0, cursor)
-            val afterSentence = before.isNotEmpty() &&
-                before.last() in SENTENCE_END &&
-                (before.length < 2 || !before[before.lastIndex - 1].isDigit())
-            if (afterSentence) {
-                val inserted = " " + s.uppercase()
+            val last = before.lastOrNull()
+            val digitBefore = before.length >= 2 &&
+                before[before.lastIndex - 1].isDigit()
+            val inserted = when {
+                last == null || digitBefore -> null
+                last in SENTENCE_END -> " " + s.uppercase()
+                last in PAUSE_MARKS -> " $s"
+                else -> null
+            }
+            if (inserted != null) {
                 insert(inserted)
                 smartRevert = SmartRevert(cursor, s, inserted.length)
                 return
@@ -139,5 +144,8 @@ class TranslateBuffer {
 
     private companion object {
         const val SENTENCE_END = ".!?…"
+
+        // Tauottavat välimerkit saavat välin, mutta eivät isoa kirjainta.
+        const val PAUSE_MARKS = ",;:"
     }
 }

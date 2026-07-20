@@ -21,6 +21,7 @@ class ToolbarView(context: Context) : View(context) {
         fun onToggleClipboard()
         fun onToggleCorrection()
         fun onToggleTranslation()
+        fun onUndo()
         fun onOpenSettings()
     }
 
@@ -102,11 +103,11 @@ class ToolbarView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER
     }
 
-    private enum class Tool { ARROWS, WEB, MIC, EMOJI, CLIPBOARD, CORRECTION, TRANSLATE, SETTINGS }
+    private enum class Tool { ARROWS, WEB, MIC, EMOJI, CLIPBOARD, CORRECTION, TRANSLATE, UNDO, SETTINGS }
 
     private val tools = listOf(
         Tool.ARROWS, Tool.WEB, Tool.MIC, Tool.EMOJI,
-        Tool.CLIPBOARD, Tool.CORRECTION, Tool.TRANSLATE, Tool.SETTINGS,
+        Tool.CLIPBOARD, Tool.CORRECTION, Tool.TRANSLATE, Tool.UNDO, Tool.SETTINGS,
     )
 
     private val cursorIcon = context.getDrawable(R.drawable.ic_cursor_move)?.mutate()
@@ -115,6 +116,7 @@ class ToolbarView(context: Context) : View(context) {
     private val clipboardIcon = context.getDrawable(R.drawable.ic_clipboard)?.mutate()
     private val correctionIcon = context.getDrawable(R.drawable.ic_spellcheck)?.mutate()
     private val translateIcon = context.getDrawable(R.drawable.ic_translate)?.mutate()
+    private val undoIcon = context.getDrawable(R.drawable.ic_undo)?.mutate()
     private val settingsIcon = context.getDrawable(R.drawable.ic_settings)?.mutate()
 
     fun applySettings(newTheme: KeyboardTheme) {
@@ -200,6 +202,7 @@ class ToolbarView(context: Context) : View(context) {
                 Tool.CLIPBOARD -> clipboardIcon
                 Tool.CORRECTION -> correctionIcon
                 Tool.TRANSLATE -> translateIcon
+                Tool.UNDO -> undoIcon
                 else -> settingsIcon
             } ?: return@forEachIndexed
             icon.setTint(contentColor)
@@ -228,6 +231,7 @@ class ToolbarView(context: Context) : View(context) {
                         Tool.CLIPBOARD -> listener?.onToggleClipboard()
                         Tool.CORRECTION -> listener?.onToggleCorrection()
                         Tool.TRANSLATE -> listener?.onToggleTranslation()
+                        Tool.UNDO -> listener?.onUndo()
                         Tool.SETTINGS -> listener?.onOpenSettings()
                     }
                 }

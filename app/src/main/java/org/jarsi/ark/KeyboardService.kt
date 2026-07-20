@@ -50,6 +50,7 @@ import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
 import org.jarsi.ark.keyboard.SmartSpace
 import org.jarsi.ark.keyboard.SymbolOrder
+import org.jarsi.ark.keyboard.TextUndo
 import org.jarsi.ark.keyboard.TranslateBuffer
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
@@ -146,6 +147,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     ic.setComposingText("$text ", 1)
                     ic.finishComposingText()
                     ic.endBatchEdit()
+                    textUndo.record("$text ")
                     if (learningEnabled) {
                         // Sanellut sanat oppivat samoin kuin kirjoitetut.
                         WordTools.words(text).forEach { learning.onWordCommitted(it) }
@@ -198,6 +200,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // askelpalautin heti perään palauttaa kirjaimen ilman väliä, jotta
     // esim. jarsi.org jatkuu pisteen jälkeen ehjänä.
     private var pendingSpaceRevert: Pair<String, String>? = null
+
+    // Työkalurivin peruutusnapin kertaperuutus näppäimistön toimenpiteille.
+    private val textUndo = TextUndo()
 
     private var autoCorrectEnabled = true
     private var noSuggestionsField = false
@@ -693,6 +698,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 ic.setComposingText(result, 1)
                 ic.finishComposingText()
                 ic.endBatchEdit()
+                textUndo.record(result)
                 translateBuffer.clear()
                 lastTranslatedText = ""
                 updateTranslateBar()
@@ -857,6 +863,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         )
         ic.commitText(word, 1)
         ic.endBatchEdit()
+        textUndo.record(word, correctionText.substring(range))
         if (learningEnabled) {
             learning.onCorrectionAccepted(word)
             maybeFlush()
@@ -878,6 +885,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 onTranslateBufferChanged()
             } else {
                 ic.commitText(clip.text, 1)
+                textUndo.record(clip.text)
             }
             hideClipboardPanel()
             feedback()
@@ -1006,7 +1014,47 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             // sovelluksissa oikein.
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         }
+        // Poiston jälkeen kenttä ei enää vastaa kirjattua toimenpidettä.
+        textUndo.clear()
         feedback(AudioManager.FX_KEYPRESS_DELETE)
+    }
+
+    /**
+     * Työkalurivin peruutus: viimeisin näppäimistön toimenpide perutaan
+     * omalla kirjauksella, jos kentän teksti on yhä ennallaan; muuten
+     * pyydetään kentän omaa peruutusta (Ctrl+Z), jota useimmat
+     * muokkauskentät tukevat.
+     */
+    private fun performUndo() {
+        // Käännösrivillä poisto hoituu askelpalauttimella; peruutus koskee kenttää.
+        if (translateMode) return
+        val ic = currentInputConnection ?: return
+        markOwnEdit()
+        val undo = textUndo.consume { length -> ic.getTextBeforeCursor(length, 0) }
+        if (undo != null) {
+            ic.beginBatchEdit()
+            ic.deleteSurroundingText(undo.deleteLength, 0)
+            if (undo.restore.isNotEmpty()) ic.commitText(undo.restore, 1)
+            ic.endBatchEdit()
+            // Peruttu teksti ei saa jäädä sanaketjuun.
+            learning.resetContext()
+        } else {
+            sendCtrlZ()
+        }
+        feedback()
+        if (correctionPanel?.visibility == View.VISIBLE) {
+            refreshCorrectionPanel()
+        } else {
+            updateSuggestions()
+        }
+    }
+
+    private fun sendCtrlZ() {
+        val ic = currentInputConnection ?: return
+        val time = SystemClock.uptimeMillis()
+        val meta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        ic.sendKeyEvent(KeyEvent(time, time, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, meta))
+        ic.sendKeyEvent(KeyEvent(time, time, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, meta))
     }
 
     /**
@@ -1080,6 +1128,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 ic.commitText("$display ", 1)
                 ic.endBatchEdit()
                 pendingRevert = typed to display
+                textUndo.record("$display ", "$typed ")
                 applied = true
             }
         }
@@ -1231,6 +1280,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 override fun onToggleTranslation() {
                     feedback()
                     if (translateMode) hideTranslateBar() else showTranslateBar()
+                }
+
+                override fun onUndo() {
+                    performUndo()
                 }
 
                 override fun onOpenSettings() {
@@ -1397,6 +1450,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         onTranslateBufferChanged()
                     } else {
                         currentInputConnection?.commitText(emoji, 1)
+                        textUndo.record(emoji)
                     }
                     feedback()
                 }
@@ -1494,6 +1548,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             info.inputType and InputType.TYPE_TEXT_FLAG_CAP_SENTENCES != 0
         smartSpaceState = 0
         pendingSpaceRevert = null
+        textUndo.clear()
         // Salasana- ja numerokentissä ehdotusrivi on piilossa. NO_SUGGESTIONS
         // EI piilota riviä: moni sovellus (esim. Google Keep) merkitsee sillä
         // tavallisia kirjoituskenttiä, ja oma oppiminen on tämän näppäimistön
@@ -1534,6 +1589,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (current.isNotEmpty()) ic.deleteSurroundingText(current.length, 0)
         ic.commitText(committed, 1)
         ic.endBatchEdit()
+        textUndo.record(committed, current)
         autoSpaceState = if (spaceAfterSuggestion) 2 else 0
         smartSpaceState = 0
         if (learningEnabled) {
@@ -1635,6 +1691,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val ic = currentInputConnection ?: return
         markOwnEdit()
         pendingRevert = null
+        textUndo.clear()
         if (translateMode) {
             // Käännöstilassa näppäily kertyy käännösriville; kenttään
             // kirjoittuu vain käännös.
@@ -1693,6 +1750,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             val letter = if (decision.capitalize) output.uppercase(fiLocale) else output
             ic.commitText(" $letter", 1)
             pendingSpaceRevert = output to " $letter"
+            textUndo.record(" $letter", output)
             smartSpaceState = 0
         } else {
             smartSpaceState = if (smartSpaceField && SmartSpace.rearm(text)) 2 else 0
@@ -1720,6 +1778,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (action != KeyAction.Backspace && action != KeyAction.Shift) {
             pendingRevert = null
             pendingSpaceRevert = null
+            textUndo.clear()
         }
         when (action) {
             KeyAction.Shift -> handleShift()

@@ -74,6 +74,24 @@ object WordTools {
     }
 
     /**
+     * Sana kohdassa [index] tai sitä lähin sana [wordRanges]-säännöin;
+     * null jos tekstissä ei ole yhtään sanaa. Kohta osuu sanaan myös
+     * heti sen perässä, kuten tekstikentän sanavalinnassa.
+     */
+    fun wordRangeAt(text: CharSequence, index: Int): IntRange? {
+        val ranges = wordRanges(text)
+        if (ranges.isEmpty()) return null
+        val i = index.coerceIn(0, text.length)
+        return ranges.minByOrNull { range ->
+            when {
+                i < range.first -> range.first - i
+                i > range.last + 1 -> i - (range.last + 1)
+                else -> 0
+            }
+        }
+    }
+
+    /**
      * Damerau–Levenshtein-etäisyys, jossa viereisten merkkien vaihdos on
      * yksi muokkaus. Laskenta katkeaa rajaan: paluuarvo on [max] + 1 heti,
      * kun etäisyys ylittää sen.

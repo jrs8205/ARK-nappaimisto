@@ -1,12 +1,14 @@
 package org.jarsi.ark
 
 import android.Manifest
+import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Build
 import android.inputmethodservice.InputMethodService
 import android.net.Uri
 import android.media.AudioManager
@@ -1335,6 +1337,20 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     translateBuffer.setCursor(position)
                     updateTranslateBar()
                     feedback()
+                }
+
+                override fun onCopy(text: String) {
+                    feedback()
+                    clipboardManager?.setPrimaryClip(ClipData.newPlainText("", text))
+                    // Android 13:sta alkaen järjestelmä näyttää oman
+                    // kopiointi-ilmoituksensa; vanhemmilla kuitataan itse.
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(
+                            this@KeyboardService,
+                            R.string.kaannos_kopioitu,
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
                 }
             }
             it.visibility = View.GONE

@@ -170,4 +170,43 @@ class WordToolsTest {
     @Test
     fun `wordRanges tyhjasta tyhja`() =
         assertEquals(emptyList<IntRange>(), WordTools.wordRanges(""))
+
+    @Test
+    fun `wordRangeAt sanan keskelta`() {
+        val text = "moi hyvä päivä"
+        assertEquals("hyvä", text.substring(WordTools.wordRangeAt(text, 5)!!))
+    }
+
+    @Test
+    fun `wordRangeAt sanan alusta ja perasta`() {
+        val text = "moi hei"
+        assertEquals("moi", text.substring(WordTools.wordRangeAt(text, 0)!!))
+        assertEquals("moi", text.substring(WordTools.wordRangeAt(text, 3)!!))
+    }
+
+    @Test
+    fun `wordRangeAt tekstin lopun ylitys palauttaa viimeisen sanan`() {
+        val text = "moi hei"
+        assertEquals("hei", text.substring(WordTools.wordRangeAt(text, 7)!!))
+        assertEquals("hei", text.substring(WordTools.wordRangeAt(text, 100)!!))
+    }
+
+    @Test
+    fun `wordRangeAt valimerkkien keskelta lahin sana`() {
+        val text = "hei,  maailma"
+        assertEquals("hei", text.substring(WordTools.wordRangeAt(text, 3)!!))
+        assertEquals("maailma", text.substring(WordTools.wordRangeAt(text, 5)!!))
+    }
+
+    @Test
+    fun `wordRangeAt osoite on yksi sana`() {
+        val text = "käy jarsi.org nyt"
+        assertEquals("jarsi.org", text.substring(WordTools.wordRangeAt(text, 10)!!))
+    }
+
+    @Test
+    fun `wordRangeAt ilman sanoja null`() {
+        assertEquals(null, WordTools.wordRangeAt("", 0))
+        assertEquals(null, WordTools.wordRangeAt("... !", 2))
+    }
 }

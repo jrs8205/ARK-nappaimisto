@@ -5,17 +5,25 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.text.Spannable
 import android.text.SpannableStringBuilder
+import android.text.style.BackgroundColorSpan
 import android.text.style.ReplacementSpan
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.TextView
 import org.jarsi.ark.R
+import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.theme.KeyboardTheme
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -34,6 +42,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
         /** Käyttäjä napautti lähdetekstiä: kursori kohtaan [position]. */
         fun onCursorTap(position: Int)
+
+        /** Käyttäjä kopioi valitun lähdetekstin. */
+        fun onCopy(text: String)
     }
 
     var listener: Listener? = null
@@ -127,6 +138,21 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onCycleTarget() }
     }
 
+    // Näytetty lähdeteksti ja valittu väli (lähdetekstin indeksejä)
+    // kopiointia varten; valinta piirretään korostustaustalla.
+    private var shownText = ""
+    private var shownHint = ""
+    private var shownCursorTarget = 0
+    private var selection: IntRange? = null
+    private var selectionPopup: PopupWindow? = null
+    private var popupAnchorX = 0
+
+    private var downX = 0f
+    private var downY = 0f
+    private var longPressFired = false
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private val longPressRunnable = Runnable { onBufferLongPressed() }
+
     @SuppressLint("ClickableViewAccessibility")
     private val bufferView = TextView(context).apply {
         textSize = 16f
@@ -134,11 +160,38 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(8), dp(8), dp(8), dp(8))
         setOnTouchListener { view, event ->
-            if (event.actionMasked == MotionEvent.ACTION_UP) {
-                onBufferTapped(view as TextView, event.x, event.y)
-                view.performClick()
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    longPressFired = false
+                    view.postDelayed(
+                        longPressRunnable,
+                        ViewConfiguration.getLongPressTimeout().toLong(),
+                    )
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (abs(event.x - downX) > touchSlop ||
+                        abs(event.y - downY) > touchSlop
+                    ) {
+                        view.removeCallbacks(longPressRunnable)
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    view.removeCallbacks(longPressRunnable)
+                    if (!longPressFired) {
+                        if (selection != null) {
+                            clearSelection()
+                            render()
+                        }
+                        onBufferTapped(view as TextView, event.x, event.y)
+                        view.performClick()
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> view.removeCallbacks(longPressRunnable)
             }
-            // Kosketus kuluu tässä, ettei vieritys nappaa napautusta.
+            // Kosketus kuluu tässä, ettei vieritys nappaa napautusta;
+            // liike jää vierityksen siepattavaksi kuten ennenkin.
             event.actionMasked == MotionEvent.ACTION_UP ||
                 event.actionMasked == MotionEvent.ACTION_DOWN
         }
@@ -196,16 +249,24 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
      * rivi on tyhjä. [cursor] on kohta lähdetekstissä.
      */
     fun setBuffer(text: String, cursor: Int, hint: String) {
-        if (text.isEmpty()) {
+        if (text != shownText) clearSelection()
+        shownText = text
+        shownHint = hint
+        shownCursorTarget = cursor
+        render()
+    }
+
+    private fun render() {
+        if (shownText.isEmpty()) {
             shownCursor = -1
             removeCallbacks(blinkRunnable)
-            bufferView.text = hint
+            bufferView.text = shownHint
             bufferView.setTextColor(theme.hint)
             clearLabel.visibility = GONE
         } else {
-            val position = cursor.coerceIn(0, text.length)
+            val position = shownCursorTarget.coerceIn(0, shownText.length)
             shownCursor = position
-            bufferView.text = SpannableStringBuilder(text).apply {
+            bufferView.text = SpannableStringBuilder(shownText).apply {
                 insert(position, CURSOR_PLACEHOLDER)
                 setSpan(
                     cursorSpan,
@@ -213,6 +274,17 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
                     position + CURSOR_PLACEHOLDER.length,
                     Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
                 )
+                selection?.let { sel ->
+                    // Paikkamerkki siirtää näyttöindeksejä kursorin kohdalla.
+                    val start = sel.first + if (sel.first >= position) 1 else 0
+                    val end = sel.last + 1 + if (sel.last + 1 > position) 1 else 0
+                    setSpan(
+                        BackgroundColorSpan(selectionColor()),
+                        start,
+                        end,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                }
             }
             bufferView.setTextColor(theme.text)
             clearLabel.visibility = VISIBLE
@@ -220,6 +292,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             scrollCursorIntoView(position)
         }
     }
+
+    private fun selectionColor(): Int =
+        (theme.accent and 0x00FFFFFF) or (SELECTION_ALPHA shl 24)
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
@@ -229,11 +304,13 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             bufferView.invalidate()
         } else if (!isVisible) {
             removeCallbacks(blinkRunnable)
+            clearSelection()
         }
     }
 
     override fun onDetachedFromWindow() {
         removeCallbacks(blinkRunnable)
+        dismissSelectionPopup()
         super.onDetachedFromWindow()
     }
 
@@ -264,11 +341,105 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         listener?.onCursorTap(position)
     }
 
+    /** Pitkä painallus maalaa sanan ja avaa Kopioi-valikon sen ylle. */
+    private fun onBufferLongPressed() {
+        if (shownCursor < 0) return
+        val offset = bufferView.getOffsetForPosition(downX, downY)
+        if (offset < 0) return
+        val position = if (offset > shownCursor) offset - 1 else offset
+        val range = WordTools.wordRangeAt(shownText, position) ?: return
+        longPressFired = true
+        selection = range
+        bufferView.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        render()
+        val location = IntArray(2)
+        bufferView.getLocationInWindow(location)
+        popupAnchorX = location[0] + downX.roundToInt()
+        showSelectionPopup()
+    }
+
+    private fun showSelectionPopup() {
+        dismissSelectionPopup()
+        val sel = selection ?: return
+        val allSelected = sel.first == 0 && sel.last >= shownText.length - 1
+
+        val container = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(theme.specialKey)
+            }
+        }
+        fun addItem(label: String, onClick: () -> Unit) {
+            container.addView(
+                TextView(context).apply {
+                    text = label
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    setTextColor(theme.text)
+                    setPadding(dp(16), dp(10), dp(16), dp(10))
+                    setOnClickListener { onClick() }
+                },
+                LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        addItem(context.getString(R.string.kaannos_kopioi)) {
+            selection?.let { s ->
+                listener?.onCopy(shownText.substring(s.first, s.last + 1))
+            }
+            clearSelection()
+            render()
+        }
+        if (!allSelected) {
+            addItem(context.getString(R.string.kaannos_valitse_kaikki)) {
+                selection = 0 until shownText.length
+                render()
+                showSelectionPopup()
+            }
+        }
+
+        container.measure(
+            View.MeasureSpec.UNSPECIFIED,
+            View.MeasureSpec.UNSPECIFIED,
+        )
+        val popupWidth = container.measuredWidth
+        val popupHeight = container.measuredHeight
+        val barLocation = IntArray(2)
+        getLocationInWindow(barLocation)
+        val x = (popupAnchorX - popupWidth / 2)
+            .coerceIn(dp(4), (resources.displayMetrics.widthPixels - popupWidth - dp(4)).coerceAtLeast(dp(4)))
+        selectionPopup = PopupWindow(container, popupWidth, popupHeight).apply {
+            isClippingEnabled = false
+            showAtLocation(
+                this@TranslateBarView,
+                Gravity.NO_GRAVITY,
+                x,
+                barLocation[1] - popupHeight - dp(6),
+            )
+        }
+    }
+
+    private fun clearSelection() {
+        selection = null
+        dismissSelectionPopup()
+    }
+
+    private fun dismissSelectionPopup() {
+        selectionPopup?.dismiss()
+        selectionPopup = null
+    }
+
     private companion object {
         // Leveydetön merkki kantaa kursoripiirron; itse teksti ei muutu.
         const val CURSOR_PLACEHOLDER = "\u200B"
 
         // Sama tahti kuin Androidin tekstikenttien kursorilla.
         const val CURSOR_BLINK_MS = 500L
+
+        // Valinnan korostustaustan läpinäkyvyys korostusväristä.
+        const val SELECTION_ALPHA = 0x55
     }
 }

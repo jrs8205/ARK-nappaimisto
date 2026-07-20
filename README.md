@@ -85,8 +85,12 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   (nykyisin 170 100 sanamuotoa taajuuksineen, ks.
   [docs/sanalista.md](docs/sanalista.md))
 * työkalurivi: kursorinsiirtotila, verkko-osoitesivu, sanelu, emojit,
-  leikepöytä, korjausnäkymä, käännös ja asetukset
+  leikepöytä, korjausnäkymä, käännös, peruutus ja asetukset; nappien
+  järjestyksen ja näkyvyyden voi muokata asetuksista
 * välimerkki siirtyy ehdotuksen lisäämän välilyönnin eteen
+* älykäs jälkiväli: välimerkin perään kirjoitettu kirjain saa välin
+  eteensä ja uusi lause alkaa isolla; askelpalautin peruu välin, joten
+  osoitteet (jarsi.org) ja desimaalit (3.14) säilyvät ehjinä
 * isot alkukirjaimet ehdotuksissa lauseen alussa
 * ehdotusten asetukset: näkyvyys, välilyönti hyväksynnän jälkeen,
   yleisimmät sanat tyhjällä syötteellä
@@ -142,7 +146,11 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 ## Muut ominaisuudet
 
 * opittujen sanojen hallinta asetuksissa: haku, kiinnitys, eston purku,
-  poisto ja koko oppimishistorian tyhjennys
+  poisto ja koko oppimishistorian tyhjennys; käyttömäärät laskevat myös
+  ehdotusriviltä valitut kerrat
+* peruutusnappi työkalurivillä: peruu viimeisimmän näppäimistön
+  toimenpiteen (esim. liittämisen tai automaattikorjauksen); muissa
+  tilanteissa pyytää kentän omaa peruutusta
 * yleissanasto 170 100 sanaa: Parole-taajuuslista täydennettynä Kotuksen
   Nykysuomen sanalistalla (ks. [docs/sanalista.md](docs/sanalista.md))
 * jatkuva sanelu työkalurivin mikrofonista: miettimistauko ei katkaise,
@@ -167,7 +175,9 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   laitetuen mukainen valikoima
 * käännös työkaluriviltä: kentän tekstin käännös laitteella (Google
   ML Kit), kielipari vaihdettavissa ja suunta käännettävissä;
-  kielimallit ladataan ja poistetaan asetuksista (~30 Mt/kieli)
+  kielimallit ladataan ja poistetaan asetuksista (~30 Mt/kieli).
+  Kirjoitettavaa tekstiä voi muokata rivillä: napautus tai nuolet
+  siirtävät kursoria, ja leikepöydästä liitetty teksti kääntyy heti.
 
 ## Yksityisyys
 

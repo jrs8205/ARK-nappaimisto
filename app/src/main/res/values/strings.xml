@@ -35,6 +35,7 @@
     <string name="opitut_sanat">Opitut sanat</string>
     <string name="opitut_sanat_kuvaus">Selaa, kiinnitä, salli ja poista opittuja sanoja</string>
     <string name="opitut_haku">Hae sanaa</string>
+    <string name="opitut_ohje">Näppäimistö oppii sanat, jotka kirjoitat itse tai valitset ehdotusriviltä. Napauta sanaa tällä listalla, niin voit kiinnittää sen (pysyy ehdotusten kärjessä), estää sen tai poistaa sen. Samat toiminnot saat kirjoittaessa painamalla ehdotusrivin sanaa pitkään.</string>
     <string name="opitut_osio_opitut">Opitut sanat (%d)</string>
     <string name="opitut_osio_estetyt">Estetyt sanat (%d)</string>
     <string name="opitut_salli">Salli taas</string>

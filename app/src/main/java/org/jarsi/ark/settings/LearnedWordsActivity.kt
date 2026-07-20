@@ -73,6 +73,13 @@ class LearnedWordsActivity : AppCompatActivity() {
                 refreshList()
             }
         })
+        // Lyhyt käyttöohje haun alla: mitä lista tekee ja mistä toiminnot löytyvät.
+        val helpView = TextView(this).apply {
+            text = getString(R.string.opitut_ohje)
+            textSize = 13f
+            alpha = 0.7f
+            setPadding(dp(16), dp(4), dp(16), dp(8))
+        }
         emptyView = TextView(this).apply {
             text = getString(R.string.opitut_tyhja)
             gravity = Gravity.CENTER
@@ -104,6 +111,13 @@ class LearnedWordsActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             addView(
                 topRow,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            addView(
+                helpView,
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,

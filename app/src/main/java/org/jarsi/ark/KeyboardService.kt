@@ -16,7 +16,6 @@ import android.text.InputType
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.View
-import android.icu.text.BreakIterator
 import android.os.SystemClock
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
@@ -51,6 +50,7 @@ import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
 import org.jarsi.ark.keyboard.SmartSpace
 import org.jarsi.ark.keyboard.SymbolOrder
+import org.jarsi.ark.keyboard.TranslateBuffer
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
@@ -108,7 +108,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var emojiPanel: EmojiPanelView? = null
     private var translateBar: TranslateBarView? = null
     private var translateMode = false
-    private val translateBuffer = StringBuilder()
+    private val translateBuffer = TranslateBuffer()
     private var translateRunnable: Runnable? = null
 
     // Rivin sisältö, jonka viimeisin onnistunut live-käännös kattoi: sulku
@@ -584,7 +584,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         } else {
             getString(R.string.kaannos_ladataan)
         }
-        bar.setBuffer(translateBuffer.toString(), hint)
+        bar.setBuffer(translateBuffer.text, translateBuffer.cursor, hint)
     }
 
     private fun onTranslatePairChanged() {
@@ -871,7 +871,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val ic = currentInputConnection ?: return
         markOwnEdit()
         if (clip.text != null) {
-            ic.commitText(clip.text, 1)
+            if (translateMode) {
+                // Liitetty teksti menee käännösriville, jolloin sen
+                // käännös näkyy kentässä heti.
+                translateBuffer.insert(clip.text)
+                onTranslateBufferChanged()
+            } else {
+                ic.commitText(clip.text, 1)
+            }
             hideClipboardPanel()
             feedback()
             return
@@ -987,22 +994,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
     }
 
-    // Poistaa viimeisen grafeemin: monen koodipisteen emojit (liput,
-    // ZWJ-perheet, ihonsävyt) lähtevät yhdellä painalluksella kokonaan.
-    private fun deleteLastGrapheme(buffer: StringBuilder) {
-        if (buffer.isEmpty()) return
-        val iterator = BreakIterator.getCharacterInstance()
-        iterator.setText(buffer.toString())
-        iterator.last()
-        val start = iterator.previous()
-        buffer.setLength(if (start == BreakIterator.DONE) 0 else start)
-    }
-
     private fun handleBackspaceKey() {
         if (translateMode && translateBuffer.isNotEmpty()) {
-            // Poisto kohdistuu käännösriviin, ei kenttään.
-            deleteLastGrapheme(translateBuffer)
-            onTranslateBufferChanged()
+            // Poisto kohdistuu käännösriviin, ei kenttään; rivin alussa
+            // poisto ei valu kenttään vaan jää tekemättä.
+            if (translateBuffer.backspace()) {
+                onTranslateBufferChanged()
+            }
         } else if (!revertSmartSpace() && !revertAutoCorrect()) {
             // Näppäintapahtumana, jotta valitun tekstin poisto toimii
             // sovelluksissa oikein.
@@ -1277,6 +1275,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     currentInputConnection?.setComposingText("", 1)
                     updateTranslateBar()
                 }
+
+                override fun onCursorTap(position: Int) {
+                    translateBuffer.setCursor(position)
+                    updateTranslateBar()
+                    feedback()
+                }
             }
             it.visibility = View.GONE
             container.addView(it, LinearLayout.LayoutParams(params))
@@ -1389,7 +1393,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     markOwnEdit()
                     if (translateMode) {
                         // Emojit kulkevat käännösrivin kautta muun tekstin mukana.
-                        translateBuffer.append(emoji)
+                        translateBuffer.insert(emoji)
                         onTranslateBufferChanged()
                     } else {
                         currentInputConnection?.commitText(emoji, 1)
@@ -1639,7 +1643,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             } else {
                 text
             }
-            translateBuffer.append(output)
+            translateBuffer.insert(output)
             if (shiftState == ShiftState.SHIFT) {
                 shiftState = ShiftState.OFF
                 manualShift = false
@@ -1740,7 +1744,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             KeyAction.Space -> {
                 if (translateMode) {
-                    translateBuffer.append(' ')
+                    translateBuffer.insert(" ")
                     onTranslateBufferChanged()
                 } else {
                     commitSpaceWithAutoCorrect()
@@ -1765,9 +1769,22 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 feedback()
             }
             is KeyAction.Arrow -> {
-                sendDownUpKeyEvents(action.keyCode)
-                // Kursorin siirto katkaisee sanaketjun.
-                learning.resetContext()
+                if (translateMode) {
+                    // Nuolet liikuttavat käännösrivin kursoria: vasen/oikea
+                    // grafeemin, ylös alkuun ja alas loppuun.
+                    when (action.keyCode) {
+                        KeyEvent.KEYCODE_DPAD_LEFT -> translateBuffer.moveLeft()
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> translateBuffer.moveRight()
+                        KeyEvent.KEYCODE_DPAD_UP -> translateBuffer.moveToStart()
+                        KeyEvent.KEYCODE_DPAD_DOWN -> translateBuffer.moveToEnd()
+                        else -> Unit
+                    }
+                    updateTranslateBar()
+                } else {
+                    sendDownUpKeyEvents(action.keyCode)
+                    // Kursorin siirto katkaisee sanaketjun.
+                    learning.resetContext()
+                }
                 feedback()
             }
             KeyAction.None -> Unit
@@ -1776,11 +1793,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     override fun onSpaceSwipe(steps: Int) {
-        sendDownUpKeyEvents(
-            if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
-        )
-        // Kursorin siirto katkaisee sanaketjun.
-        learning.resetContext()
+        if (translateMode) {
+            // Liu'utus liikuttaa käännösrivin kursoria kentän sijaan.
+            translateBuffer.move(steps)
+            updateTranslateBar()
+        } else {
+            sendDownUpKeyEvents(
+                if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+            )
+            // Kursorin siirto katkaisee sanaketjun.
+            learning.resetContext()
+        }
         // Kevyt napsaus jokaisesta askeleesta, jotta liu'utukseen saa tuntuman.
         if (vibrationEnabled) {
             keyboardView?.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)

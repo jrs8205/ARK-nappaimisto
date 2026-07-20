@@ -1,10 +1,12 @@
 package org.jarsi.ark.view
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Typeface
-import android.text.TextUtils
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.ViewGroup
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import org.jarsi.ark.R
@@ -15,6 +17,7 @@ import kotlin.math.roundToInt
  * Live-käännösrivi ehdotusrivin paikalle: tähän kirjoitetaan lähdekieltä,
  * ja kenttään menee käännös sitä mukaa. Kielikoodia napauttamalla kieli
  * vaihtuu ladattujen joukossa, ⇄ kääntää suunnan ja ✕ tyhjentää rivin.
+ * Tekstiä napauttamalla kursorin voi siirtää keskelle muokkausta varten.
  */
 class TranslateBarView(context: Context) : LinearLayout(context) {
 
@@ -23,6 +26,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         fun onSwap()
         fun onCycleTarget()
         fun onClear()
+
+        /** Käyttäjä napautti lähdetekstiä: kursori kohtaan [position]. */
+        fun onCursorTap(position: Int)
     }
 
     var listener: Listener? = null
@@ -30,6 +36,10 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private var theme = KeyboardTheme.load(context)
     private val density = resources.displayMetrics.density
     private fun dp(value: Int) = (value * density).roundToInt()
+
+    // Näytetyn tekstin kursorikohta napautuksen takaisinmappausta varten;
+    // -1 kun rivillä näkyy vihjeteksti.
+    private var shownCursor = -1
 
     private val sourceLabel = TextView(context).apply {
         textSize = 14f
@@ -53,12 +63,34 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onCycleTarget() }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private val bufferView = TextView(context).apply {
         textSize = 16f
         maxLines = 1
-        // Rivin loppu pysyy näkyvissä, kun teksti ei enää mahdu.
-        ellipsize = TextUtils.TruncateAt.START
+        gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(8), dp(8), dp(8), dp(8))
+        setOnTouchListener { view, event ->
+            if (event.actionMasked == MotionEvent.ACTION_UP) {
+                onBufferTapped(view as TextView, event.x, event.y)
+                view.performClick()
+            }
+            // Kosketus kuluu tässä, ettei vieritys nappaa napautusta.
+            event.actionMasked == MotionEvent.ACTION_UP ||
+                event.actionMasked == MotionEvent.ACTION_DOWN
+        }
+    }
+
+    // Pitkä teksti vierii vaakasuunnassa; kursori pidetään näkyvissä.
+    private val bufferScroll = HorizontalScrollView(context).apply {
+        isHorizontalScrollBarEnabled = false
+        isFillViewport = true
+        addView(
+            bufferView,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
     }
 
     private val clearLabel = TextView(context).apply {
@@ -77,7 +109,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         addView(sourceLabel)
         addView(swapLabel)
         addView(targetLabel)
-        addView(bufferView, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(bufferScroll, LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         addView(clearLabel)
     }
 
@@ -95,16 +127,54 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         targetLabel.text = target
     }
 
-    /** Näyttää keskeneräisen tekstin tai [hint]-vihjeen, kun rivi on tyhjä. */
-    fun setBuffer(text: String, hint: String) {
+    /**
+     * Näyttää keskeneräisen tekstin kursoreineen tai [hint]-vihjeen, kun
+     * rivi on tyhjä. [cursor] on kohta lähdetekstissä.
+     */
+    fun setBuffer(text: String, cursor: Int, hint: String) {
         if (text.isEmpty()) {
+            shownCursor = -1
             bufferView.text = hint
             bufferView.setTextColor(theme.hint)
             clearLabel.visibility = GONE
         } else {
-            bufferView.text = "$text▏"
+            val position = cursor.coerceIn(0, text.length)
+            shownCursor = position
+            bufferView.text = buildString {
+                append(text, 0, position)
+                append('▏')
+                append(text, position, text.length)
+            }
             bufferView.setTextColor(theme.text)
             clearLabel.visibility = VISIBLE
+            scrollCursorIntoView(position)
         }
+    }
+
+    /** Vierittää niin, että kursori pysyy näkyvissä pienellä marginaalilla. */
+    private fun scrollCursorIntoView(position: Int) {
+        bufferView.post {
+            val layout = bufferView.layout ?: return@post
+            val x = layout.getPrimaryHorizontal(position).roundToInt() + bufferView.paddingLeft
+            val margin = dp(24)
+            val viewport = bufferScroll.width
+            if (viewport <= 0) return@post
+            val scrollX = bufferScroll.scrollX
+            if (x < scrollX + margin) {
+                bufferScroll.smoothScrollTo((x - margin).coerceAtLeast(0), 0)
+            } else if (x > scrollX + viewport - margin) {
+                bufferScroll.smoothScrollTo(x - viewport + margin, 0)
+            }
+        }
+    }
+
+    private fun onBufferTapped(view: TextView, x: Float, y: Float) {
+        // Vihjetekstiä ei voi kohdistaa.
+        if (shownCursor < 0) return
+        val offset = view.getOffsetForPosition(x, y)
+        if (offset < 0) return
+        // Näytetyssä tekstissä on kursorimerkki; poistetaan sen vaikutus.
+        val position = if (offset > shownCursor) offset - 1 else offset
+        listener?.onCursorTap(position)
     }
 }

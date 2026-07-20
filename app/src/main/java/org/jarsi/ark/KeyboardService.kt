@@ -937,8 +937,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             connection.setRequestProperty("content-type", "application/json")
             connection.setRequestProperty("x-api-key", apiKey)
             connection.setRequestProperty("anthropic-version", "2023-06-01")
+            val model = prefs.getString(PREF_IMPROVE_MODEL, null)
+                ?.takeIf { it.isNotBlank() } ?: TextImprover.MODEL
             connection.outputStream.use {
-                it.write(TextImprover.buildRequest(text).toByteArray(Charsets.UTF_8))
+                it.write(TextImprover.buildRequest(text, model).toByteArray(Charsets.UTF_8))
             }
             if (connection.responseCode in 200..299) {
                 connection.inputStream.bufferedReader().use { it.readText() }
@@ -2089,6 +2091,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_TRANSLATE_SOURCE = "kaannos_lahde"
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
         const val PREF_IMPROVE_KEY = "claude_api_avain"
+        const val PREF_IMPROVE_MODEL = "claude_malli"
         const val LIVE_TRANSLATE_DELAY_MS = 300L
         const val EXTERNAL_SELECTION_MS = 1000L
         const val MAX_IMAGE_CLIP_BYTES = 10L * 1024 * 1024

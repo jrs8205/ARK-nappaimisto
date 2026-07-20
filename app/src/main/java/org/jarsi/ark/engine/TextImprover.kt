@@ -12,6 +12,7 @@ import org.json.JSONArray
 object TextImprover {
 
     const val ENDPOINT = "https://api.anthropic.com/v1/messages"
+    const val MODELS_ENDPOINT = "https://api.anthropic.com/v1/models?limit=100"
     const val MODEL = "claude-haiku-4-5"
 
     private const val SYSTEM_PROMPT =
@@ -25,8 +26,8 @@ object TextImprover {
             "lainausmerkkejä tai muotoilua. Jos korjattavaa ei ole, " +
             "palauta teksti sellaisenaan."
 
-    fun buildRequest(text: String): String = JSONObject()
-        .put("model", MODEL)
+    fun buildRequest(text: String, model: String = MODEL): String = JSONObject()
+        .put("model", model)
         .put("max_tokens", 2048)
         .put("system", SYSTEM_PROMPT)
         .put(
@@ -51,5 +52,27 @@ object TextImprover {
         result?.takeIf { it.isNotEmpty() }
     } catch (e: JSONException) {
         null
+    }
+
+    /**
+     * Mallilistan tulkinta /v1/models-vastauksesta: parit (tunniste,
+     * näyttönimi). Lista haetaan aina tuoreena, joten uudet mallit
+     * ilmestyvät valikkoon ilman sovelluspäivitystä.
+     */
+    fun parseModels(body: String): List<Pair<String, String>> = try {
+        val data = JSONObject(body).optJSONArray("data")
+        val models = mutableListOf<Pair<String, String>>()
+        if (data != null) {
+            for (i in 0 until data.length()) {
+                val item = data.getJSONObject(i)
+                val id = item.optString("id")
+                if (id.isNotEmpty()) {
+                    models.add(id to item.optString("display_name").ifEmpty { id })
+                }
+            }
+        }
+        models
+    } catch (e: JSONException) {
+        emptyList()
     }
 }

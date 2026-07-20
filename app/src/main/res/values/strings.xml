@@ -63,6 +63,10 @@
     <string name="asetukset_tekoaly">Tekoäly</string>
     <string name="asetus_api_avain">Claude API -avain</string>
     <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään Anthropicin palveluun vain kun painat nappia; avain säilyy vain tällä laitteella.</string>
+    <string name="asetus_malli">Korjausten Claude-malli</string>
+    <string name="asetus_malli_nykyinen">Käytössä: %1$s. Lista haetaan Anthropicilta omalla avaimellasi.</string>
+    <string name="malli_aseta_avain">Aseta ensin Claude API -avain</string>
+    <string name="malli_haku_virhe">Mallilistan haku epäonnistui – tarkista API-avain ja verkkoyhteys</string>
     <string name="korjaus_paranna">Paranna teksti</string>
     <string name="korjaus_parannus_otsikko">Parannusehdotus</string>
     <string name="korjaus_parannetaan">Parannetaan…</string>

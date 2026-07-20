@@ -44,6 +44,27 @@ class TextImproverTest {
     }
 
     @Test
+    fun `mallin voi vaihtaa pyyntoon`() {
+        val json = JSONObject(TextImprover.buildRequest("moi", "claude-opus-4-8"))
+        assertEquals("claude-opus-4-8", json.getString("model"))
+    }
+
+    @Test
+    fun `mallilista tulkitaan vastauksesta`() {
+        val body = """{"data":[
+            {"id":"claude-haiku-4-5","display_name":"Claude Haiku 4.5"},
+            {"id":"claude-opus-4-8","display_name":"Claude Opus 4.8"}]}"""
+        assertEquals(
+            listOf(
+                "claude-haiku-4-5" to "Claude Haiku 4.5",
+                "claude-opus-4-8" to "Claude Opus 4.8",
+            ),
+            TextImprover.parseModels(body),
+        )
+        assertEquals(emptyList<Pair<String, String>>(), TextImprover.parseModels("roska"))
+    }
+
+    @Test
     fun `virhevastauksesta tulee null`() {
         assertNull(TextImprover.parseResponse("""{"type":"error","error":{"message":"x"}}"""))
         assertNull(TextImprover.parseResponse("ei jsonia"))

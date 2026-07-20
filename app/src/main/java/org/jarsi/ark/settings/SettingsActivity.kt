@@ -15,8 +15,10 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.jarsi.ark.R
 import org.jarsi.ark.data.Backup
+import org.jarsi.ark.engine.TextImprover
 import org.jarsi.ark.data.BackupCodec
 import org.jarsi.ark.data.LearnedDataStamp
 import org.jarsi.ark.data.LearnedDatabase
@@ -105,6 +107,89 @@ class SettingsActivity : AppCompatActivity() {
             findPreference<Preference>("varmuuskopio_tuo")?.setOnPreferenceClickListener {
                 importLauncher.launch(arrayOf("application/json"))
                 true
+            }
+            setupModelPreference()
+        }
+
+        /**
+         * Paranna teksti -mallin valinta: lista haetaan Anthropicin
+         * Models-rajapinnasta käyttäjän omalla avaimella, joten uudet
+         * mallit näkyvät ilman sovelluspäivitystä.
+         */
+        private fun setupModelPreference() {
+            val pref = findPreference<Preference>("claude_malli") ?: return
+            fun updateSummary() {
+                val current = preferenceManager.sharedPreferences
+                    ?.getString("claude_malli", null)?.takeIf { it.isNotBlank() }
+                    ?: TextImprover.MODEL
+                pref.summary = getString(R.string.asetus_malli_nykyinen, current)
+            }
+            updateSummary()
+            pref.setOnPreferenceClickListener {
+                val apiKey = preferenceManager.sharedPreferences
+                    ?.getString("claude_api_avain", null)?.trim().orEmpty()
+                if (apiKey.isEmpty()) {
+                    Toast.makeText(
+                        requireContext(), R.string.malli_aseta_avain, Toast.LENGTH_SHORT
+                    ).show()
+                    return@setOnPreferenceClickListener true
+                }
+                fetchModels(apiKey) { models ->
+                    if (models.isNullOrEmpty()) {
+                        Toast.makeText(
+                            requireContext(), R.string.malli_haku_virhe, Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        val current = preferenceManager.sharedPreferences
+                            ?.getString("claude_malli", null) ?: TextImprover.MODEL
+                        val checked = models.indexOfFirst { it.first == current }
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(R.string.asetus_malli)
+                            .setSingleChoiceItems(
+                                models.map { it.second }.toTypedArray(), checked
+                            ) { dialog, index ->
+                                preferenceManager.sharedPreferences?.edit()
+                                    ?.putString("claude_malli", models[index].first)
+                                    ?.apply()
+                                updateSummary()
+                                dialog.dismiss()
+                            }
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show()
+                    }
+                }
+                true
+            }
+        }
+
+        private fun fetchModels(
+            apiKey: String,
+            onResult: (List<Pair<String, String>>?) -> Unit,
+        ) {
+            ioExecutor.execute {
+                val models = try {
+                    val connection = java.net.URL(TextImprover.MODELS_ENDPOINT)
+                        .openConnection() as javax.net.ssl.HttpsURLConnection
+                    try {
+                        connection.connectTimeout = 10_000
+                        connection.readTimeout = 20_000
+                        connection.setRequestProperty("x-api-key", apiKey)
+                        connection.setRequestProperty("anthropic-version", "2023-06-01")
+                        if (connection.responseCode in 200..299) {
+                            connection.inputStream.bufferedReader().use { it.readText() }
+                                .let(TextImprover::parseModels)
+                        } else {
+                            null
+                        }
+                    } finally {
+                        connection.disconnect()
+                    }
+                } catch (e: Exception) {
+                    null
+                }
+                activity?.runOnUiThread {
+                    if (isAdded) onResult(models)
+                }
             }
         }
 

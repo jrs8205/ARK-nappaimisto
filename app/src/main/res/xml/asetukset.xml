@@ -112,6 +112,11 @@
             android:title="@string/asetus_api_avain"
             android:summary="@string/asetus_api_avain_kuvaus"
             app:singleLineTitle="false" />
+        <Preference
+            android:key="claude_malli"
+            android:icon="@drawable/ic_tune"
+            android:title="@string/asetus_malli"
+            app:singleLineTitle="false" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_varmuuskopio">

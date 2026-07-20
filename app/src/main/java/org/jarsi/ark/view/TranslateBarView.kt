@@ -46,6 +46,24 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     // -1 kun rivillä näkyy vihjeteksti.
     private var shownCursor = -1
 
+    // Kursori vilkkuu kuten tekstikentässä: puoli sekuntia näkyvissä ja
+    // puoli piilossa; siirto tuo sen aina heti näkyviin.
+    private var cursorVisible = true
+    private val blinkRunnable = object : Runnable {
+        override fun run() {
+            if (shownCursor < 0 || !isShown) return
+            cursorVisible = !cursorVisible
+            bufferView.invalidate()
+            postDelayed(this, CURSOR_BLINK_MS)
+        }
+    }
+
+    private fun restartBlink() {
+        cursorVisible = true
+        removeCallbacks(blinkRunnable)
+        postDelayed(blinkRunnable, CURSOR_BLINK_MS)
+    }
+
     // Kursori piirretään kapeana pystyviivana, joka vie vain parin pisteen
     // raon — kokonainen merkki työntäisi kirjaimet erilleen kuin välilyönti.
     private val cursorSpan = object : ReplacementSpan() {
@@ -77,8 +95,11 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             bottom: Int,
             paint: Paint,
         ) {
+            if (!cursorVisible) return
             val oldColor = paint.color
-            paint.color = theme.accent
+            // Tekstin väri: tummassa teemassa valkoinen kuten kentän kursori,
+            // vaaleassa tumma, jotta viiva näkyy aina.
+            paint.color = theme.text
             canvas.drawRect(x, y + paint.ascent(), x + dp(2), y + paint.descent(), paint)
             paint.color = oldColor
         }
@@ -177,6 +198,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     fun setBuffer(text: String, cursor: Int, hint: String) {
         if (text.isEmpty()) {
             shownCursor = -1
+            removeCallbacks(blinkRunnable)
             bufferView.text = hint
             bufferView.setTextColor(theme.hint)
             clearLabel.visibility = GONE
@@ -194,8 +216,25 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             }
             bufferView.setTextColor(theme.text)
             clearLabel.visibility = VISIBLE
+            restartBlink()
             scrollCursorIntoView(position)
         }
+    }
+
+    override fun onVisibilityAggregated(isVisible: Boolean) {
+        super.onVisibilityAggregated(isVisible)
+        // Vilkutus pyörii vain rivin ollessa esillä.
+        if (isVisible && shownCursor >= 0) {
+            restartBlink()
+            bufferView.invalidate()
+        } else if (!isVisible) {
+            removeCallbacks(blinkRunnable)
+        }
+    }
+
+    override fun onDetachedFromWindow() {
+        removeCallbacks(blinkRunnable)
+        super.onDetachedFromWindow()
     }
 
     /** Vierittää niin, että kursori pysyy näkyvissä pienellä marginaalilla. */
@@ -228,5 +267,8 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private companion object {
         // Leveydetön merkki kantaa kursoripiirron; itse teksti ei muutu.
         const val CURSOR_PLACEHOLDER = "\u200B"
+
+        // Sama tahti kuin Androidin tekstikenttien kursorilla.
+        const val CURSOR_BLINK_MS = 500L
     }
 }

@@ -5,11 +5,13 @@
     <PreferenceCategory android:title="@string/asetukset_kayttoonotto">
         <Preference
             android:key="avaa_ime_asetukset"
+            android:icon="@drawable/ic_keyboard"
             android:title="@string/ota_kayttoon"
             android:summary="@string/ota_kayttoon_kuvaus"
             app:singleLineTitle="false" />
         <Preference
             android:key="vaihda_nappaimisto"
+            android:icon="@drawable/ic_swap"
             android:title="@string/vaihda_nappaimistoksi"
             android:summary="@string/vaihda_nappaimistoksi_kuvaus"
             app:singleLineTitle="false" />
@@ -30,26 +32,31 @@
     <PreferenceCategory android:title="@string/asetukset_kirjoittaminen">
         <SwitchPreferenceCompat
             android:key="aanet"
+            android:icon="@drawable/ic_volume"
             android:title="@string/asetus_aanet"
             android:defaultValue="false"
             app:singleLineTitle="false" />
         <SwitchPreferenceCompat
             android:key="varina"
+            android:icon="@drawable/ic_vibration"
             android:title="@string/asetus_varina"
             android:defaultValue="true"
             app:singleLineTitle="false" />
         <SwitchPreferenceCompat
             android:key="esikatselu"
+            android:icon="@drawable/ic_visibility"
             android:title="@string/asetus_esikatselu"
             android:defaultValue="true"
             app:singleLineTitle="false" />
         <Preference
             android:key="erikoismerkit"
+            android:icon="@drawable/ic_tag"
             android:title="@string/erikoismerkit"
             android:summary="@string/erikoismerkit_kuvaus"
             app:singleLineTitle="false" />
         <Preference
             android:key="tyokalurivi"
+            android:icon="@drawable/ic_tune"
             android:title="@string/tyokalurivi"
             android:summary="@string/tyokalurivi_kuvaus"
             app:singleLineTitle="false" />
@@ -58,27 +65,32 @@
     <PreferenceCategory android:title="@string/asetukset_ehdotukset">
         <SwitchPreferenceCompat
             android:key="ehdotukset"
+            android:icon="@drawable/ic_lightbulb"
             android:title="@string/asetus_ehdotukset"
             android:defaultValue="true"
             app:singleLineTitle="false" />
         <SwitchPreferenceCompat
             android:key="ehdotus_valilyonti"
+            android:icon="@drawable/ic_space_bar"
             android:title="@string/asetus_ehdotus_valilyonti"
             android:defaultValue="true"
             app:singleLineTitle="false" />
         <SwitchPreferenceCompat
             android:key="ehdotus_yleiset"
+            android:icon="@drawable/ic_book"
             android:title="@string/asetus_ehdotus_yleiset"
             android:defaultValue="true"
             app:singleLineTitle="false" />
         <SwitchPreferenceCompat
             android:key="automaattikorjaus"
+            android:icon="@drawable/ic_spellcheck"
             android:title="@string/asetus_automaattikorjaus"
             android:summary="@string/asetus_automaattikorjaus_kuvaus"
             android:defaultValue="true"
             app:singleLineTitle="false" />
         <Preference
             android:key="opitut_sanat"
+            android:icon="@drawable/ic_school"
             android:title="@string/opitut_sanat"
             android:summary="@string/opitut_sanat_kuvaus"
             app:singleLineTitle="false" />
@@ -87,6 +99,7 @@
     <PreferenceCategory android:title="@string/asetukset_kaannos">
         <Preference
             android:key="kaannoskielet"
+            android:icon="@drawable/ic_translate"
             android:title="@string/kaannoskielet"
             android:summary="@string/kaannoskielet_kuvaus"
             app:singleLineTitle="false" />
@@ -95,11 +108,13 @@
     <PreferenceCategory android:title="@string/asetukset_varmuuskopio">
         <Preference
             android:key="varmuuskopio_vie"
+            android:icon="@drawable/ic_upload"
             android:title="@string/varmuuskopio_vie"
             android:summary="@string/varmuuskopio_vie_kuvaus"
             app:singleLineTitle="false" />
         <Preference
             android:key="varmuuskopio_tuo"
+            android:icon="@drawable/ic_download"
             android:title="@string/varmuuskopio_tuo"
             android:summary="@string/varmuuskopio_tuo_kuvaus"
             app:singleLineTitle="false" />

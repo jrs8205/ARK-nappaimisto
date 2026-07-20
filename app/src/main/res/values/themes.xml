@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Ark" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+        <item name="preferenceTheme">@style/ArkPreferenceTheme</item>
         <item name="colorPrimary">@color/vaalea_korostus</item>
         <item name="colorOnPrimary">@color/vaalea_korostusteksti</item>
         <item name="android:colorBackground">@color/vaalea_tausta</item>
@@ -9,6 +9,37 @@
         <item name="colorOnSurface">@color/vaalea_teksti</item>
         <item name="colorSurfaceVariant">@color/vaalea_erikoisnappain</item>
         <item name="colorOnSurfaceVariant">@color/vaalea_vihje</item>
+        <item name="colorSurfaceContainer">@color/vaalea_nappain</item>
+    </style>
+
+    <!-- Asetusrivit pyöristettyinä kortteina ja modernit M3-kytkimet.
+         Material You -laitteilla värit tulevat taustakuvasta. -->
+    <style name="ArkPreferenceTheme" parent="@style/PreferenceThemeOverlay">
+        <item name="preferenceStyle">@style/ArkPreference</item>
+        <item name="preferenceCategoryStyle">@style/ArkPreferenceCategory</item>
+        <item name="switchPreferenceCompatStyle">@style/ArkSwitchPreference</item>
+        <item name="seekBarPreferenceStyle">@style/ArkSeekBarPreference</item>
+    </style>
+
+    <style name="ArkPreference" parent="@style/Preference.Material">
+        <item name="android:layout">@layout/asetus_rivi</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+
+    <style name="ArkPreferenceCategory" parent="@style/Preference.Category.Material">
+        <item name="android:layout">@layout/asetus_otsikkorivi</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+
+    <style name="ArkSwitchPreference" parent="@style/Preference.SwitchPreferenceCompat.Material">
+        <item name="android:layout">@layout/asetus_rivi</item>
+        <item name="android:widgetLayout">@layout/asetus_kytkin</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+
+    <style name="ArkSeekBarPreference" parent="@style/Preference.SeekBarPreference.Material">
+        <item name="android:layout">@layout/asetus_liukurivi</item>
+        <item name="iconSpaceReserved">false</item>
     </style>
 
     <!-- Emojivalitsin: valitun kategorian merkkiviiva näppäimistön korostusvärillä. -->

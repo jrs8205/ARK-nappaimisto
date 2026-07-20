@@ -7,8 +7,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -51,12 +49,7 @@ class TranslationLanguagesActivity : AppCompatActivity() {
             layoutManager = LinearLayoutManager(this@TranslationLanguagesActivity)
             adapter = this@TranslationLanguagesActivity.adapter
         }
-        setContentView(list)
-        ViewCompat.setOnApplyWindowInsetsListener(list) { view, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-            WindowInsetsCompat.CONSUMED
-        }
+        SettingsUi.install(this, list)
         refreshDownloaded()
     }
 

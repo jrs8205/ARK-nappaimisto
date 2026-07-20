@@ -12,6 +12,7 @@
          leikkeet pysyvät laitteella, ja siirto tehdään käyttäjän omalla
          varmuuskopiolla. -->
     <application
+        android:name=".ArkApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/varmistussaannot"
         android:fullBackupContent="@xml/taysvarmistus"

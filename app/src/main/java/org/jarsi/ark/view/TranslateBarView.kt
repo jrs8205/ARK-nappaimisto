@@ -2,7 +2,12 @@ package org.jarsi.ark.view
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.Typeface
+import android.text.Spannable
+import android.text.SpannableStringBuilder
+import android.text.style.ReplacementSpan
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -40,6 +45,44 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     // Näytetyn tekstin kursorikohta napautuksen takaisinmappausta varten;
     // -1 kun rivillä näkyy vihjeteksti.
     private var shownCursor = -1
+
+    // Kursori piirretään kapeana pystyviivana, joka vie vain parin pisteen
+    // raon — kokonainen merkki työntäisi kirjaimet erilleen kuin välilyönti.
+    private val cursorSpan = object : ReplacementSpan() {
+        override fun getSize(
+            paint: Paint,
+            text: CharSequence?,
+            start: Int,
+            end: Int,
+            fm: Paint.FontMetricsInt?,
+        ): Int {
+            fm?.let {
+                val metrics = paint.fontMetricsInt
+                it.top = metrics.top
+                it.ascent = metrics.ascent
+                it.descent = metrics.descent
+                it.bottom = metrics.bottom
+            }
+            return dp(2)
+        }
+
+        override fun draw(
+            canvas: Canvas,
+            text: CharSequence?,
+            start: Int,
+            end: Int,
+            x: Float,
+            top: Int,
+            y: Int,
+            bottom: Int,
+            paint: Paint,
+        ) {
+            val oldColor = paint.color
+            paint.color = theme.accent
+            canvas.drawRect(x, y + paint.ascent(), x + dp(2), y + paint.descent(), paint)
+            paint.color = oldColor
+        }
+    }
 
     private val sourceLabel = TextView(context).apply {
         textSize = 14f
@@ -140,10 +183,14 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         } else {
             val position = cursor.coerceIn(0, text.length)
             shownCursor = position
-            bufferView.text = buildString {
-                append(text, 0, position)
-                append('▏')
-                append(text, position, text.length)
+            bufferView.text = SpannableStringBuilder(text).apply {
+                insert(position, CURSOR_PLACEHOLDER)
+                setSpan(
+                    cursorSpan,
+                    position,
+                    position + CURSOR_PLACEHOLDER.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
             }
             bufferView.setTextColor(theme.text)
             clearLabel.visibility = VISIBLE
@@ -173,8 +220,13 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         if (shownCursor < 0) return
         val offset = view.getOffsetForPosition(x, y)
         if (offset < 0) return
-        // Näytetyssä tekstissä on kursorimerkki; poistetaan sen vaikutus.
+        // Näytetyssä tekstissä on kursorin paikkamerkki; poistetaan sen vaikutus.
         val position = if (offset > shownCursor) offset - 1 else offset
         listener?.onCursorTap(position)
+    }
+
+    private companion object {
+        // Leveydetön merkki kantaa kursoripiirron; itse teksti ei muutu.
+        const val CURSOR_PLACEHOLDER = "\u200B"
     }
 }

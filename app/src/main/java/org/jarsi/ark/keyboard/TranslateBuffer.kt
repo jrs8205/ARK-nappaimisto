@@ -21,61 +21,46 @@ class TranslateBuffer {
     fun isNotEmpty(): Boolean = builder.isNotEmpty()
 
     fun insert(s: String) {
-        smartRevert = null
         builder.insert(cursor, s)
         cursor += s.length
     }
 
-    // Älykkään lisäyksen peruutustieto: askelpalautin palauttaa
-    // esimerkiksi " O":n takaisin "o":ksi, jotta jarsi.org onnistuu.
-    private var smartRevert: SmartRevert? = null
-
-    private data class SmartRevert(
-        val cursorAfter: Int,
-        val original: String,
-        val insertedLength: Int,
-    )
-
     /**
-     * Lisää näppäillyn tekstin älykkäästi: kirjain suoraan lauseen
-     * päättävän välimerkin perään saa välin eteensä ja ison
-     * alkukirjaimen. Askelpalautin peruu muunnoksen, joten osoitteet
-     * kuten jarsi.org onnistuvat. Numeroiden perässä sääntö ei laukea
-     * (3.14). Välin jälkeinen iso kirjain tulee shift-tilasta, joka
-     * näkyy käyttäjälle nuolen värissä.
+     * Lisää näppäillyn tekstin kuten muutkin näppäimistöt: välimerkki
+     * sanan perässä saa välin heti peräänsä ("sana," -> "sana, "), ja
+     * välilyönnin edelle kirjoitettu välimerkki siirtää välin taakseen
+     * ("sana. " + "." -> "sana.. "). Numeron perässä sääntö ei laukea
+     * (3,14), eikä keskellä tekstiä. Askelpalautin poistaa lisätyn
+     * välin normaalisti, joten osoitteet kuten jarsi.org onnistuvat
+     * yhdellä poistolla.
      */
-    fun smartInsert(s: String) {
-        if (s.length == 1 && s[0].isLetter()) {
-            val before = builder.substring(0, cursor)
-            val last = before.lastOrNull()
-            val digitBefore = before.length >= 2 &&
-                before[before.lastIndex - 1].isDigit()
-            val inserted = when {
-                last == null || digitBefore -> null
-                last in SENTENCE_END -> " " + s.uppercase()
-                last in PAUSE_MARKS -> " $s"
-                else -> null
+    fun smartType(s: String) {
+        if (s.length == 1 && s[0] in AUTO_SPACE_MARKS) {
+            val prev = if (cursor > 0) builder[cursor - 1] else null
+            val next = if (cursor < builder.length) builder[cursor] else null
+            when {
+                prev == null || prev.isDigit() || next != null -> insert(s)
+                prev == ' ' && cursor > 1 && builder[cursor - 2] != ' ' -> {
+                    builder.deleteCharAt(cursor - 1)
+                    cursor--
+                    insert("$s ")
+                }
+                prev != ' ' -> insert("$s ")
+                else -> insert(s)
             }
-            if (inserted != null) {
-                insert(inserted)
-                smartRevert = SmartRevert(cursor, s, inserted.length)
-                return
-            }
+            return
         }
         insert(s)
     }
 
+    /** Välilyönti; heti automaattivälin perään painettu väli ohitetaan. */
+    fun smartSpace() {
+        if (cursor > 0 && builder[cursor - 1] == ' ') return
+        insert(" ")
+    }
+
     /** Poistaa grafeemin kursorin edeltä; alussa ei tee mitään. */
     fun backspace(): Boolean {
-        smartRevert?.let { revert ->
-            smartRevert = null
-            if (cursor == revert.cursorAfter) {
-                val start = cursor - revert.insertedLength
-                builder.replace(start, cursor, revert.original)
-                cursor = start + revert.original.length
-                return true
-            }
-        }
         if (cursor == 0) return false
         val start = previousBoundary(cursor)
         builder.delete(start, cursor)
@@ -84,14 +69,12 @@ class TranslateBuffer {
     }
 
     fun moveLeft(): Boolean {
-        smartRevert = null
         if (cursor == 0) return false
         cursor = previousBoundary(cursor)
         return true
     }
 
     fun moveRight(): Boolean {
-        smartRevert = null
         if (cursor >= builder.length) return false
         cursor = nextBoundary(cursor)
         return true
@@ -116,7 +99,6 @@ class TranslateBuffer {
 
     /** Siirtää kursorin kohtaan [index] lähimpään grafeemirajaan rajattuna. */
     fun setCursor(index: Int) {
-        smartRevert = null
         val clamped = index.coerceIn(0, builder.length)
         val iterator = characterIterator()
         cursor = if (iterator.isBoundary(clamped)) {
@@ -143,9 +125,7 @@ class TranslateBuffer {
         characterIterator().following(index).takeIf { it != BreakIterator.DONE } ?: builder.length
 
     private companion object {
-        const val SENTENCE_END = ".!?…"
-
-        // Tauottavat välimerkit saavat välin, mutta eivät isoa kirjainta.
-        const val PAUSE_MARKS = ",;:"
+        // Välimerkit, jotka saavat automaattisen välin peräänsä.
+        const val AUTO_SPACE_MARKS = ".!?…,;:"
     }
 }

@@ -1,7 +1,6 @@
 package org.jarsi.ark.keyboard
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,74 +105,72 @@ class TranslateBufferTest {
     }
 
     @Test
-    fun `smartInsert lisaa valin ja ison kirjaimen valimerkin jalkeen`() {
+    fun `valimerkki saa valin heti peraansa`() {
         val b = TranslateBuffer()
-        b.insert("voinko tulla?")
-        b.smartInsert("s")
-        assertEquals("voinko tulla? S", b.text)
-        assertEquals(15, b.cursor)
+        b.insert("sana")
+        b.smartType(",")
+        assertEquals("sana, ", b.text)
+        b.insert("ja")
+        b.smartType("?")
+        assertEquals("sana, ja? ", b.text)
     }
 
     @Test
-    fun `valin jalkeen lisays on tavallinen koska shift hoitaa ison`() {
+    fun `numeron perassa ei tule valia`() {
         val b = TranslateBuffer()
-        b.insert("moi. ")
-        b.smartInsert("H")
-        assertEquals("moi. H", b.text)
+        b.insert("3")
+        b.smartType(".")
+        assertEquals("3.", b.text)
+        b.smartType("1")
+        assertEquals("3.1", b.text)
     }
 
     @Test
-    fun `askelpalautin peruu alykkaan lisayksen`() {
+    fun `valin edelle kirjoitettu valimerkki siirtaa valin taakse`() {
         val b = TranslateBuffer()
-        b.insert("jarsi.")
-        b.smartInsert("o")
-        assertEquals("jarsi. O", b.text)
+        b.insert("sana")
+        b.smartType(".")
+        b.smartType(".")
+        b.smartType(".")
+        assertEquals("sana... ", b.text)
+    }
+
+    @Test
+    fun `keskella tekstia ei tule valia`() {
+        val b = TranslateBuffer()
+        b.insert("ab")
+        b.setCursor(1)
+        b.smartType(".")
+        assertEquals("a.b", b.text)
+    }
+
+    @Test
+    fun `osoite onnistuu yhdella poistolla`() {
+        val b = TranslateBuffer()
+        b.insert("jarsi")
+        b.smartType(".")
+        assertEquals("jarsi. ", b.text)
         assertTrue(b.backspace())
+        b.smartType("o")
         assertEquals("jarsi.o", b.text)
-        assertEquals(7, b.cursor)
     }
 
     @Test
-    fun `pilkun jalkeen tulee vali ilman isoa kirjainta`() {
+    fun `rivin alussa valimerkki on tavallinen`() {
         val b = TranslateBuffer()
-        b.insert("moi,")
-        b.smartInsert("h")
-        assertEquals("moi, h", b.text)
-        assertTrue(b.backspace())
-        assertEquals("moi,h", b.text)
+        b.smartType(".")
+        assertEquals(".", b.text)
     }
 
     @Test
-    fun `numeron jalkeinen piste ei laukaise saantoa`() {
+    fun `smartSpace ohittaa tuplavalin`() {
         val b = TranslateBuffer()
-        b.insert("3.")
-        b.smartInsert("a")
-        assertEquals("3.a", b.text)
-    }
-
-    @Test
-    fun `rivin alussa lisays on tavallinen koska shift hoitaa ison`() {
-        val b = TranslateBuffer()
-        b.smartInsert("M")
-        assertEquals("M", b.text)
-    }
-
-    @Test
-    fun `tavallinen lisays ei muutu`() {
-        val b = TranslateBuffer()
-        b.insert("moi hei")
-        b.smartInsert("t")
-        assertEquals("moi heit", b.text)
-    }
-
-    @Test
-    fun `kursorin siirto mitatoi peruutuksen`() {
-        val b = TranslateBuffer()
-        b.insert("moi.")
-        b.smartInsert("h")
-        b.moveLeft()
-        b.moveRight()
-        assertTrue(b.backspace())
-        assertEquals("moi. ", b.text)
+        b.insert("sana")
+        b.smartType(",")
+        b.smartSpace()
+        assertEquals("sana, ", b.text)
+        b.insert("x")
+        b.smartSpace()
+        assertEquals("sana, x ", b.text)
     }
 }

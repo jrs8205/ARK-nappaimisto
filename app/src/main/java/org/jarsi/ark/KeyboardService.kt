@@ -201,6 +201,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // ohitettu, 0 = ei voimassa. Kirjain saa välin eteensä vain tilassa > 0.
     private var smartSpaceState = 0
 
+    // Välimerkin perään lisättiin juuri automaattiväli; heti perään
+    // painettu välilyönti ohitetaan tuplavälin estämiseksi.
+    private var punctSpaceAdded = false
+
     // Kenttäkohtaiset ehdot: älykäs jälkiväli ei sovi osoite-, sähköposti-
     // eikä koodikenttiin, ja iso alkukirjain seuraa kentän omaa pyyntöä.
     private var smartSpaceField = false
@@ -1831,7 +1835,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             } else {
                 text
             }
-            translateBuffer.smartInsert(output)
+            translateBuffer.smartType(output)
             if (shiftState == ShiftState.SHIFT) {
                 shiftState = ShiftState.OFF
                 manualShift = false
@@ -1845,48 +1849,45 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (text.length == 1 && !text[0].isLetterOrDigit() && text[0] != '-') {
             learnCurrentWord()
         }
-        if (autoSpaceState > 0 && text.length == 1 && SmartSpace.isPunctuation(text[0]) &&
-            ic.getTextBeforeCursor(1, 0)?.toString() == " "
+        if ((autoSpaceState > 0 || smartSpaceField) && text.length == 1 &&
+            SmartSpace.isPunctuation(text[0]) &&
+            ic.getTextBeforeCursor(1, 0)?.toString() == " " &&
+            ic.getTextAfterCursor(1, 0)?.toString().isNullOrEmpty()
         ) {
-            // Ehdotuksen lisäämä välilyönti siirtyy välimerkin taakse: "sana ." -> "sana. "
+            // Välilyönti siirtyy välimerkin taakse: "sana ." -> "sana. "
             ic.beginBatchEdit()
             ic.deleteSurroundingText(1, 0)
             ic.commitText(text + " ", 1)
             ic.endBatchEdit()
-            autoSpaceState = 2
+            if (autoSpaceState > 0) autoSpaceState = 2
             smartSpaceState = 0
+            punctSpaceAdded = true
             feedback()
             return
         }
         autoSpaceState = 0
+        punctSpaceAdded = false
         // Vain yksittäiset merkit shiftautuvat; esim. verkko-osoitepalat pysyvät ennallaan.
         val output = if (shiftState != ShiftState.OFF && text.length == 1) {
             text.uppercase(fiLocale)
         } else {
             text
         }
-        // Älykäs jälkiväli: välimerkin perään kirjoitettu kirjain saa välin
-        // eteensä, ja lauseen päättäjän jälkeen uusi lause alkaa isolla.
-        val decision = if (smartSpaceField && smartSpaceState > 0) {
-            SmartSpace.decide(
-                armed = true,
-                input = text,
-                before = ic.getTextBeforeCursor(1, 0)?.lastOrNull(),
-                capSentences = capSentencesField,
-            )
-        } else {
-            null
+        // Välitön jälkiväli kuten muissakin näppäimistöissä: välimerkki
+        // sanan perässä saa välin heti peräänsä. Numeron perässä sääntö
+        // ei laukea (3,14) eikä keskellä tekstiä; osoitteen (jarsi.org)
+        // välin saa pois yhdellä askelpalauttimella.
+        if (smartSpaceField && text.length == 1 && SmartSpace.isPunctuation(text[0])) {
+            val prev = ic.getTextBeforeCursor(1, 0)?.lastOrNull()
+            val next = ic.getTextAfterCursor(1, 0)?.toString()
+            if (prev != null && prev != ' ' && !prev.isDigit() && next.isNullOrEmpty()) {
+                ic.commitText(text + " ", 1)
+                punctSpaceAdded = true
+                feedback()
+                return
+            }
         }
-        if (decision != null) {
-            val letter = if (decision.capitalize) output.uppercase(fiLocale) else output
-            ic.commitText(" $letter", 1)
-            pendingSpaceRevert = output to " $letter"
-            textUndo.record(" $letter", output)
-            smartSpaceState = 0
-        } else {
-            smartSpaceState = if (smartSpaceField && SmartSpace.rearm(text)) 2 else 0
-            ic.commitText(output, 1)
-        }
+        ic.commitText(output, 1)
         if (shiftState == ShiftState.SHIFT) {
             shiftState = ShiftState.OFF
             manualShift = false
@@ -1898,7 +1899,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     override fun onKey(action: KeyAction) {
         // Tekstiä muuttava näppäin katkaisee automaattivälin seurannan.
         when (action) {
-            KeyAction.Backspace, KeyAction.Enter, KeyAction.Space, is KeyAction.Arrow -> {
+            KeyAction.Backspace, KeyAction.Enter, is KeyAction.Arrow -> {
+                autoSpaceState = 0
+                smartSpaceState = 0
+                punctSpaceAdded = false
+                markOwnEdit()
+            }
+            KeyAction.Space -> {
                 autoSpaceState = 0
                 smartSpaceState = 0
                 markOwnEdit()
@@ -1933,9 +1940,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
             }
             KeyAction.Space -> {
+                val swallowPunctSpace = punctSpaceAdded
+                punctSpaceAdded = false
                 if (translateMode) {
-                    translateBuffer.insert(" ")
+                    translateBuffer.smartSpace()
                     onTranslateBufferChanged()
+                } else if (swallowPunctSpace &&
+                    currentInputConnection?.getTextBeforeCursor(1, 0)?.toString() == " "
+                ) {
+                    // Automaattivälin perään painettu väli ohitetaan,
+                    // ettei "sana, " saa tuplaväliä totutusta näppäilystä.
                 } else {
                     commitSpaceWithAutoCorrect()
                 }

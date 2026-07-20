@@ -162,6 +162,22 @@ class DictationController(
             )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fi-FI")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            // Melussa tunnistimen oma taukopäättely katkaisee jakson liian
+            // herkästi; pidemmät toleranssit harventavat katkoja ja siten
+            // uudelleenkäynnistyksen katvehetkiä, joissa sanan alku katoaa.
+            // Nämäkin ovat vain toiveita, osa tunnistimista ohittaa ne.
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                COMPLETE_SILENCE_MS,
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS,
+                COMPLETE_SILENCE_MS,
+            )
+            putExtra(
+                RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS,
+                MINIMUM_SEGMENT_MS,
+            )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 // Vihjeet ovat vain toive: tukematon tunnistin ohittaa ne.
                 val words = biasWords()
@@ -181,5 +197,7 @@ class DictationController(
 
     private companion object {
         const val SILENCE_BUDGET_MS = 15_000L
+        const val COMPLETE_SILENCE_MS = 2_000L
+        const val MINIMUM_SEGMENT_MS = 3_000L
     }
 }

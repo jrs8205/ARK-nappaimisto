@@ -55,6 +55,7 @@ import org.jarsi.ark.keyboard.SymbolOrder
 import org.jarsi.ark.keyboard.TextUndo
 import org.jarsi.ark.keyboard.ToolbarOrder
 import org.jarsi.ark.keyboard.TranslateBuffer
+import org.jarsi.ark.keyboard.TranslatePrep
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
@@ -654,14 +655,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         val client = translator ?: return
         val generation = translationGeneration
-        client.translate(text).addOnSuccessListener { result ->
+        val prepared = TranslatePrep.prepare(text)
+        client.translate(prepared.text).addOnSuccessListener { result ->
             // Tulos kelpaa vain, jos rivi ei ehtinyt muuttua välissä.
             if (translateMode && generation == translationGeneration &&
                 text == translateBuffer.toString()
             ) {
                 markOwnEdit()
                 lastTranslatedText = text
-                currentInputConnection?.setComposingText(result, 1)
+                currentInputConnection?.setComposingText(
+                    TranslatePrep.clean(result, prepared), 1
+                )
             }
         }
     }
@@ -686,7 +690,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         val generation = ++translationGeneration
         val session = editorSessionId
-        client.translate(text)
+        val prepared = TranslatePrep.prepare(text)
+        client.translate(prepared.text)
             .addOnSuccessListener { result ->
                 // Vanhentunut tulos hylätään: käyttäjä ehti jatkaa, painaa
                 // enteriä uudelleen, sulkea tilan, vaihtaa kenttää tai
@@ -697,12 +702,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     return@addOnSuccessListener
                 }
                 val ic = currentInputConnection ?: return@addOnSuccessListener
+                val cleaned = TranslatePrep.clean(result, prepared)
                 markOwnEdit()
                 ic.beginBatchEdit()
-                ic.setComposingText(result, 1)
+                ic.setComposingText(cleaned, 1)
                 ic.finishComposingText()
                 ic.endBatchEdit()
-                textUndo.record(result)
+                textUndo.record(cleaned)
                 translateBuffer.clear()
                 lastTranslatedText = ""
                 updateTranslateBar()

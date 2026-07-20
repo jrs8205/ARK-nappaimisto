@@ -60,6 +60,16 @@
     <string name="opitut_tyhjenna">Tyhjennä kaikki</string>
     <string name="opitut_tyhjenna_varmistus">Poistetaanko kaikki opitut sanat ja sanaketjut? Tätä ei voi perua.</string>
 
+    <string name="asetukset_tekoaly">Tekoäly</string>
+    <string name="asetus_api_avain">Claude API -avain</string>
+    <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään Anthropicin palveluun vain kun painat nappia; avain säilyy vain tällä laitteella.</string>
+    <string name="korjaus_paranna">Paranna teksti</string>
+    <string name="korjaus_parannus_otsikko">Parannusehdotus</string>
+    <string name="korjaus_parannetaan">Parannetaan…</string>
+    <string name="korjaus_kayta">Käytä</string>
+    <string name="korjaus_hylkaa">Hylkää</string>
+    <string name="korjaus_paranna_virhe">Parannus epäonnistui – tarkista verkkoyhteys ja API-avain</string>
+
     <string name="asetukset_varmuuskopio">Varmuuskopio</string>
     <string name="varmuuskopio_vie">Vie varmuuskopio</string>
     <string name="varmuuskopio_vie_kuvaus">Tallentaa opitut sanat, sanaketjut ja kiinnitetyt tekstileikkeet tiedostoon</string>

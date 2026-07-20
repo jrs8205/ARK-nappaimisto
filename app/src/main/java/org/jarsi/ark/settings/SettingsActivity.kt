@@ -9,8 +9,10 @@ import android.provider.Settings
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import android.text.InputType
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import org.jarsi.ark.R
@@ -56,6 +58,12 @@ class SettingsActivity : AppCompatActivity() {
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.asetukset, rootKey)
+            // API-avain kirjoitetaan piilotettuna kuten salasana.
+            findPreference<EditTextPreference>("claude_api_avain")
+                ?.setOnBindEditTextListener { edit ->
+                    edit.inputType = InputType.TYPE_CLASS_TEXT or
+                        InputType.TYPE_TEXT_VARIATION_PASSWORD
+                }
             findPreference<Preference>("avaa_ime_asetukset")?.setOnPreferenceClickListener {
                 startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                 true

@@ -46,6 +46,7 @@ import org.jarsi.ark.engine.LearnedTrigram
 import org.jarsi.ark.engine.LearnedWord
 import org.jarsi.ark.engine.LearningEngine
 import org.jarsi.ark.engine.SuggestionEngine
+import org.jarsi.ark.engine.TextImprover
 import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
@@ -181,6 +182,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val suggestExecutor = Executors.newSingleThreadExecutor()
+
+    // Paranna teksti -verkkopyynnöt omassa säikeessään, ettei hidas
+    // yhteys viivästytä oppimisdatan kirjoituksia.
+    private val improveExecutor = Executors.newSingleThreadExecutor()
+    private var improveGeneration = 0
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var suggestGeneration = 0
     private var suggestionsVisible = true
@@ -294,6 +300,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         flushLearned()
         destroyed = true
         suggestExecutor.shutdownNow()
+        improveExecutor.shutdownNow()
         // Sulkeutuu vasta kun jonossa oleva kirjoitus on valmis.
         ioExecutor.shutdown()
         super.onDestroy()
@@ -773,6 +780,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         kb.visibility = View.GONE
         panel.visibility = View.VISIBLE
         toolbar?.correctionActive = true
+        panel.improveEnabled =
+            prefs.getString(PREF_IMPROVE_KEY, null)?.isNotBlank() == true
+        panel.hideImprovement()
         // Rivi tyhjenee kunnes sanaa napautetaan; vireillä olevat
         // rivipäivitykset mitätöidään.
         suggestGeneration++
@@ -785,6 +795,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val panel = correctionPanel ?: return
         if (panel.visibility != View.VISIBLE) return
         panel.visibility = View.GONE
+        panel.hideImprovement()
+        improveGeneration++
         keyboardView?.visibility = View.VISIBLE
         toolbar?.correctionActive = false
         correctionSelected = -1
@@ -878,6 +890,77 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             learning.onCorrectionAccepted(word)
             maybeFlush()
         }
+        feedback()
+        suggestGeneration++
+        suggestionBar?.setSuggestions(emptyList())
+        refreshCorrectionPanel()
+    }
+
+    /** Lähettää kentän tekstin parannettavaksi ja näyttää ehdotuksen. */
+    private fun requestImprovement() {
+        feedback()
+        val text = correctionText
+        if (text.isBlank()) return
+        val apiKey = prefs.getString(PREF_IMPROVE_KEY, null)?.trim().orEmpty()
+        if (apiKey.isEmpty()) return
+        correctionPanel?.showImprovementLoading()
+        val generation = ++improveGeneration
+        improveExecutor.execute {
+            val result = runImprovement(apiKey, text)
+            mainHandler.post {
+                if (generation != improveGeneration || destroyed) return@post
+                val panel = correctionPanel ?: return@post
+                if (panel.visibility != View.VISIBLE) return@post
+                if (result != null && text == correctionText) {
+                    panel.showImprovement(result)
+                } else {
+                    panel.hideImprovement()
+                    Toast.makeText(
+                        this, R.string.korjaus_paranna_virhe, Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun runImprovement(apiKey: String, text: String): String? = try {
+        val connection = java.net.URL(TextImprover.ENDPOINT)
+            .openConnection() as javax.net.ssl.HttpsURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 60_000
+            connection.doOutput = true
+            connection.setRequestProperty("content-type", "application/json")
+            connection.setRequestProperty("x-api-key", apiKey)
+            connection.setRequestProperty("anthropic-version", "2023-06-01")
+            connection.outputStream.use {
+                it.write(TextImprover.buildRequest(text).toByteArray(Charsets.UTF_8))
+            }
+            if (connection.responseCode in 200..299) {
+                connection.inputStream.bufferedReader().use { it.readText() }
+                    .let(TextImprover::parseResponse)
+            } else {
+                null
+            }
+        } finally {
+            connection.disconnect()
+        }
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Korvaa kentän koko tekstin hyväksytyllä parannuksella. */
+    private fun applyImprovement(text: String) {
+        val panel = correctionPanel ?: return
+        val ic = currentInputConnection ?: return
+        val old = correctionText
+        ic.beginBatchEdit()
+        ic.setSelection(correctionStartOffset, correctionStartOffset + old.length)
+        ic.commitText(text, 1)
+        ic.endBatchEdit()
+        textUndo.record(text, old)
+        panel.hideImprovement()
         feedback()
         suggestGeneration++
         suggestionBar?.setSuggestions(emptyList())
@@ -1460,6 +1543,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     feedback()
                     hideCorrectionPanel()
                 }
+
+                override fun onImprove() = requestImprovement()
+
+                override fun onAcceptImprovement(text: String) = applyImprovement(text)
             }
             it.visibility = View.GONE
             container.addView(it, LinearLayout.LayoutParams(params))
@@ -1986,6 +2073,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val BIAS_WORD_MAX = 100
         const val PREF_TRANSLATE_SOURCE = "kaannos_lahde"
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
+        const val PREF_IMPROVE_KEY = "claude_api_avain"
         const val LIVE_TRANSLATE_DELAY_MS = 300L
         const val EXTERNAL_SELECTION_MS = 1000L
         const val MAX_IMAGE_CLIP_BYTES = 10L * 1024 * 1024

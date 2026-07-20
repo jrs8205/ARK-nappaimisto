@@ -19,6 +19,7 @@
         <item name="preferenceCategoryStyle">@style/ArkPreferenceCategory</item>
         <item name="switchPreferenceCompatStyle">@style/ArkSwitchPreference</item>
         <item name="seekBarPreferenceStyle">@style/ArkSeekBarPreference</item>
+        <item name="editTextPreferenceStyle">@style/ArkEditTextPreference</item>
     </style>
 
     <style name="ArkPreference" parent="@style/Preference.Material">
@@ -39,6 +40,11 @@
 
     <style name="ArkSeekBarPreference" parent="@style/Preference.SeekBarPreference.Material">
         <item name="android:layout">@layout/asetus_liukurivi</item>
+        <item name="iconSpaceReserved">false</item>
+    </style>
+
+    <style name="ArkEditTextPreference" parent="@style/Preference.DialogPreference.EditTextPreference.Material">
+        <item name="android:layout">@layout/asetus_rivi</item>
         <item name="iconSpaceReserved">false</item>
     </style>
 

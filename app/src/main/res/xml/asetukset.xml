@@ -105,6 +105,15 @@
             app:singleLineTitle="false" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/asetukset_tekoaly">
+        <EditTextPreference
+            android:key="claude_api_avain"
+            android:icon="@drawable/ic_sparkle"
+            android:title="@string/asetus_api_avain"
+            android:summary="@string/asetus_api_avain_kuvaus"
+            app:singleLineTitle="false" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/asetukset_varmuuskopio">
         <Preference
             android:key="varmuuskopio_vie"

@@ -178,15 +178,23 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   kielimallit ladataan ja poistetaan asetuksista (~30 Mt/kieli).
   Kirjoitettavaa tekstiä voi muokata rivillä: napautus tai nuolet
   siirtävät kursoria, ja leikepöydästä liitetty teksti kääntyy heti.
+  Käännösrivin tekstin voi kopioida pitkällä painalluksella.
+* Paranna teksti (valinnainen): korjausnäkymän nappi lähettää kentän
+  tekstin Anthropicin Claude-palveluun ja näyttää parannusehdotuksen,
+  joka korvaa tekstin vasta hyväksynnästä. Vaatii oman API-avaimen
+  asetuksiin; ilman avainta nappia ei näytetä eikä mitään lähetetä.
 
 ## Yksityisyys
 
 Oppiminen ja ehdotukset ovat kokonaan paikallisia, eikä sovelluksessa ole
-analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus yhtä
-tarkoitusta varten: käännöskielten mallien kertalataus (Google ML Kit).
-Itse käännös tehdään laitteella, eikä kirjoitettua tekstiä lähetetä
-minnekään ilman käyttäjän omaa, tietoista toimintoa. Oppiminen kytkeytyy
-kokonaan pois salasana- ja muissa arkaluonteisissa kentissä.
+analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus kahta
+tarkoitusta varten: käännöskielten mallien kertalataus (Google ML Kit)
+sekä valinnainen Paranna teksti -toiminto, joka lähettää kentän tekstin
+Anthropicin Claude-palveluun vain kun käyttäjä itse painaa nappia ja on
+ensin asettanut oman API-avaimensa. Itse käännös tehdään laitteella,
+eikä kirjoitettua tekstiä lähetetä minnekään ilman käyttäjän omaa,
+tietoista toimintoa. Oppiminen kytkeytyy kokonaan pois salasana- ja
+muissa arkaluonteisissa kentissä.
 
 ## Kääntäminen
 

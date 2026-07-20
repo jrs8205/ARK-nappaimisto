@@ -33,9 +33,18 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
     interface Listener {
         fun onWordTapped(index: Int)
         fun onDone()
+
+        /** Käyttäjä pyysi koko tekstin parannusta. */
+        fun onImprove()
+
+        /** Käyttäjä hyväksyi parannusehdotuksen [text]. */
+        fun onAcceptImprovement(text: String)
     }
 
     var listener: Listener? = null
+
+    /** Paranna-nappi näytetään vain, kun API-avain on asetettu. */
+    var improveEnabled = false
 
     private var theme = KeyboardTheme.load(context)
     private val density = resources.displayMetrics.density
@@ -73,6 +82,85 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
         setOnClickListener { listener?.onDone() }
     }
 
+    private val improveButton = ImageView(context).apply {
+        setPadding(dp(14), dp(14), dp(14), dp(14))
+        contentDescription = context.getString(R.string.korjaus_paranna)
+        visibility = GONE
+        setOnClickListener { listener?.onImprove() }
+    }
+
+    private val improvementTitle = TextView(context).apply {
+        textSize = 14f
+        setTypeface(typeface, android.graphics.Typeface.BOLD)
+    }
+
+    private val improvementText = TextView(context).apply {
+        textSize = 18f
+        setLineSpacing(dp(6).toFloat(), 1f)
+        setPadding(0, dp(8), 0, dp(8))
+    }
+
+    private val rejectButton = TextView(context).apply {
+        text = context.getString(R.string.korjaus_hylkaa)
+        textSize = 16f
+        setPadding(dp(16), dp(10), dp(16), dp(10))
+        setOnClickListener { hideImprovement() }
+    }
+
+    private val acceptButton = TextView(context).apply {
+        text = context.getString(R.string.korjaus_kayta)
+        textSize = 16f
+        setPadding(dp(20), dp(10), dp(20), dp(10))
+        setOnClickListener {
+            listener?.onAcceptImprovement(improvementText.text.toString())
+        }
+    }
+
+    // Parannusehdotus peittää tekstin, kunnes se hyväksytään tai hylätään.
+    private val improvementOverlay = android.widget.LinearLayout(context).apply {
+        orientation = android.widget.LinearLayout.VERTICAL
+        setPadding(dp(16), dp(12), dp(16), dp(12))
+        visibility = GONE
+        isClickable = true
+        addView(
+            improvementTitle,
+            android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        addView(
+            ScrollView(context).apply {
+                addView(
+                    improvementText,
+                    ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
+            },
+            android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f),
+        )
+        addView(
+            android.widget.LinearLayout(context).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                addView(rejectButton)
+                addView(
+                    acceptButton,
+                    android.widget.LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ).apply { marginStart = dp(12) },
+                )
+            },
+            android.widget.LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+    }
+
     init {
         addView(
             scroll,
@@ -92,6 +180,37 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
                 setMargins(0, 0, dp(16), dp(16))
             },
         )
+        addView(
+            improveButton,
+            LayoutParams(dp(52), dp(52), Gravity.BOTTOM or Gravity.START).apply {
+                setMargins(dp(16), 0, 0, dp(16))
+            },
+        )
+        addView(
+            improvementOverlay,
+            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+        )
+    }
+
+    /** Näyttää odotustilan, kunnes parannus valmistuu tai epäonnistuu. */
+    fun showImprovementLoading() {
+        improvementTitle.text = context.getString(R.string.korjaus_parannetaan)
+        improvementText.text = ""
+        rejectButton.visibility = VISIBLE
+        acceptButton.visibility = GONE
+        improvementOverlay.visibility = VISIBLE
+    }
+
+    fun showImprovement(text: String) {
+        improvementTitle.text = context.getString(R.string.korjaus_parannus_otsikko)
+        improvementText.text = text
+        rejectButton.visibility = VISIBLE
+        acceptButton.visibility = VISIBLE
+        improvementOverlay.visibility = VISIBLE
+    }
+
+    fun hideImprovement() {
+        improvementOverlay.visibility = GONE
     }
 
     // IME-ikkuna ulottuu navigointipalkin alle; palkin korkeus varataan
@@ -124,10 +243,28 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
         doneButton.setImageDrawable(
             context.getDrawable(R.drawable.ic_check)?.mutate()?.apply { setTint(theme.accentText) }
         )
+        improveButton.background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(theme.specialKey)
+        }
+        improveButton.setImageDrawable(
+            context.getDrawable(R.drawable.ic_sparkle)?.mutate()?.apply { setTint(theme.text) }
+        )
+        improvementOverlay.setBackgroundColor(theme.background)
+        improvementTitle.setTextColor(theme.accent)
+        improvementText.setTextColor(theme.text)
+        rejectButton.setTextColor(theme.hint)
+        acceptButton.setTextColor(theme.accentText)
+        acceptButton.background = GradientDrawable().apply {
+            cornerRadius = dp(20).toFloat()
+            setColor(theme.accent)
+        }
     }
 
     fun render(text: CharSequence, words: List<IntRange>, unknown: Set<Int>, selected: Int) {
         emptyView.visibility = if (text.isBlank()) VISIBLE else GONE
+        improveButton.visibility =
+            if (improveEnabled && text.isNotBlank()) VISIBLE else GONE
         val spannable = SpannableString(text)
         words.forEachIndexed { index, range ->
             val start = range.first

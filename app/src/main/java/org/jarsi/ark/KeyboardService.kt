@@ -49,6 +49,7 @@ import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
+import org.jarsi.ark.keyboard.SmartSpace
 import org.jarsi.ark.keyboard.SymbolOrder
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
@@ -183,6 +184,20 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // 2 = automaattinen välilyönti juuri lisätty, 1 = commitin oma kursoripäivitys
     // ohitettu, 0 = ei voimassa. Välimerkki imaisee välin vain tilassa > 0.
     private var autoSpaceState = 0
+
+    // 2 = välimerkki juuri kirjoitettu, 1 = commitin oma kursoripäivitys
+    // ohitettu, 0 = ei voimassa. Kirjain saa välin eteensä vain tilassa > 0.
+    private var smartSpaceState = 0
+
+    // Kenttäkohtaiset ehdot: älykäs jälkiväli ei sovi osoite-, sähköposti-
+    // eikä koodikenttiin, ja iso alkukirjain seuraa kentän omaa pyyntöä.
+    private var smartSpaceField = false
+    private var capSentencesField = false
+
+    // Viimeisin älykäs jälkiväli (kirjoitettu kirjain, kenttään mennyt häntä):
+    // askelpalautin heti perään palauttaa kirjaimen ilman väliä, jotta
+    // esim. jarsi.org jatkuu pisteen jälkeen ehjänä.
+    private var pendingSpaceRevert: Pair<String, String>? = null
 
     private var autoCorrectEnabled = true
     private var noSuggestionsField = false
@@ -988,12 +1003,29 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             // Poisto kohdistuu käännösriviin, ei kenttään.
             deleteLastGrapheme(translateBuffer)
             onTranslateBufferChanged()
-        } else if (!revertAutoCorrect()) {
+        } else if (!revertSmartSpace() && !revertAutoCorrect()) {
             // Näppäintapahtumana, jotta valitun tekstin poisto toimii
             // sovelluksissa oikein.
             sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         }
         feedback(AudioManager.FX_KEYPRESS_DELETE)
+    }
+
+    /**
+     * Askelpalautin heti älykkään jälkivälin jälkeen palauttaa kirjaimen
+     * ilman väliä ja isontamista, jolloin esim. jarsi.org jatkuu ehjänä.
+     */
+    private fun revertSmartSpace(): Boolean {
+        val (typed, committed) = pendingSpaceRevert ?: return false
+        pendingSpaceRevert = null
+        val ic = currentInputConnection ?: return false
+        if (ic.getTextBeforeCursor(committed.length, 0)?.toString() != committed) return false
+        markOwnEdit()
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(committed.length, 0)
+        ic.commitText(typed, 1)
+        ic.endBatchEdit()
+        return true
     }
 
     /**
@@ -1447,6 +1479,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         autoCorrectEnabled = prefs.getBoolean("automaattikorjaus", true)
         symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
         pendingRevert = null
+        // Osoitteissa, sähköposteissa ja koodikentissä pisteet kuuluvat
+        // tekstiin, eikä väliä saa lisätä niiden perään automaattisesti.
+        smartSpaceField = inputClass == InputType.TYPE_CLASS_TEXT &&
+            !passwordField && !noSuggestionsField &&
+            variation != InputType.TYPE_TEXT_VARIATION_URI &&
+            variation != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS &&
+            variation != InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS
+        capSentencesField = inputClass == InputType.TYPE_CLASS_TEXT &&
+            info.inputType and InputType.TYPE_TEXT_FLAG_CAP_SENTENCES != 0
+        smartSpaceState = 0
+        pendingSpaceRevert = null
         // Salasana- ja numerokentissä ehdotusrivi on piilossa. NO_SUGGESTIONS
         // EI piilota riviä: moni sovellus (esim. Google Keep) merkitsee sillä
         // tavallisia kirjoituskenttiä, ja oma oppiminen on tämän näppäimistön
@@ -1469,11 +1512,26 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val ic = currentInputConnection ?: return
         val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
         val current = WordTools.currentWord(before)
+        // Välimerkin perään valittu ennustus saa välin eteensä samoin kuin
+        // kirjoitettu kirjain, ja lauseen alku isonnetaan.
+        val beforeChar = before.lastOrNull()
+        val smartPrefix = smartSpaceField && smartSpaceState > 0 && current.isEmpty() &&
+            beforeChar != null && SmartSpace.isPunctuation(beforeChar)
+        val display = if (smartPrefix && beforeChar != null && capSentencesField &&
+            SmartSpace.isSentenceEnder(beforeChar)
+        ) {
+            word.replaceFirstChar { it.titlecase(fiLocale) }
+        } else {
+            word
+        }
+        val committed = (if (smartPrefix) " " else "") +
+            if (spaceAfterSuggestion) "$display " else display
         ic.beginBatchEdit()
         if (current.isNotEmpty()) ic.deleteSurroundingText(current.length, 0)
-        ic.commitText(if (spaceAfterSuggestion) "$word " else word, 1)
+        ic.commitText(committed, 1)
         ic.endBatchEdit()
         autoSpaceState = if (spaceAfterSuggestion) 2 else 0
+        smartSpaceState = 0
         if (learningEnabled) {
             // Muut näkyneet täydennykset ohitettiin; valittu sana saa hyväksynnän.
             learning.onSuggestionsIgnored(shownCompletions, word)
@@ -1595,7 +1653,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (text.length == 1 && !text[0].isLetterOrDigit() && text[0] != '-') {
             learnCurrentWord()
         }
-        if (autoSpaceState > 0 && text.length == 1 && text[0] in AUTO_SPACE_PUNCTUATION &&
+        if (autoSpaceState > 0 && text.length == 1 && SmartSpace.isPunctuation(text[0]) &&
             ic.getTextBeforeCursor(1, 0)?.toString() == " "
         ) {
             // Ehdotuksen lisäämä välilyönti siirtyy välimerkin taakse: "sana ." -> "sana. "
@@ -1604,6 +1662,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             ic.commitText(text + " ", 1)
             ic.endBatchEdit()
             autoSpaceState = 2
+            smartSpaceState = 0
             feedback()
             return
         }
@@ -1614,7 +1673,27 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         } else {
             text
         }
-        ic.commitText(output, 1)
+        // Älykäs jälkiväli: välimerkin perään kirjoitettu kirjain saa välin
+        // eteensä, ja lauseen päättäjän jälkeen uusi lause alkaa isolla.
+        val decision = if (smartSpaceField && smartSpaceState > 0) {
+            SmartSpace.decide(
+                armed = true,
+                input = text,
+                before = ic.getTextBeforeCursor(1, 0)?.lastOrNull(),
+                capSentences = capSentencesField,
+            )
+        } else {
+            null
+        }
+        if (decision != null) {
+            val letter = if (decision.capitalize) output.uppercase(fiLocale) else output
+            ic.commitText(" $letter", 1)
+            pendingSpaceRevert = output to " $letter"
+            smartSpaceState = 0
+        } else {
+            smartSpaceState = if (smartSpaceField && SmartSpace.rearm(text)) 2 else 0
+            ic.commitText(output, 1)
+        }
         if (shiftState == ShiftState.SHIFT) {
             shiftState = ShiftState.OFF
             manualShift = false
@@ -1628,12 +1707,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         when (action) {
             KeyAction.Backspace, KeyAction.Enter, KeyAction.Space, is KeyAction.Arrow -> {
                 autoSpaceState = 0
+                smartSpaceState = 0
                 markOwnEdit()
             }
             else -> Unit
         }
         // Korjauksen voi perua vain heti perään; muut näppäimet mitätöivät.
-        if (action != KeyAction.Backspace && action != KeyAction.Shift) pendingRevert = null
+        if (action != KeyAction.Backspace && action != KeyAction.Shift) {
+            pendingRevert = null
+            pendingSpaceRevert = null
+        }
         when (action) {
             KeyAction.Shift -> handleShift()
             KeyAction.Backspace -> handleBackspaceKey()
@@ -1767,6 +1850,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         updateAutoCaps()
         if (autoSpaceState > 0) autoSpaceState--
+        if (smartSpaceState > 0) smartSpaceState--
         updateSuggestions()
     }
 
@@ -1798,7 +1882,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val LIVE_TRANSLATE_DELAY_MS = 300L
         const val EXTERNAL_SELECTION_MS = 1000L
         const val MAX_IMAGE_CLIP_BYTES = 10L * 1024 * 1024
-        const val AUTO_SPACE_PUNCTUATION = ".,!?:;…"
         const val FLUSH_THRESHOLD = 50
         const val SHOWN_TOP_COUNT = 3
         const val FILE_AUTHORITY = "org.jarsi.ark.nappaimisto.tiedostot"

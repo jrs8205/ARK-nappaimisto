@@ -50,6 +50,29 @@ class TextImproverTest {
     }
 
     @Test
+    fun `versiot poimitaan json-vastauksesta`() {
+        val body = """{"content":[{"type":"text","text":
+            "{\"versiot\": [\"Eka versio.\", \"Toka versio.\", \"Kolmas.\"]}"}]}"""
+        assertEquals(
+            listOf("Eka versio.", "Toka versio.", "Kolmas."),
+            TextImprover.parseVersions(body),
+        )
+    }
+
+    @Test
+    fun `koodiaidat riisutaan versioista`() {
+        val body = """{"content":[{"type":"text","text":
+            "```json\n{\"versiot\": [\"Vain yksi.\"]}\n```"}]}"""
+        assertEquals(listOf("Vain yksi."), TextImprover.parseVersions(body))
+    }
+
+    @Test
+    fun `muotoa noudattamaton vastaus on yksi versio`() {
+        val body = """{"content":[{"type":"text","text":"Pelkkä korjattu teksti."}]}"""
+        assertEquals(listOf("Pelkkä korjattu teksti."), TextImprover.parseVersions(body))
+    }
+
+    @Test
     fun `mallilista tulkitaan vastauksesta`() {
         val body = """{"data":[
             {"id":"claude-haiku-4-5","display_name":"Claude Haiku 4.5"},

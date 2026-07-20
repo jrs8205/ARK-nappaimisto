@@ -94,10 +94,9 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
         setTypeface(typeface, android.graphics.Typeface.BOLD)
     }
 
-    private val improvementText = TextView(context).apply {
-        textSize = 18f
-        setLineSpacing(dp(6).toFloat(), 1f)
-        setPadding(0, dp(8), 0, dp(8))
+    // Versiot listataan kortteina; napautus ottaa version käyttöön.
+    private val improvementList = android.widget.LinearLayout(context).apply {
+        orientation = android.widget.LinearLayout.VERTICAL
     }
 
     private val rejectButton = TextView(context).apply {
@@ -105,15 +104,6 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
         textSize = 16f
         setPadding(dp(16), dp(10), dp(16), dp(10))
         setOnClickListener { hideImprovement() }
-    }
-
-    private val acceptButton = TextView(context).apply {
-        text = context.getString(R.string.korjaus_kayta)
-        textSize = 16f
-        setPadding(dp(20), dp(10), dp(20), dp(10))
-        setOnClickListener {
-            listener?.onAcceptImprovement(improvementText.text.toString())
-        }
     }
 
     // Parannusehdotus peittää tekstin, kunnes se hyväksytään tai hylätään.
@@ -132,7 +122,7 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
         addView(
             ScrollView(context).apply {
                 addView(
-                    improvementText,
+                    improvementList,
                     ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -146,13 +136,6 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
                 orientation = android.widget.LinearLayout.HORIZONTAL
                 gravity = Gravity.END or Gravity.CENTER_VERTICAL
                 addView(rejectButton)
-                addView(
-                    acceptButton,
-                    android.widget.LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ).apply { marginStart = dp(12) },
-                )
             },
             android.widget.LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -195,17 +178,33 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
     /** Näyttää odotustilan, kunnes parannus valmistuu tai epäonnistuu. */
     fun showImprovementLoading() {
         improvementTitle.text = context.getString(R.string.korjaus_parannetaan)
-        improvementText.text = ""
-        rejectButton.visibility = VISIBLE
-        acceptButton.visibility = GONE
+        improvementList.removeAllViews()
         improvementOverlay.visibility = VISIBLE
     }
 
-    fun showImprovement(text: String) {
+    fun showImprovement(versions: List<String>) {
         improvementTitle.text = context.getString(R.string.korjaus_parannus_otsikko)
-        improvementText.text = text
-        rejectButton.visibility = VISIBLE
-        acceptButton.visibility = VISIBLE
+        improvementList.removeAllViews()
+        versions.forEach { version ->
+            improvementList.addView(
+                TextView(context).apply {
+                    text = version
+                    textSize = 17f
+                    setLineSpacing(dp(4).toFloat(), 1f)
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
+                    setTextColor(theme.text)
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(theme.specialKey)
+                    }
+                    setOnClickListener { listener?.onAcceptImprovement(version) }
+                },
+                android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(8) },
+            )
+        }
         improvementOverlay.visibility = VISIBLE
     }
 
@@ -252,13 +251,7 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
         )
         improvementOverlay.setBackgroundColor(theme.background)
         improvementTitle.setTextColor(theme.accent)
-        improvementText.setTextColor(theme.text)
         rejectButton.setTextColor(theme.hint)
-        acceptButton.setTextColor(theme.accentText)
-        acceptButton.background = GradientDrawable().apply {
-            cornerRadius = dp(20).toFloat()
-            setColor(theme.accent)
-        }
     }
 
     fun render(text: CharSequence, words: List<IntRange>, unknown: Set<Int>, selected: Int) {

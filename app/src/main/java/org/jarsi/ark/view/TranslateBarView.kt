@@ -173,7 +173,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         textSize = 16f
         maxLines = 1
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(8), dp(8), dp(8), dp(8))
+        setPadding(dp(8), dp(14), dp(8), dp(14))
         setOnTouchListener { view, event ->
             val textView = view as TextView
             when (event.actionMasked) {
@@ -254,7 +254,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     init {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        minimumHeight = dp(40)
+        // Korkeampi rivi antaa valintakahvoille sormitilaa, ettei veto
+        // osu alapuolella olevaan numeroriviin.
+        minimumHeight = dp(56)
         addView(sourceLabel)
         addView(swapLabel)
         addView(targetLabel)

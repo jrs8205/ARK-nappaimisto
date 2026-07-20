@@ -914,7 +914,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 if (generation != improveGeneration || destroyed) return@post
                 val panel = correctionPanel ?: return@post
                 if (panel.visibility != View.VISIBLE) return@post
-                if (result != null && text == correctionText) {
+                if (!result.isNullOrEmpty() && text == correctionText) {
                     panel.showImprovement(result)
                 } else {
                     panel.hideImprovement()
@@ -926,7 +926,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
     }
 
-    private fun runImprovement(apiKey: String, text: String): String? = try {
+    private fun runImprovement(apiKey: String, text: String): List<String>? = try {
         val connection = java.net.URL(TextImprover.ENDPOINT)
             .openConnection() as javax.net.ssl.HttpsURLConnection
         try {
@@ -944,7 +944,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             if (connection.responseCode in 200..299) {
                 connection.inputStream.bufferedReader().use { it.readText() }
-                    .let(TextImprover::parseResponse)
+                    .let(TextImprover::parseVersions)
             } else {
                 null
             }

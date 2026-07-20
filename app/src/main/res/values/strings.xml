@@ -68,9 +68,8 @@
     <string name="malli_aseta_avain">Aseta ensin Claude API -avain</string>
     <string name="malli_haku_virhe">Mallilistan haku epäonnistui – tarkista API-avain ja verkkoyhteys</string>
     <string name="korjaus_paranna">Paranna teksti</string>
-    <string name="korjaus_parannus_otsikko">Parannusehdotus</string>
+    <string name="korjaus_parannus_otsikko">Valitse parannus napauttamalla</string>
     <string name="korjaus_parannetaan">Parannetaan…</string>
-    <string name="korjaus_kayta">Käytä</string>
     <string name="korjaus_hylkaa">Hylkää</string>
     <string name="korjaus_paranna_virhe">Parannus epäonnistui – tarkista verkkoyhteys ja API-avain</string>
 

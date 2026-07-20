@@ -1674,8 +1674,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         pendingRevert = null
         // Osoitteissa, sähköposteissa ja koodikentissä pisteet kuuluvat
         // tekstiin, eikä väliä saa lisätä niiden perään automaattisesti.
+        // NO_SUGGESTIONS ei estä väliä: esim. Google Keep merkitsee sillä
+        // tavalliset kirjoituskentät, joissa jälkiväli nimenomaan halutaan.
         smartSpaceField = inputClass == InputType.TYPE_CLASS_TEXT &&
-            !passwordField && !noSuggestionsField &&
+            !passwordField &&
             variation != InputType.TYPE_TEXT_VARIATION_URI &&
             variation != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS &&
             variation != InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS

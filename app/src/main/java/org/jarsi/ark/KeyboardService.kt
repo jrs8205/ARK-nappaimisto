@@ -603,6 +603,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         bar.pasteAvailable = clipboardManager?.hasPrimaryClip() == true
         bar.setBuffer(translateBuffer.text, translateBuffer.cursor, hint)
+        // Shift-nuoli seuraa käännösrivin tekstiä kuten kenttää.
+        if (translateMode) updateAutoCaps()
     }
 
     private fun onTranslatePairChanged() {
@@ -2026,18 +2028,31 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun updateAutoCaps() {
         if (page != Page.LETTERS || manualShift || shiftState == ShiftState.CAPS) return
-        val info = currentInputEditorInfo ?: return
-        val ic = currentInputConnection ?: return
-        val caps = if (info.inputType != InputType.TYPE_NULL) {
-            ic.getCursorCapsMode(info.inputType)
+        val caps = if (translateMode) {
+            translateAutoCaps()
         } else {
-            0
+            val info = currentInputEditorInfo ?: return
+            val ic = currentInputConnection ?: return
+            info.inputType != InputType.TYPE_NULL &&
+                ic.getCursorCapsMode(info.inputType) != 0
         }
-        val newState = if (caps != 0) ShiftState.SHIFT else ShiftState.OFF
+        val newState = if (caps) ShiftState.SHIFT else ShiftState.OFF
         if (newState != shiftState) {
             shiftState = newState
             keyboardView?.shiftState = newState
         }
+    }
+
+    /**
+     * Käännösrivin iso alkukirjain kuten kentissä: rivin alussa ja
+     * lauseen päättävän välimerkin ja välin jälkeen.
+     */
+    private fun translateAutoCaps(): Boolean {
+        val before = translateBuffer.text.substring(0, translateBuffer.cursor)
+        if (before.isBlank()) return true
+        if (!before.endsWith(" ")) return false
+        val trimmed = before.trimEnd(' ')
+        return trimmed.isNotEmpty() && trimmed.last() in ".!?…"
     }
 
     override fun onUpdateSelection(

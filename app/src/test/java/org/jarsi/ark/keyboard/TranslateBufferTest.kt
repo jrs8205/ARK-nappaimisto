@@ -115,10 +115,10 @@ class TranslateBufferTest {
     }
 
     @Test
-    fun `smartInsert kapitalisoi valmiin valin jalkeen`() {
+    fun `valin jalkeen lisays on tavallinen koska shift hoitaa ison`() {
         val b = TranslateBuffer()
         b.insert("moi. ")
-        b.smartInsert("h")
+        b.smartInsert("H")
         assertEquals("moi. H", b.text)
     }
 
@@ -142,12 +142,10 @@ class TranslateBufferTest {
     }
 
     @Test
-    fun `rivin alku alkaa isolla ja peruutus palauttaa`() {
+    fun `rivin alussa lisays on tavallinen koska shift hoitaa ison`() {
         val b = TranslateBuffer()
-        b.smartInsert("m")
+        b.smartInsert("M")
         assertEquals("M", b.text)
-        assertTrue(b.backspace())
-        assertEquals("m", b.text)
     }
 
     @Test

@@ -37,28 +37,23 @@ class TranslateBuffer {
     )
 
     /**
-     * Lisää näppäillyn tekstin älykkäästi: kirjain lauseen päättävän
-     * välimerkin perään saa välin eteensä ja ison alkukirjaimen, ja
-     * rivin alkuun kirjoitettu kirjain alkaa isolla. Askelpalautin
-     * peruu muunnoksen. Numeroiden perässä sääntö ei laukea (3.14).
+     * Lisää näppäillyn tekstin älykkäästi: kirjain suoraan lauseen
+     * päättävän välimerkin perään saa välin eteensä ja ison
+     * alkukirjaimen. Askelpalautin peruu muunnoksen, joten osoitteet
+     * kuten jarsi.org onnistuvat. Numeroiden perässä sääntö ei laukea
+     * (3.14). Välin jälkeinen iso kirjain tulee shift-tilasta, joka
+     * näkyy käyttäjälle nuolen värissä.
      */
     fun smartInsert(s: String) {
         if (s.length == 1 && s[0].isLetter()) {
             val before = builder.substring(0, cursor)
-            val trimmed = before.trimEnd(' ')
-            val afterSentence = trimmed.isNotEmpty() &&
-                trimmed.last() in SENTENCE_END &&
-                (trimmed.length < 2 || !trimmed[trimmed.lastIndex - 1].isDigit())
+            val afterSentence = before.isNotEmpty() &&
+                before.last() in SENTENCE_END &&
+                (before.length < 2 || !before[before.lastIndex - 1].isDigit())
             if (afterSentence) {
-                val space = if (before.length == trimmed.length) " " else ""
-                val inserted = space + s.uppercase()
+                val inserted = " " + s.uppercase()
                 insert(inserted)
                 smartRevert = SmartRevert(cursor, s, inserted.length)
-                return
-            }
-            if (before.isBlank() && s[0].isLowerCase()) {
-                insert(s.uppercase())
-                smartRevert = SmartRevert(cursor, s, 1)
                 return
             }
         }

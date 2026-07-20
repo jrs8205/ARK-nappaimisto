@@ -117,9 +117,9 @@ class ToolbarOrderActivity : AppCompatActivity() {
         }
     )
 
-    private fun toolIcon(tool: ToolbarTool): Int? = when (tool) {
+    private fun toolIcon(tool: ToolbarTool): Int = when (tool) {
         ToolbarTool.ARROWS -> R.drawable.ic_cursor_move
-        ToolbarTool.WEB -> null
+        ToolbarTool.WEB -> R.drawable.ic_globe
         ToolbarTool.MIC -> R.drawable.ic_mic
         ToolbarTool.EMOJI -> R.drawable.ic_emoji
         ToolbarTool.CLIPBOARD -> R.drawable.ic_clipboard
@@ -168,6 +168,13 @@ class ToolbarOrderActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER_VERTICAL
                 compoundDrawablePadding = dp(12)
             }
+            // Kahva kertoo raahattavuudesta ilman tekstin lukemista.
+            val dragHandle = android.widget.ImageView(parent.context).apply {
+                setImageResource(R.drawable.ic_drag_handle)
+                alpha = 0.4f
+                importantForAccessibility =
+                    android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
             val toggle = MaterialSwitch(parent.context)
             val row = LinearLayout(parent.context).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -176,6 +183,12 @@ class ToolbarOrderActivity : AppCompatActivity() {
                 layoutParams = RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
+                addView(
+                    dragHandle,
+                    LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+                        marginEnd = dp(16)
+                    },
                 )
                 addView(
                     label,
@@ -189,23 +202,18 @@ class ToolbarOrderActivity : AppCompatActivity() {
                     ),
                 )
             }
+            dragHandle.imageTintList = ColorStateList.valueOf(label.currentTextColor)
             return ToolHolder(row, label, toggle)
         }
 
         override fun onBindViewHolder(holder: ToolHolder, position: Int) {
             val tool = items[position]
             holder.label.text = toolName(tool)
-            val icon = toolIcon(tool)
-            if (icon != null) {
-                holder.label.setCompoundDrawablesRelativeWithIntrinsicBounds(icon, 0, 0, 0)
-                holder.label.compoundDrawableTintList =
-                    ColorStateList.valueOf(holder.label.currentTextColor)
-                holder.label.setPadding(0, 0, 0, 0)
-            } else {
-                // www-napilla ei ole kuvaketta; sisennys pitää rivit tasassa.
-                holder.label.setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
-                holder.label.setPadding(dp(24) + dp(12), 0, 0, 0)
-            }
+            holder.label.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                toolIcon(tool), 0, 0, 0
+            )
+            holder.label.compoundDrawableTintList =
+                ColorStateList.valueOf(holder.label.currentTextColor)
             holder.label.alpha = if (tool in hidden) 0.5f else 1f
             holder.toggle.contentDescription = toolName(tool)
             holder.toggle.setOnCheckedChangeListener(null)

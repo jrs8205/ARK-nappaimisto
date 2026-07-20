@@ -136,9 +136,15 @@ class LearnedWordsActivity : AppCompatActivity() {
             WindowInsetsCompat.CONSUMED
         }
 
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Lista luetaan aina näkymään palattaessa, jotta näppäimistön
+        // taustalla oppimat sanat näkyvät ilman erillistä muutosta.
         ioExecutor.execute {
             try {
-                val db = LearnedDatabase.create(this)
+                val db = database ?: LearnedDatabase.create(this)
                 val words = db.dao().allWords()
                 runOnUiThread {
                     database = db
@@ -162,16 +168,21 @@ class LearnedWordsActivity : AppCompatActivity() {
         } else {
             allWords.filter { it.key.contains(query) }
         }
-        // Hallinnassa näkyvät kirjoitetut ja kiinnitetyt sanat; estetyt omassa
-        // osiossaan, jotta eston voi purkaa.
+        // Hallinnassa näkyvät kirjoitetut, ehdotuksista valitut ja kiinnitetyt
+        // sanat; estetyt omassa osiossaan, jotta eston voi purkaa.
         val learned = filtered
-            .filter { !it.blocked && (it.count > 0 || it.pinned) }
-            .sortedWith(compareByDescending<WordEntity> { it.count }.thenBy { it.key })
+            .filter { !it.blocked && (it.count > 0 || it.acceptedCount > 0 || it.pinned) }
+            .sortedWith(
+                compareByDescending<WordEntity> { it.count + it.acceptedCount }.thenBy { it.key }
+            )
         val blocked = filtered.filter { it.blocked }.sortedBy { it.key }
         val items = buildList {
-            learned.forEach { add(Item.Row(it)) }
+            if (learned.isNotEmpty()) {
+                add(Item.Header(getString(R.string.opitut_osio_opitut, learned.size)))
+                learned.forEach { add(Item.Row(it)) }
+            }
             if (blocked.isNotEmpty()) {
-                add(Item.Header(getString(R.string.opitut_estetyt)))
+                add(Item.Header(getString(R.string.opitut_osio_estetyt, blocked.size)))
                 blocked.forEach { add(Item.Row(it)) }
             }
         }
@@ -312,7 +323,9 @@ class LearnedWordsActivity : AppCompatActivity() {
                     val meta = column.getChildAt(1) as TextView
                     word.text = item.entity.word
                     meta.text = buildString {
-                        append(getString(R.string.opitut_kaytto, item.entity.count))
+                        // Käyttö = itse kirjoitetut + ehdotusriviltä valitut kerrat.
+                        val uses = item.entity.count + item.entity.acceptedCount
+                        append(getString(R.string.opitut_kaytto, uses))
                         if (item.entity.pinned) {
                             append(" • ").append(getString(R.string.opitut_kiinnitetty))
                         }

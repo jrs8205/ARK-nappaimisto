@@ -35,7 +35,8 @@
     <string name="opitut_sanat">Opitut sanat</string>
     <string name="opitut_sanat_kuvaus">Selaa, kiinnitä, salli ja poista opittuja sanoja</string>
     <string name="opitut_haku">Hae sanaa</string>
-    <string name="opitut_estetyt">Estetyt sanat</string>
+    <string name="opitut_osio_opitut">Opitut sanat (%d)</string>
+    <string name="opitut_osio_estetyt">Estetyt sanat (%d)</string>
     <string name="opitut_salli">Salli taas</string>
     <string name="opitut_tyhja">Ei vielä opittuja sanoja</string>
     <string name="opitut_kaytto">%d käyttöä</string>

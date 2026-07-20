@@ -189,6 +189,8 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         val result = HashMap<String, Float>()
         for ((previous, followers) in bigrams) {
             val state = followers[nextKey] ?: continue
+            // Estetty sana ei kelpaa vaihtoehdoksi tässäkään suunnassa.
+            if (words[previous]?.blocked == true) continue
             result[previous] = state.count * recency(state.lastUsed)
         }
         return result

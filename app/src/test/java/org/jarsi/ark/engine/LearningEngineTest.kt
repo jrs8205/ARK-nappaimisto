@@ -360,6 +360,14 @@ class LearningEngineTest {
     }
 
     @Test
+    fun `previousMatches ei anna estettya sanaa`() {
+        val e = engine()
+        listOf("paha", "on").forEach { e.onWordCommitted(it) }
+        e.blockWord("paha")
+        assertFalse("paha" in e.previousMatches("on"))
+    }
+
+    @Test
     fun `onCorrectionAccepted kirjaa hyvaksynnan ilman ketjua`() {
         val e = engine()
         e.onWordCommitted("eka")

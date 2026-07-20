@@ -151,6 +151,11 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 * peruutusnappi työkalurivillä: peruu viimeisimmän näppäimistön
   toimenpiteen (esim. liittämisen tai automaattikorjauksen); muissa
   tilanteissa pyytää kentän omaa peruutusta
+* välitön jälkiväli: välimerkki sanan perässä saa välin heti peräänsä
+  ("sana," → "sana, ") sekä kentässä että käännösrivillä; numeroiden
+  välissä (3,14) sääntö ei laukea, ja osoitteen (jarsi.org) välin saa
+  pois yhdellä askelpalauttimella. Osoite-, sähköposti- ja
+  salasanakentissä sääntö ei ole käytössä.
 * yleissanasto 170 100 sanaa: Parole-taajuuslista täydennettynä Kotuksen
   Nykysuomen sanalistalla (ks. [docs/sanalista.md](docs/sanalista.md))
 * jatkuva sanelu työkalurivin mikrofonista: miettimistauko ei katkaise,
@@ -178,11 +183,21 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   kielimallit ladataan ja poistetaan asetuksista (~30 Mt/kieli).
   Kirjoitettavaa tekstiä voi muokata rivillä: napautus tai nuolet
   siirtävät kursoria, ja leikepöydästä liitetty teksti kääntyy heti.
-  Käännösrivin tekstin voi kopioida pitkällä painalluksella.
+  Rivillä toimivat myös välitön jälkiväli, shift-nuolta seuraava iso
+  alkukirjain sekä pitkän painalluksen valikko: Kopioi, Valitse
+  kaikki ja Liitä, ja valintaa voi säätää kahvoista. Käännettävä
+  teksti esikäsitellään kokonaisiksi lauseiksi, mikä parantaa
+  käännösten laatua.
 * Paranna teksti (valinnainen): korjausnäkymän nappi lähettää kentän
-  tekstin Anthropicin Claude-palveluun ja näyttää parannusehdotuksen,
-  joka korvaa tekstin vasta hyväksynnästä. Vaatii oman API-avaimen
-  asetuksiin; ilman avainta nappia ei näytetä eikä mitään lähetetä.
+  tekstin Anthropicin Claude-palveluun ja näyttää kolme
+  parannusehdotusta, joista valittu korvaa tekstin. Käytettävän
+  Claude-mallin voi valita asetuksista; lista haetaan Anthropicilta,
+  joten uudet mallit näkyvät ilman sovelluspäivitystä. Vaatii oman
+  API-avaimen asetuksiin; ilman avainta nappia ei näytetä eikä mitään
+  lähetetä.
+* asetussivujen Material 3 -ilme: iso kutistuva otsikko, korttirivit,
+  kuvakkeet ja Material You -värit (Android 12+). Värit täyttävät
+  WCAG AAA -kontrastivaatimukset molemmissa teemoissa.
 
 ## Yksityisyys
 

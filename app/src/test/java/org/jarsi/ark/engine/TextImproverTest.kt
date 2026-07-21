@@ -73,14 +73,14 @@ class TextImproverTest {
     }
 
     @Test
-    fun `mallilista tulkitaan vastauksesta`() {
+    fun `mallilista tulkitaan vastauksesta ja jarjestetaan kyvykkain ensin`() {
         val body = """{"data":[
             {"id":"claude-haiku-4-5","display_name":"Claude Haiku 4.5"},
             {"id":"claude-opus-4-8","display_name":"Claude Opus 4.8"}]}"""
         assertEquals(
             listOf(
-                "claude-haiku-4-5" to "Claude Haiku 4.5",
                 "claude-opus-4-8" to "Claude Opus 4.8",
+                "claude-haiku-4-5" to "Claude Haiku 4.5",
             ),
             TextImprover.parseModels(body),
         )
@@ -178,17 +178,63 @@ class TextImproverTest {
     @Test
     fun `openai-mallilista suodattaa muut kuin chat-mallit`() {
         val body = """{"data":[
-            {"id":"gpt-5-mini"},
-            {"id":"gpt-4o"},
-            {"id":"o3"},
-            {"id":"whisper-1"},
-            {"id":"gpt-4o-audio-preview"},
-            {"id":"text-embedding-3-small"},
-            {"id":"dall-e-3"}]}"""
+            {"id":"gpt-5-mini","created":30},
+            {"id":"gpt-4o","created":10},
+            {"id":"o3","created":20},
+            {"id":"whisper-1","created":40},
+            {"id":"gpt-4o-audio-preview","created":40},
+            {"id":"text-embedding-3-small","created":40},
+            {"id":"dall-e-3","created":40}]}"""
         val models = TextImprover.parseOpenAiModels(body).map { it.first }
-        assertEquals(true, "gpt-5-mini" in models)
-        assertEquals(true, "gpt-4o" in models)
-        assertEquals(true, "o3" in models)
-        assertEquals(false, models.any { "whisper" in it || "audio" in it || "embedding" in it || "dall" in it })
+        assertEquals(listOf("gpt-5-mini", "o3", "gpt-4o"), models)
+    }
+
+    @Test
+    fun `openai-mallilista pudottaa paivatyt kopiot ja aliakset`() {
+        val body = """{"data":[
+            {"id":"gpt-5.6-terra","created":60},
+            {"id":"gpt-4o-2024-08-06","created":50},
+            {"id":"chatgpt-4o-latest","created":50},
+            {"id":"gpt-4.5-preview","created":50}]}"""
+        assertEquals(
+            listOf("gpt-5.6-terra"),
+            TextImprover.parseOpenAiModels(body).map { it.first },
+        )
+    }
+
+    @Test
+    fun `openai-mallilista rajautuu kahteentoista uusimpaan`() {
+        val items = (1..20).joinToString(",") { """{"id":"gpt-m$it","created":$it}""" }
+        val models = TextImprover.parseOpenAiModels("""{"data":[$items]}""")
+        assertEquals(12, models.size)
+        assertEquals("gpt-m20", models.first().first)
+    }
+
+    @Test
+    fun `claude-mallilista nayttaa vain perheen uusimman kyvykkain ensin`() {
+        val body = """{"data":[
+            {"id":"claude-sonnet-5","display_name":"Claude Sonnet 5"},
+            {"id":"claude-fable-5","display_name":"Claude Fable 5"},
+            {"id":"claude-opus-4-8","display_name":"Claude Opus 4.8"},
+            {"id":"claude-opus-4-7","display_name":"Claude Opus 4.7"},
+            {"id":"claude-sonnet-4-6","display_name":"Claude Sonnet 4.6"},
+            {"id":"claude-haiku-4-5","display_name":"Claude Haiku 4.5"}]}"""
+        assertEquals(
+            listOf("claude-fable-5", "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5"),
+            TextImprover.parseModels(body).map { it.first },
+        )
+    }
+
+    @Test
+    fun `openai-sukupolven sisalla kyvykkain ensin`() {
+        val body = """{"data":[
+            {"id":"gpt-5.6-terra","created":102},
+            {"id":"gpt-5.6-luna","created":101},
+            {"id":"gpt-5.6-sol","created":100},
+            {"id":"gpt-5","created":90}]}"""
+        assertEquals(
+            listOf("gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5"),
+            TextImprover.parseOpenAiModels(body).map { it.first },
+        )
     }
 }

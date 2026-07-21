@@ -160,32 +160,64 @@ object TextImprover {
     fun parseOpenAiVersions(body: String): List<String> =
         versionsFromText(parseOpenAiResponse(body))
 
-    // OpenAI:n mallilista sisältää myös kuva-, ääni- ja upotusmallit;
-    // valikkoon kelpaavat vain tekstiä tuottavat chat-mallit.
+    // OpenAI:n mallilista sisältää myös kuva-, ääni- ja upotusmallit sekä
+    // vanhoja sukupolvia; valikkoon kelpaavat vain tekstiä tuottavat
+    // chat-mallit ilman päivättyjä kopioita ja ChatGPT-aliaksia.
     private val OPENAI_EXCLUDE = listOf(
         "audio", "realtime", "tts", "whisper", "embedding", "dall",
         "moderation", "image", "transcribe", "search", "instruct",
-        "davinci", "babbage", "computer-use", "codex",
+        "davinci", "babbage", "computer-use", "codex", "preview", "latest",
     )
 
+    private val OPENAI_DATED = Regex("-\\d{4}-\\d{2}-\\d{2}$")
+
+    private const val OPENAI_MODEL_LIMIT = 12
+
+    // Saman sukupolven kokoluokat kyvykkäin ensin: sol/perusmalli,
+    // terra, luna/mini, nano.
+    private fun openAiTierRank(id: String): Int = when {
+        "nano" in id -> 3
+        "mini" in id || "luna" in id -> 2
+        "terra" in id -> 1
+        else -> 0
+    }
+
+    private fun openAiGeneration(id: String): String =
+        id.replace(Regex("-(sol|terra|luna|mini|nano).*"), "")
+
     /**
-     * Mallilista OpenAI:n /v1/models-vastauksesta: chat-mallit uusin
-     * ensin. Näyttönimiä ei ole, joten tunniste toimii nimenä.
+     * Mallilista OpenAI:n /v1/models-vastauksesta: uusin sukupolvi
+     * ensin ja sen sisällä kyvykkäin (ja kallein) ylimpänä, enintään
+     * [OPENAI_MODEL_LIMIT] kappaletta, jottei valikko täyty vanhoista
+     * sukupolvista. Näyttönimiä ei ole, joten tunniste toimii nimenä.
      */
     fun parseOpenAiModels(body: String): List<Pair<String, String>> = try {
         val data = JSONObject(body).optJSONArray("data")
-        val ids = mutableListOf<String>()
+        val models = mutableListOf<Pair<String, Long>>()
         if (data != null) {
             for (i in 0 until data.length()) {
-                val id = data.getJSONObject(i).optString("id")
-                val chatModel = id.startsWith("gpt-") || id.startsWith("chatgpt-") ||
-                    Regex("^o\\d").containsMatchIn(id)
-                if (id.isNotEmpty() && chatModel && OPENAI_EXCLUDE.none { it in id }) {
-                    ids.add(id)
+                val item = data.getJSONObject(i)
+                val id = item.optString("id")
+                val chatModel = id.startsWith("gpt-") || Regex("^o\\d").containsMatchIn(id)
+                if (id.isNotEmpty() && chatModel &&
+                    OPENAI_EXCLUDE.none { it in id } && !OPENAI_DATED.containsMatchIn(id)
+                ) {
+                    models.add(id to item.optLong("created"))
                 }
             }
         }
-        ids.sortedDescending().map { it to it }
+        // Sukupolven ikä määräytyy sen uusimman jäsenen mukaan, jotta
+        // saman perheen kokoluokat pysyvät yhdessä tier-järjestyksessä.
+        val generationAge = models
+            .groupBy({ openAiGeneration(it.first) }, { it.second })
+            .mapValues { (_, created) -> created.max() }
+        models.sortedWith(
+            compareByDescending<Pair<String, Long>> { generationAge[openAiGeneration(it.first)] }
+                .thenBy { openAiTierRank(it.first) }
+                .thenByDescending { it.second }
+        )
+            .take(OPENAI_MODEL_LIMIT)
+            .map { it.first to it.first }
     } catch (e: JSONException) {
         emptyList()
     }
@@ -203,10 +235,15 @@ object TextImprover {
         null
     }
 
+    // Malliperheet uusimman poimintaa varten; muut tunnisteet jäävät omikseen.
+    private val CLAUDE_FAMILIES = listOf("fable", "mythos", "opus", "sonnet", "haiku")
+
     /**
      * Mallilistan tulkinta /v1/models-vastauksesta: parit (tunniste,
      * näyttönimi). Lista haetaan aina tuoreena, joten uudet mallit
-     * ilmestyvät valikkoon ilman sovelluspäivitystä.
+     * ilmestyvät valikkoon ilman sovelluspäivitystä. Rajapinta palauttaa
+     * mallit uusin ensin, ja valikkoon otetaan vain kunkin perheen
+     * uusin, jottei se täyty vanhoista versioista.
      */
     fun parseModels(body: String): List<Pair<String, String>> = try {
         val data = JSONObject(body).optJSONArray("data")
@@ -220,7 +257,14 @@ object TextImprover {
                 }
             }
         }
-        models
+        val seen = mutableSetOf<String>()
+        models.filter { (id, _) ->
+            seen.add(CLAUDE_FAMILIES.firstOrNull { it in id } ?: id)
+        }.sortedBy { (id, _) ->
+            // Kyvykkäin ja kallein ensin: fable, opus, sonnet, haiku.
+            CLAUDE_FAMILIES.indexOfFirst { it in id }.takeIf { it >= 0 }
+                ?: CLAUDE_FAMILIES.size
+        }
     } catch (e: JSONException) {
         emptyList()
     }

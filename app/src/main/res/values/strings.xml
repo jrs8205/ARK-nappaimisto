@@ -94,6 +94,7 @@
     <string name="korjaus_paranna_virhe">Parannus epäonnistui – tarkista verkkoyhteys ja API-avain</string>
     <string name="korjaus_paranna_virhe_syy">Parannus epäonnistui: %1$s</string>
     <string name="korjaus_tyhja_vastaus">palvelu palautti tyhjän vastauksen</string>
+    <string name="korjaus_ei_korjattavaa">Teksti on jo kunnossa – ei korjattavaa</string>
 
     <string name="asetukset_varmuuskopio">Varmuuskopio</string>
     <string name="varmuuskopio_vie">Vie varmuuskopio</string>

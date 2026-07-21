@@ -956,7 +956,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 val panel = correctionPanel ?: return@post
                 if (panel.visibility != View.VISIBLE) return@post
                 if (!result.isNullOrEmpty() && text == correctionText) {
-                    panel.showImprovement(result)
+                    if (result.all { it.trim() == text.trim() }) {
+                        // Malli ei löytänyt korjattavaa: sama teksti
+                        // kortteina näyttäisi siltä kuin mitään ei
+                        // tapahtunut, joten kerrotaan asia suoraan.
+                        panel.hideImprovement()
+                        Toast.makeText(
+                            this, R.string.korjaus_ei_korjattavaa, Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        panel.showImprovement(result)
+                    }
                 } else {
                     panel.hideImprovement()
                     // Syy näkyviin (väärä avain, kiintiö, tyhjä vastaus…),

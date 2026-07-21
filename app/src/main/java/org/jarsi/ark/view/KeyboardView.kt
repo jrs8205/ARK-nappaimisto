@@ -39,6 +39,9 @@ class KeyboardView(context: Context) : View(context) {
         fun onText(text: String)
         fun onKey(action: KeyAction)
         fun onSpaceSwipe(steps: Int)
+
+        /** Pohjassa pidetyn näppäimen toistokerta; oletuksena kuin napautus. */
+        fun onKeyRepeat(action: KeyAction) = onKey(action)
     }
 
     var listener: Listener? = null
@@ -97,8 +100,15 @@ class KeyboardView(context: Context) : View(context) {
         val longPressRunnable = Runnable { handleLongPress(this) }
         val repeatRunnable: Runnable = object : Runnable {
             override fun run() {
-                commit(bounded.key)
-                postDelayed(this, REPEAT_INTERVAL_MS)
+                val action = bounded.key.action
+                if (action == KeyAction.Backspace) {
+                    // Pohjassa pidetty askelpalautin siirtyy sanapoistoon.
+                    listener?.onKeyRepeat(action)
+                    postDelayed(this, REPEAT_WORD_INTERVAL_MS)
+                } else {
+                    commit(bounded.key)
+                    postDelayed(this, REPEAT_INTERVAL_MS)
+                }
             }
         }
     }
@@ -531,5 +541,9 @@ class KeyboardView(context: Context) : View(context) {
     private companion object {
         const val REPEAT_DELAY_MS = 400L
         const val REPEAT_INTERVAL_MS = 50L
+
+        // Sanapoisto etenee harvemmin kuin merkkipoisto, jotta pitkän
+        // painalluksen voi lopettaa halutun sanan kohdalle.
+        const val REPEAT_WORD_INTERVAL_MS = 250L
     }
 }

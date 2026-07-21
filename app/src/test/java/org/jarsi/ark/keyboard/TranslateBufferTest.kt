@@ -173,4 +173,34 @@ class TranslateBufferTest {
         b.smartSpace()
         assertEquals("sana, x ", b.text)
     }
+
+    @Test
+    fun `backspaceWord poistaa sanan ja hantavalit`() {
+        val b = TranslateBuffer()
+        b.insert("kaksi sanaa ")
+        assertTrue(b.backspaceWord())
+        assertEquals("kaksi ", b.text)
+        assertTrue(b.backspaceWord())
+        assertEquals("", b.text)
+        assertEquals(0, b.cursor)
+    }
+
+    @Test
+    fun `backspaceWord keskella tekstia poistaa kursorin edelta`() {
+        val b = TranslateBuffer()
+        b.insert("eka toka kolmas")
+        b.move(-7)
+        assertTrue(b.backspaceWord())
+        assertEquals("eka  kolmas", b.text)
+        assertEquals(4, b.cursor)
+    }
+
+    @Test
+    fun `backspaceWord alussa ei tee mitaan`() {
+        val b = TranslateBuffer()
+        b.insert("sana")
+        b.moveToStart()
+        assertFalse(b.backspaceWord())
+        assertEquals("sana", b.text)
+    }
 }

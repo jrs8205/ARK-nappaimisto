@@ -48,6 +48,13 @@
             android:title="@string/asetus_esikatselu"
             android:defaultValue="true"
             app:singleLineTitle="false" />
+        <SwitchPreferenceCompat
+            android:key="numerorivi"
+            android:icon="@drawable/ic_keyboard"
+            android:title="@string/asetus_numerorivi"
+            android:summary="@string/asetus_numerorivi_kuvaus"
+            android:defaultValue="true"
+            app:singleLineTitle="false" />
         <Preference
             android:key="erikoismerkit"
             android:icon="@drawable/ic_tag"
@@ -103,6 +110,19 @@
             android:title="@string/kaannoskielet"
             android:summary="@string/kaannoskielet_kuvaus"
             app:singleLineTitle="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/asetukset_sanelu">
+        <SeekBarPreference
+            android:key="sanelu_hiljaisuus"
+            android:icon="@drawable/ic_mic"
+            android:title="@string/asetus_sanelu_hiljaisuus"
+            android:summary="@string/asetus_sanelu_hiljaisuus_kuvaus"
+            android:defaultValue="5"
+            android:max="10"
+            app:min="2"
+            app:singleLineTitle="false"
+            app:showSeekBarValue="true" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_tekoaly">

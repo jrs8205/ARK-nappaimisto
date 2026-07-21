@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -11,10 +13,15 @@ import android.speech.SpeechRecognizer
 import org.jarsi.ark.R
 
 /**
- * Jatkuva sanelu Androidin vakiotunnistimella. Tunnistin käynnistetään
- * jokaisen valmistuneen tuloksen ja tyhjän jakson jälkeen uudelleen, joten
- * miettimistauko ei katkaise sanelua; vasta [SILENCE_BUDGET_MS] ylittävä
- * yhtäjaksoinen hiljaisuus (tai [stop]) lopettaa. Kutsut päälangalta.
+ * Jatkuva sanelu Androidin vakiotunnistimella. Android 13+:lla käytetään
+ * jaksotettua istuntoa (EXTRA_SEGMENTED_SESSION): mikrofoni pysyy auki
+ * tulosten välillä, joten puheen alkuja ei katoa uudelleenkäynnistyksen
+ * katveeseen. Vanhemmilla laitteilla ja jos tunnistin ei tue jaksotusta,
+ * pudotaan jakso kerrallaan -malliin, jossa tunnistin käynnistetään heti
+ * uudelleen jokaisen tuloksen jälkeen. Sanelu päättyy vasta, kun itse
+ * mitattu yhtäjaksoinen hiljaisuus ylittää [silenceLimitMs] tai [stop]
+ * kutsutaan — tunnistimen omiin hiljaisuusvihjeisiin ei luoteta, koska
+ * osa laitteista ohittaa ne. Kutsut päälangalta.
  */
 class DictationController(
     private val context: Context,
@@ -34,6 +41,9 @@ class DictationController(
     var isActive = false
         private set
 
+    /** Hiljaisuus, jonka jälkeen sanelu päättyy itsestään. */
+    var silenceLimitMs = 5_000L
+
     /**
      * Sanastovihjeet tunnistimelle: käyttäjän omat sanat, joita tavallinen
      * kielimalli ei tunne. Luetaan jokaisen kuuntelujakson alussa.
@@ -42,12 +52,28 @@ class DictationController(
 
     private var recognizer: SpeechRecognizer? = null
     private var useOnDevice = false
+    private var useSegmented = false
     private var lastSpeechTime = 0L
     private var retried = false
+    private val handler = Handler(Looper.getMainLooper())
 
     // Kuuntelukerran tunniste: nopeassa stop–start-sarjassa vanhan
     // tunnistimen jonoon jäänyt callback ei kelpaa uudelle kerralle.
     private var session = 0
+
+    // Hiljaisuutta mitataan itse tulosten aikaleimoista: vahti katkaisee
+    // sanelun vasta kun viimeisimmästä puheesta on kulunut käyttäjän
+    // valitsema aika, eikä tunnistimen oma taukopäättely lopeta mitään.
+    private val silenceWatchdog = object : Runnable {
+        override fun run() {
+            if (!isActive) return
+            if (SystemClock.elapsedRealtime() - lastSpeechTime > silenceLimitMs) {
+                stop()
+            } else {
+                handler.postDelayed(this, WATCHDOG_INTERVAL_MS)
+            }
+        }
+    }
 
     private fun makeListener(mySession: Int) = object : RecognitionListener {
         private fun stale() = mySession != session || !isActive
@@ -76,11 +102,19 @@ class DictationController(
 
         override fun onResults(results: Bundle?) {
             if (stale()) return
-            val text = bestResult(results)
-            if (!text.isNullOrBlank()) {
-                lastSpeechTime = SystemClock.elapsedRealtime()
-                listener.onFinalText(text)
-            }
+            deliverFinal(results)
+            restartListening()
+        }
+
+        override fun onSegmentResults(segmentResults: Bundle) {
+            // Jaksotettu istunto: tulos valmistui, mutta kuuntelu jatkuu
+            // ilman uudelleenkäynnistystä eikä puhetta katoa väliin.
+            if (stale()) return
+            deliverFinal(segmentResults)
+        }
+
+        override fun onEndOfSegmentedSession() {
+            if (stale()) return
             restartListening()
         }
 
@@ -89,8 +123,8 @@ class DictationController(
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH,
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
-                    // Tyhjä jakso: jatketaan kunnes hiljaisuusbudjetti täyttyy.
-                    if (SystemClock.elapsedRealtime() - lastSpeechTime > SILENCE_BUDGET_MS) {
+                    // Tyhjä jakso: jatketaan kunnes hiljaisuusraja täyttyy.
+                    if (SystemClock.elapsedRealtime() - lastSpeechTime > silenceLimitMs) {
                         stop()
                     } else {
                         restartListening()
@@ -100,22 +134,39 @@ class DictationController(
                     stop()
                     listener.onDictationError(R.string.sanelu_virhe)
                 }
-                else -> {
-                    // Laitetunnistin voi kaatua esim. kielitukeen: pudotaan
-                    // kerran tavalliseen tunnistimeen ennen luovuttamista.
-                    if (useOnDevice) {
+                else -> when {
+                    // Kaikki tunnistimet eivät tue jaksotettua istuntoa:
+                    // pudotaan ensin jakso kerrallaan -malliin, sitten
+                    // laitetunnistimesta tavalliseen, ja vasta sitten
+                    // luovutetaan.
+                    useSegmented -> {
+                        useSegmented = false
+                        recreateRecognizer()
+                        restartListening()
+                    }
+                    useOnDevice -> {
                         useOnDevice = false
                         recreateRecognizer()
                         restartListening()
-                    } else if (!retried) {
+                    }
+                    !retried -> {
                         retried = true
                         restartListening()
-                    } else {
+                    }
+                    else -> {
                         stop()
                         listener.onDictationError(R.string.sanelu_virhe)
                     }
                 }
             }
+        }
+    }
+
+    private fun deliverFinal(results: Bundle?) {
+        val text = bestResult(results)
+        if (!text.isNullOrBlank()) {
+            lastSpeechTime = SystemClock.elapsedRealtime()
+            listener.onFinalText(text)
         }
     }
 
@@ -129,15 +180,18 @@ class DictationController(
         retried = false
         useOnDevice = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+        useSegmented = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
         lastSpeechTime = SystemClock.elapsedRealtime()
         recreateRecognizer()
         listener.onDictationStateChanged(true)
         restartListening()
+        handler.postDelayed(silenceWatchdog, WATCHDOG_INTERVAL_MS)
     }
 
     fun stop() {
         if (!isActive) return
         isActive = false
+        handler.removeCallbacks(silenceWatchdog)
         recognizer?.destroy()
         recognizer = null
         listener.onDictationStateChanged(false)
@@ -162,10 +216,9 @@ class DictationController(
             )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fi-FI")
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            // Melussa tunnistimen oma taukopäättely katkaisee jakson liian
-            // herkästi; pidemmät toleranssit harventavat katkoja ja siten
-            // uudelleenkäynnistyksen katvehetkiä, joissa sanan alku katoaa.
-            // Nämäkin ovat vain toiveita, osa tunnistimista ohittaa ne.
+            // Tunnistimen omat hiljaisuusvihjeet vaikuttavat vain jakson
+            // katkaisuun, eivät sanelun loppuun; nämäkin ovat vain toiveita,
+            // osa tunnistimista ohittaa ne.
             putExtra(
                 RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
                 COMPLETE_SILENCE_MS,
@@ -179,6 +232,14 @@ class DictationController(
                 MINIMUM_SEGMENT_MS,
             )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (useSegmented) {
+                    // Jaksotettu istunto: tulokset onSegmentResults-kutsuina
+                    // ja mikrofoni pysyy auki jaksojen välillä.
+                    putExtra(
+                        RecognizerIntent.EXTRA_SEGMENTED_SESSION,
+                        RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS,
+                    )
+                }
                 // Vihjeet ovat vain toive: tukematon tunnistin ohittaa ne.
                 val words = biasWords()
                 if (words.isNotEmpty()) {
@@ -196,7 +257,7 @@ class DictationController(
         bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
 
     private companion object {
-        const val SILENCE_BUDGET_MS = 15_000L
+        const val WATCHDOG_INTERVAL_MS = 500L
         const val COMPLETE_SILENCE_MS = 2_000L
         const val MINIMUM_SEGMENT_MS = 3_000L
     }

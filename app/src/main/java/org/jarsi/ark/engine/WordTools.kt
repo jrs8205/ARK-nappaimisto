@@ -142,4 +142,15 @@ object WordTools {
         }
         return words.toList()
     }
+
+    /**
+     * Sanapoiston pituus kursorin edeltä: häntävälit ja niitä edeltävä
+     * yhtenäinen merkkijono välimerkkeineen ("sana. " poistuu kerralla).
+     */
+    fun wordBackspaceLength(textBefore: CharSequence): Int {
+        var i = textBefore.length
+        while (i > 0 && textBefore[i - 1].isWhitespace()) i--
+        while (i > 0 && !textBefore[i - 1].isWhitespace()) i--
+        return textBefore.length - i
+    }
 }

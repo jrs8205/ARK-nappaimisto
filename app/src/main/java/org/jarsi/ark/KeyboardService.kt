@@ -34,6 +34,7 @@ import org.jarsi.ark.clipboard.ClipStore
 import org.jarsi.ark.clipboard.NewClipActivity
 import org.jarsi.ark.data.ClipEntity
 import org.jarsi.ark.dictation.DictationController
+import org.jarsi.ark.dictation.DictationText
 import org.jarsi.ark.dictation.RecordAudioPermissionActivity
 import org.jarsi.ark.data.BigramEntity
 import org.jarsi.ark.data.LearnedDataStamp
@@ -140,19 +141,24 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             object : DictationController.Listener {
                 override fun onPartialText(text: String) {
                     lastEditTime = SystemClock.uptimeMillis()
-                    currentInputConnection?.setComposingText(text, 1)
+                    val shown = if (dictationCapNext) DictationText.capitalize(text) else text
+                    currentInputConnection?.setComposingText(shown, 1)
                 }
 
                 override fun onFinalText(text: String) {
                     val ic = currentInputConnection ?: return
                     lastEditTime = SystemClock.uptimeMillis()
+                    val committed =
+                        if (dictationCapNext) DictationText.capitalize(text) else text
                     // Lopullinen teksti korvaa keskeneräisen — ei sen perään,
                     // ettei sama puhe päädy kenttään kahdesti.
                     ic.beginBatchEdit()
-                    ic.setComposingText("$text ", 1)
+                    ic.setComposingText("$committed ", 1)
                     ic.finishComposingText()
                     ic.endBatchEdit()
-                    textUndo.record("$text ")
+                    textUndo.record("$committed ")
+                    // Lauseen loppu nostaa seuraavankin jakson isolle alkukirjaimelle.
+                    dictationCapNext = DictationText.endsSentence(committed)
                     if (learningEnabled) {
                         // Sanellut sanat oppivat samoin kuin kirjoitetut.
                         WordTools.words(text).forEach { learning.onWordCommitted(it) }
@@ -180,6 +186,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             it.biasWords = { learning.biasWords(BIAS_WORD_MAX) }
         }
     }
+
+    /** Käynnistää sanelun asetusten hiljaisuusrajalla; alku isolla kirjaimella. */
+    private fun startDictation() {
+        dictation.silenceLimitMs =
+            prefs.getInt(PREF_DICTATION_SILENCE, 5).coerceIn(2, 10) * 1000L
+        dictationCapNext = true
+        dictation.start()
+    }
+    // Seuraava sanelujakso alkaa isolla kirjaimella (istunnon ja lauseen alut).
+    private var dictationCapNext = true
+
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private val suggestExecutor = Executors.newSingleThreadExecutor()
 
@@ -220,6 +237,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private var autoCorrectEnabled = true
     private var noSuggestionsField = false
+    private var numberRowEnabled = true
 
     // Editori-istunnon tunniste: viivästynyt callback (automaattikorjaus,
     // käännöksen viimeistely) ei saa kirjoittaa toiseen kenttään.
@@ -1123,6 +1141,35 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         feedback(AudioManager.FX_KEYPRESS_DELETE)
     }
 
+    /** Pohjassa pidetyn askelpalauttimen toistokerta: poistaa sanan kerrallaan. */
+    override fun onKeyRepeat(action: KeyAction) {
+        if (action != KeyAction.Backspace) {
+            onKey(action)
+            return
+        }
+        autoSpaceState = 0
+        smartSpaceState = 0
+        punctSpaceAdded = false
+        pendingRevert = null
+        pendingSpaceRevert = null
+        if (translateMode && translateBuffer.isNotEmpty()) {
+            if (translateBuffer.backspaceWord()) {
+                onTranslateBufferChanged()
+            }
+        } else {
+            val ic = currentInputConnection ?: return
+            markOwnEdit()
+            val before = ic.getTextBeforeCursor(WORD_BACKSPACE_LOOKBACK, 0)
+            if (before.isNullOrEmpty()) {
+                sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            } else {
+                ic.deleteSurroundingText(WordTools.wordBackspaceLength(before), 0)
+            }
+        }
+        textUndo.clear()
+        feedback(AudioManager.FX_KEYPRESS_DELETE)
+    }
+
     /**
      * Työkalurivin peruutus: viimeisin näppäimistön toimenpide perutaan
      * omalla kirjauksella, jos kentän teksti on yhä ennallaan; muuten
@@ -1339,7 +1386,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         passwordField -> Unit
                         dictation.isActive -> dictation.stop()
                         checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
-                            PackageManager.PERMISSION_GRANTED -> dictation.start()
+                            PackageManager.PERMISSION_GRANTED -> startDictation()
                         else -> {
                             // Lupa kysytään erillisellä aktiviteetilla; sanelu
                             // jatkuu automaattisesti kenttään palattaessa.
@@ -1659,7 +1706,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
             ) {
-                dictation.start()
+                startDictation()
             }
         }
         if (pendingClipboardPanel) {
@@ -1669,6 +1716,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         spaceAfterSuggestion = prefs.getBoolean("ehdotus_valilyonti", true)
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
         autoCorrectEnabled = prefs.getBoolean("automaattikorjaus", true)
+        numberRowEnabled = prefs.getBoolean(PREF_NUMBER_ROW, true)
         symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
         toolbar?.tools = ToolbarOrder.load(prefs.getString(ToolbarOrder.PREF_KEY, null)).visible
         pendingRevert = null
@@ -1810,7 +1858,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun updateLayout() {
         val layout = when (page) {
-            Page.LETTERS -> Layouts.letters(extraKey)
+            Page.LETTERS -> Layouts.letters(extraKey, numberRowEnabled)
             Page.SYMBOLS1 -> Layouts.symbols1(symbolOrder)
             Page.SYMBOLS2 -> Layouts.symbols2(symbolOrder)
             Page.SYMBOLS3 -> Layouts.symbols3
@@ -1851,10 +1899,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (text.length == 1 && !text[0].isLetterOrDigit() && text[0] != '-') {
             learnCurrentWord()
         }
+        // Rivin loppu kelpaa kuten kentän loppu: monirivisissä kentissä
+        // (esim. Keepin muistiinpanot) kursorin jäljessä on rivinvaihto,
+        // eikä se saa estää välimerkkisääntöjä.
+        val afterCursor = ic.getTextAfterCursor(1, 0)?.toString()
+        val atLineEnd = afterCursor.isNullOrEmpty() || afterCursor == "\n"
         if ((autoSpaceState > 0 || smartSpaceField) && text.length == 1 &&
             SmartSpace.isPunctuation(text[0]) &&
             ic.getTextBeforeCursor(1, 0)?.toString() == " " &&
-            ic.getTextAfterCursor(1, 0)?.toString().isNullOrEmpty()
+            atLineEnd
         ) {
             // Välilyönti siirtyy välimerkin taakse: "sana ." -> "sana. "
             ic.beginBatchEdit()
@@ -1881,8 +1934,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // välin saa pois yhdellä askelpalauttimella.
         if (smartSpaceField && text.length == 1 && SmartSpace.isPunctuation(text[0])) {
             val prev = ic.getTextBeforeCursor(1, 0)?.lastOrNull()
-            val next = ic.getTextAfterCursor(1, 0)?.toString()
-            if (prev != null && prev != ' ' && !prev.isDigit() && next.isNullOrEmpty()) {
+            if (prev != null && prev != ' ' && !prev.isDigit() && atLineEnd) {
                 ic.commitText(text + " ", 1)
                 punctSpaceAdded = true
                 feedback()
@@ -2116,6 +2168,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private companion object {
         const val MAX_WORD_LOOKBACK = 48
+        const val WORD_BACKSPACE_LOOKBACK = 48
         const val CORRECTION_LOOKBACK = 5000
         const val COMMON_WORD_POOL = 24
         const val BIAS_WORD_MAX = 100
@@ -2123,6 +2176,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
         const val PREF_IMPROVE_KEY = "claude_api_avain"
         const val PREF_IMPROVE_MODEL = "claude_malli"
+        const val PREF_NUMBER_ROW = "numerorivi"
+        const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"
         const val LIVE_TRANSLATE_DELAY_MS = 300L
         const val EXTERNAL_SELECTION_MS = 1000L
         const val MAX_IMAGE_CLIP_BYTES = 10L * 1024 * 1024

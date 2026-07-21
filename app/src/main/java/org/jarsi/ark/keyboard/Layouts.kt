@@ -23,10 +23,12 @@ object Layouts {
     )
 
     // Kirjainnäppäimissä ei ole tarkkeellisia lisämerkkejä: suomessa niitä ei tarvita.
-    private val letterRow1 = listOf(
-        key("q"), key("w"), key("e"), key("r"), key("t"), key("y"),
-        key("u"), key("i"), key("o"), key("p"), key("å"),
-    )
+    // Numerorivin ollessa piilossa numerot löytyvät ylärivin pitkällä painalluksella.
+    private val letterChars1 = listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "å")
+
+    private fun letterRow1(numberRow: Boolean) = letterChars1.mapIndexed { i, c ->
+        key(c, if (!numberRow && i < 10) listOf("${(i + 1) % 10}") else emptyList())
+    }
 
     private val letterRow2 = listOf(
         key("a"), key("s"), key("d"), key("f"), key("g"), key("h"),
@@ -54,10 +56,18 @@ object Layouts {
 
     /**
      * Kirjainasettelu. [extraKey] lisää kenttäkohtaisen merkin pilkun viereen,
-     * esimerkiksi @ sähköpostikentässä tai / osoitekentässä.
+     * esimerkiksi @ sähköpostikentässä tai / osoitekentässä. [numberRow]
+     * piilottaa numerorivin; numerot jäävät ?123-sivulle ja ylärivin
+     * pitkiin painalluksiin.
      */
-    fun letters(extraKey: String? = null) = KeyboardLayout(
-        listOf(numberRow, letterRow1, letterRow2, letterRow3, bottomRow(extraKey))
+    fun letters(extraKey: String? = null, numberRow: Boolean = true) = KeyboardLayout(
+        buildList {
+            if (numberRow) add(Layouts.numberRow)
+            add(letterRow1(numberRow))
+            add(letterRow2)
+            add(letterRow3)
+            add(bottomRow(extraKey))
+        }
     )
 
     private fun symbolKey(symbol: String) = key(symbol, SymbolOrder.alternatesFor(symbol))

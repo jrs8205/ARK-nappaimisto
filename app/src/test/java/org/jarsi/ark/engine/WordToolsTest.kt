@@ -209,4 +209,28 @@ class WordToolsTest {
         assertEquals(null, WordTools.wordRangeAt("", 0))
         assertEquals(null, WordTools.wordRangeAt("... !", 2))
     }
+
+    @Test
+    fun `wordBackspaceLength poistaa sanan`() {
+        assertEquals(4, WordTools.wordBackspaceLength("sana"))
+        assertEquals(5, WordTools.wordBackspaceLength("kaksi sanaa"))
+    }
+
+    @Test
+    fun `wordBackspaceLength poistaa hantavalit sanan mukana`() {
+        assertEquals(5, WordTools.wordBackspaceLength("sana "))
+        assertEquals(6, WordTools.wordBackspaceLength("eka sana  "))
+    }
+
+    @Test
+    fun `wordBackspaceLength valimerkit kuuluvat sanaan`() {
+        assertEquals(6, WordTools.wordBackspaceLength("sana. "))
+        assertEquals(6, WordTools.wordBackspaceLength("eka sana. "))
+    }
+
+    @Test
+    fun `wordBackspaceLength pelkka valilyontijono`() {
+        assertEquals(3, WordTools.wordBackspaceLength("   "))
+        assertEquals(0, WordTools.wordBackspaceLength(""))
+    }
 }

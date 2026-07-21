@@ -1,6 +1,7 @@
 package org.jarsi.ark.keyboard
 
 import java.text.BreakIterator
+import org.jarsi.ark.engine.WordTools
 
 /**
  * Käännösrivin muokattava teksti kursoreineen: lisäys ja poisto tapahtuvat
@@ -65,6 +66,15 @@ class TranslateBuffer {
         val start = previousBoundary(cursor)
         builder.delete(start, cursor)
         cursor = start
+        return true
+    }
+
+    /** Poistaa häntävälit ja koko edeltävän sanan kursorin edeltä. */
+    fun backspaceWord(): Boolean {
+        if (cursor == 0) return false
+        val length = WordTools.wordBackspaceLength(builder.subSequence(0, cursor))
+        builder.delete(cursor - length, cursor)
+        cursor -= length
         return true
     }
 

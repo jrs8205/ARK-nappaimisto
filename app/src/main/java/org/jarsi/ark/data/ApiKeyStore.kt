@@ -20,55 +20,59 @@ import javax.crypto.spec.GCMParameterSpec
  */
 object ApiKeyStore {
 
+    /** Tallennuspaikat eri palveluiden avaimille. */
+    enum class Slot(val plainPref: String, val encryptedPref: String) {
+        CLAUDE("claude_api_avain", "claude_api_avain_salattu"),
+        OPENAI("openai_api_avain", "openai_api_avain_salattu"),
+    }
+
     private const val KEYSTORE = "AndroidKeyStore"
     private const val ALIAS = "ark_api_avain"
-    private const val PREF_ENCRYPTED = "claude_api_avain_salattu"
-    private const val PREF_PLAIN = "claude_api_avain"
     private const val GCM_TAG_BITS = 128
 
     // Purku tapahtuu jokaisella korjausnäkymän avauksella; välimuisti
     // säästää Keystore-kutsut yhteen per prosessi.
-    @Volatile private var cached: String? = null
+    private val cached = java.util.concurrent.ConcurrentHashMap<Slot, String>()
 
     /** Avain käyttöä varten tai null; siirtää avoimen avaimen salatuksi. */
-    fun read(prefs: SharedPreferences): String? {
-        cached?.let { return it }
-        prefs.getString(PREF_ENCRYPTED, null)?.let { encrypted ->
+    fun read(prefs: SharedPreferences, slot: Slot = Slot.CLAUDE): String? {
+        cached[slot]?.let { return it }
+        prefs.getString(slot.encryptedPref, null)?.let { encrypted ->
             val plain = decrypt(encrypted)
-            cached = plain
+            if (plain != null) cached[slot] = plain
             return plain
         }
-        val plain = prefs.getString(PREF_PLAIN, null)?.trim().orEmpty()
+        val plain = prefs.getString(slot.plainPref, null)?.trim().orEmpty()
         if (plain.isEmpty()) return null
-        save(prefs, plain)
-        return cached
+        save(prefs, plain, slot)
+        return cached[slot]
     }
 
     /** Onko avain asetettu (ilman purkua, kun salattu muoto riittää). */
-    fun exists(prefs: SharedPreferences): Boolean =
-        prefs.getString(PREF_ENCRYPTED, null) != null ||
-            prefs.getString(PREF_PLAIN, null)?.isNotBlank() == true
+    fun exists(prefs: SharedPreferences, slot: Slot = Slot.CLAUDE): Boolean =
+        prefs.getString(slot.encryptedPref, null) != null ||
+            prefs.getString(slot.plainPref, null)?.isNotBlank() == true
 
     /** Tallentaa avaimen salattuna; tyhjä arvo poistaa avaimen kokonaan. */
-    fun save(prefs: SharedPreferences, plainKey: String) {
+    fun save(prefs: SharedPreferences, plainKey: String, slot: Slot = Slot.CLAUDE) {
         val trimmed = plainKey.trim()
         if (trimmed.isEmpty()) {
-            prefs.edit().remove(PREF_ENCRYPTED).remove(PREF_PLAIN).apply()
-            cached = null
+            prefs.edit().remove(slot.encryptedPref).remove(slot.plainPref).apply()
+            cached.remove(slot)
             return
         }
         val encrypted = encrypt(trimmed)
         prefs.edit().apply {
             if (encrypted != null) {
-                putString(PREF_ENCRYPTED, encrypted)
-                remove(PREF_PLAIN)
+                putString(slot.encryptedPref, encrypted)
+                remove(slot.plainPref)
             } else {
                 // Varareitti laitteille, joiden Keystore on rikki.
-                putString(PREF_PLAIN, trimmed)
-                remove(PREF_ENCRYPTED)
+                putString(slot.plainPref, trimmed)
+                remove(slot.encryptedPref)
             }
         }.apply()
-        cached = trimmed
+        cached[slot] = trimmed
     }
 
     private fun encrypt(plain: String): String? = try {

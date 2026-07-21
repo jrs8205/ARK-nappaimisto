@@ -809,7 +809,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         kb.visibility = View.GONE
         panel.visibility = View.VISIBLE
         toolbar?.correctionActive = true
-        panel.improveEnabled = ApiKeyStore.exists(prefs)
+        panel.improveEnabled = ApiKeyStore.exists(
+            prefs,
+            if (openAiSelected()) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
+        )
         panel.hideImprovement()
         // Rivi tyhjenee kunnes sanaa napautetaan; vireillä olevat
         // rivipäivitykset mitätöidään.
@@ -936,12 +939,18 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             ).show()
             return
         }
-        val apiKey = ApiKeyStore.read(prefs).orEmpty()
+        val openAi = openAiSelected()
+        val apiKey = ApiKeyStore.read(
+            prefs,
+            if (openAi) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
+        ).orEmpty()
         if (apiKey.isEmpty()) return
-        correctionPanel?.showImprovementLoading()
+        correctionPanel?.showImprovementLoading(
+            if (openAi) R.string.korjaus_parannetaan_openai else R.string.korjaus_parannetaan
+        )
         val generation = ++improveGeneration
         improveExecutor.execute {
-            val result = runImprovement(apiKey, text)
+            val result = runImprovement(openAi, apiKey, text)
             mainHandler.post {
                 if (generation != improveGeneration || destroyed) return@post
                 val panel = correctionPanel ?: return@post
@@ -958,34 +967,50 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
     }
 
-    private fun runImprovement(apiKey: String, text: String): List<String>? = try {
-        val connection = java.net.URL(TextImprover.ENDPOINT)
-            .openConnection() as javax.net.ssl.HttpsURLConnection
+    /** Onko asetuksissa valittu AI-palveluksi ChatGPT. */
+    private fun openAiSelected(): Boolean =
+        prefs.getString(PREF_AI_SERVICE, "claude") == "chatgpt"
+
+    private fun runImprovement(openAi: Boolean, apiKey: String, text: String): List<String>? =
         try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 60_000
-            connection.doOutput = true
-            connection.setRequestProperty("content-type", "application/json")
-            connection.setRequestProperty("x-api-key", apiKey)
-            connection.setRequestProperty("anthropic-version", "2023-06-01")
-            val model = prefs.getString(PREF_IMPROVE_MODEL, null)
-                ?.takeIf { it.isNotBlank() } ?: TextImprover.MODEL
-            connection.outputStream.use {
-                it.write(TextImprover.buildRequest(text, model).toByteArray(Charsets.UTF_8))
+            val endpoint = if (openAi) TextImprover.OPENAI_ENDPOINT else TextImprover.ENDPOINT
+            val connection = java.net.URL(endpoint)
+                .openConnection() as javax.net.ssl.HttpsURLConnection
+            try {
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 10_000
+                connection.readTimeout = 60_000
+                connection.doOutput = true
+                connection.setRequestProperty("content-type", "application/json")
+                val body = if (openAi) {
+                    connection.setRequestProperty("authorization", "Bearer $apiKey")
+                    val model = prefs.getString(PREF_OPENAI_MODEL, null)
+                        ?.takeIf { it.isNotBlank() } ?: TextImprover.OPENAI_MODEL
+                    TextImprover.buildOpenAiRequest(text, model)
+                } else {
+                    connection.setRequestProperty("x-api-key", apiKey)
+                    connection.setRequestProperty("anthropic-version", "2023-06-01")
+                    val model = prefs.getString(PREF_IMPROVE_MODEL, null)
+                        ?.takeIf { it.isNotBlank() } ?: TextImprover.MODEL
+                    TextImprover.buildRequest(text, model)
+                }
+                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                if (connection.responseCode in 200..299) {
+                    val response = connection.inputStream.bufferedReader().use { it.readText() }
+                    if (openAi) {
+                        TextImprover.parseOpenAiVersions(response)
+                    } else {
+                        TextImprover.parseVersions(response)
+                    }
+                } else {
+                    null
+                }
+            } finally {
+                connection.disconnect()
             }
-            if (connection.responseCode in 200..299) {
-                connection.inputStream.bufferedReader().use { it.readText() }
-                    .let(TextImprover::parseVersions)
-            } else {
-                null
-            }
-        } finally {
-            connection.disconnect()
+        } catch (e: Exception) {
+            null
         }
-    } catch (e: Exception) {
-        null
-    }
 
     /** Korvaa kentän koko tekstin hyväksytyllä parannuksella. */
     private fun applyImprovement(text: String) {
@@ -2183,6 +2208,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_TRANSLATE_SOURCE = "kaannos_lahde"
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
         const val PREF_IMPROVE_MODEL = "claude_malli"
+        const val PREF_OPENAI_MODEL = "openai_malli"
+        const val PREF_AI_SERVICE = "ai_palvelu"
         const val PREF_NUMBER_ROW = "numerorivi"
         const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"
         const val LIVE_TRANSLATE_DELAY_MS = 300L

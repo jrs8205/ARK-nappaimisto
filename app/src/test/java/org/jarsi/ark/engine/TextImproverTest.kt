@@ -113,6 +113,48 @@ class TextImproverTest {
         assertEquals("nopea, keskihintainen", TextImprover.modelHint("claude-sonnet-5"))
         assertEquals("harkitseva, kallis", TextImprover.modelHint("claude-opus-4-8"))
         assertEquals("harkitsevin, kallein", TextImprover.modelHint("claude-fable-5"))
+        assertEquals("nopein ja edullisin", TextImprover.modelHint("gpt-5-nano"))
+        assertEquals("nopea ja edullinen", TextImprover.modelHint("gpt-5-mini"))
+        assertEquals("harkitseva, kallis", TextImprover.modelHint("gpt-5"))
+        assertEquals("harkitseva, kallis", TextImprover.modelHint("o3"))
         assertNull(TextImprover.modelHint("uusi-tuntematon-malli"))
+    }
+
+    @Test
+    fun `openai-pyynnossa on jarjestelmaohje ja tokenkatto`() {
+        val body = TextImprover.buildOpenAiRequest("moi", "gpt-5-mini")
+        assertEquals(true, "\"model\":\"gpt-5-mini\"" in body)
+        assertEquals(true, "\"max_completion_tokens\":${(512 + 4) * 2}" in body)
+        assertEquals(true, "\"role\":\"system\"" in body)
+        assertEquals(true, "\"role\":\"user\"" in body)
+    }
+
+    @Test
+    fun `openai-vastaus tulkitaan choices-rakenteesta`() {
+        val body = """{"choices":[{"message":{"role":"assistant",
+            "content":"{\"versiot\": [\"Eka.\", \"Toka.\", \"Kolmas.\"]}"}}]}"""
+        assertEquals(
+            listOf("Eka.", "Toka.", "Kolmas."),
+            TextImprover.parseOpenAiVersions(body),
+        )
+        assertNull(TextImprover.parseOpenAiResponse("""{"error":{"message":"x"}}"""))
+        assertNull(TextImprover.parseOpenAiResponse("ei jsonia"))
+    }
+
+    @Test
+    fun `openai-mallilista suodattaa muut kuin chat-mallit`() {
+        val body = """{"data":[
+            {"id":"gpt-5-mini"},
+            {"id":"gpt-4o"},
+            {"id":"o3"},
+            {"id":"whisper-1"},
+            {"id":"gpt-4o-audio-preview"},
+            {"id":"text-embedding-3-small"},
+            {"id":"dall-e-3"}]}"""
+        val models = TextImprover.parseOpenAiModels(body).map { it.first }
+        assertEquals(true, "gpt-5-mini" in models)
+        assertEquals(true, "gpt-4o" in models)
+        assertEquals(true, "o3" in models)
+        assertEquals(false, models.any { "whisper" in it || "audio" in it || "embedding" in it || "dall" in it })
     }
 }

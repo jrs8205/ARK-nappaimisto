@@ -126,6 +126,15 @@
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_tekoaly">
+        <ListPreference
+            android:key="ai_palvelu"
+            android:icon="@drawable/ic_sparkle"
+            android:title="@string/asetus_ai_palvelu"
+            android:entries="@array/ai_palvelu_nimet"
+            android:entryValues="@array/ai_palvelu_arvot"
+            android:defaultValue="claude"
+            app:useSimpleSummaryProvider="true"
+            app:singleLineTitle="false" />
         <EditTextPreference
             android:key="claude_api_avain"
             android:icon="@drawable/ic_sparkle"
@@ -136,6 +145,17 @@
             android:key="claude_malli"
             android:icon="@drawable/ic_tune"
             android:title="@string/asetus_malli"
+            app:singleLineTitle="false" />
+        <EditTextPreference
+            android:key="openai_api_avain"
+            android:icon="@drawable/ic_sparkle"
+            android:title="@string/asetus_openai_avain"
+            android:summary="@string/asetus_openai_avain_kuvaus"
+            app:singleLineTitle="false" />
+        <Preference
+            android:key="openai_malli"
+            android:icon="@drawable/ic_tune"
+            android:title="@string/asetus_openai_malli"
             app:singleLineTitle="false" />
     </PreferenceCategory>
 

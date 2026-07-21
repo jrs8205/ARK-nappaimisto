@@ -13,6 +13,7 @@ import android.text.InputType
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -68,24 +69,18 @@ class SettingsActivity : AppCompatActivity() {
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.asetukset, rootKey)
-            // API-avain kirjoitetaan piilotettuna kuten salasana, eikä sitä
-            // tallenneta avoimena: ApiKeyStore salaa sen Android Keystorella.
-            findPreference<EditTextPreference>("claude_api_avain")?.apply {
-                setOnBindEditTextListener { edit ->
-                    edit.inputType = InputType.TYPE_CLASS_TEXT or
-                        InputType.TYPE_TEXT_VARIATION_PASSWORD
-                }
-                setOnPreferenceChangeListener { _, newValue ->
-                    preferenceManager.sharedPreferences?.let {
-                        ApiKeyStore.save(it, newValue as? String ?: "")
-                    }
-                    false
-                }
-            }
+            // API-avaimet kirjoitetaan piilotettuina kuten salasanat, eikä
+            // niitä tallenneta avoimina: ApiKeyStore salaa Android Keystorella.
+            setupApiKeyPreference("claude_api_avain", ApiKeyStore.Slot.CLAUDE)
+            setupApiKeyPreference("openai_api_avain", ApiKeyStore.Slot.OPENAI)
             // Aiemmin avoimena tallennettu avain salataan kertaalleen.
             preferenceManager.sharedPreferences?.let { prefs ->
-                ioExecutor.execute { ApiKeyStore.read(prefs) }
+                ioExecutor.execute {
+                    ApiKeyStore.read(prefs, ApiKeyStore.Slot.CLAUDE)
+                    ApiKeyStore.read(prefs, ApiKeyStore.Slot.OPENAI)
+                }
             }
+            setupAiServiceVisibility()
             findPreference<Preference>("avaa_ime_asetukset")?.setOnPreferenceClickListener {
                 startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                 true
@@ -121,40 +116,102 @@ class SettingsActivity : AppCompatActivity() {
                 importLauncher.launch(arrayOf("application/json"))
                 true
             }
-            setupModelPreference()
+            setupModelPreference(
+                key = "claude_malli",
+                defaultModel = TextImprover.MODEL,
+                slot = ApiKeyStore.Slot.CLAUDE,
+                modelsUrl = TextImprover.MODELS_ENDPOINT,
+                summaryRes = R.string.asetus_malli_nykyinen,
+                authorize = { connection, apiKey ->
+                    connection.setRequestProperty("x-api-key", apiKey)
+                    connection.setRequestProperty("anthropic-version", "2023-06-01")
+                },
+                parse = TextImprover::parseModels,
+            )
+            setupModelPreference(
+                key = "openai_malli",
+                defaultModel = TextImprover.OPENAI_MODEL,
+                slot = ApiKeyStore.Slot.OPENAI,
+                modelsUrl = TextImprover.OPENAI_MODELS_ENDPOINT,
+                summaryRes = R.string.asetus_malli_nykyinen_openai,
+                authorize = { connection, apiKey ->
+                    connection.setRequestProperty("authorization", "Bearer $apiKey")
+                },
+                parse = TextImprover::parseOpenAiModels,
+            )
+        }
+
+        private fun setupApiKeyPreference(key: String, slot: ApiKeyStore.Slot) {
+            findPreference<EditTextPreference>(key)?.apply {
+                setOnBindEditTextListener { edit ->
+                    edit.inputType = InputType.TYPE_CLASS_TEXT or
+                        InputType.TYPE_TEXT_VARIATION_PASSWORD
+                }
+                setOnPreferenceChangeListener { _, newValue ->
+                    preferenceManager.sharedPreferences?.let {
+                        ApiKeyStore.save(it, newValue as? String ?: "", slot)
+                    }
+                    false
+                }
+            }
+        }
+
+        /** Näyttää vain valitun AI-palvelun avaimen ja mallin rivit. */
+        private fun setupAiServiceVisibility() {
+            val service = findPreference<ListPreference>("ai_palvelu") ?: return
+            fun update(value: String?) {
+                val chatgpt = value == "chatgpt"
+                findPreference<Preference>("claude_api_avain")?.isVisible = !chatgpt
+                findPreference<Preference>("claude_malli")?.isVisible = !chatgpt
+                findPreference<Preference>("openai_api_avain")?.isVisible = chatgpt
+                findPreference<Preference>("openai_malli")?.isVisible = chatgpt
+            }
+            update(service.value)
+            service.setOnPreferenceChangeListener { _, newValue ->
+                update(newValue as? String)
+                true
+            }
         }
 
         /**
-         * Paranna teksti -mallin valinta: lista haetaan Anthropicin
+         * Paranna teksti -mallin valinta: lista haetaan palvelun
          * Models-rajapinnasta käyttäjän omalla avaimella, joten uudet
          * mallit näkyvät ilman sovelluspäivitystä.
          */
-        private fun setupModelPreference() {
-            val pref = findPreference<Preference>("claude_malli") ?: return
+        private fun setupModelPreference(
+            key: String,
+            defaultModel: String,
+            slot: ApiKeyStore.Slot,
+            modelsUrl: String,
+            summaryRes: Int,
+            authorize: (javax.net.ssl.HttpsURLConnection, String) -> Unit,
+            parse: (String) -> List<Pair<String, String>>,
+        ) {
+            val pref = findPreference<Preference>(key) ?: return
             fun updateSummary() {
                 val current = preferenceManager.sharedPreferences
-                    ?.getString("claude_malli", null)?.takeIf { it.isNotBlank() }
-                    ?: TextImprover.MODEL
-                pref.summary = getString(R.string.asetus_malli_nykyinen, current)
+                    ?.getString(key, null)?.takeIf { it.isNotBlank() }
+                    ?: defaultModel
+                pref.summary = getString(summaryRes, current)
             }
             updateSummary()
             pref.setOnPreferenceClickListener {
                 val apiKey = preferenceManager.sharedPreferences
-                    ?.let(ApiKeyStore::read).orEmpty()
+                    ?.let { ApiKeyStore.read(it, slot) }.orEmpty()
                 if (apiKey.isEmpty()) {
                     Toast.makeText(
                         requireContext(), R.string.malli_aseta_avain, Toast.LENGTH_SHORT
                     ).show()
                     return@setOnPreferenceClickListener true
                 }
-                fetchModels(apiKey) { models ->
+                fetchModels(modelsUrl, apiKey, authorize, parse) { models ->
                     if (models.isNullOrEmpty()) {
                         Toast.makeText(
                             requireContext(), R.string.malli_haku_virhe, Toast.LENGTH_SHORT
                         ).show()
                     } else {
                         val current = preferenceManager.sharedPreferences
-                            ?.getString("claude_malli", null) ?: TextImprover.MODEL
+                            ?.getString(key, null) ?: defaultModel
                         val checked = models.indexOfFirst { it.first == current }
                         // Nopeus- ja hintaluokka auttaa valinnassa, kun
                         // mallilista elää eikä hintoja saada rajapinnasta.
@@ -163,12 +220,12 @@ class SettingsActivity : AppCompatActivity() {
                                 ?.let { "${model.second} – $it" } ?: model.second
                         }
                         MaterialAlertDialogBuilder(requireContext())
-                            .setTitle(R.string.asetus_malli)
+                            .setTitle(pref.title)
                             .setSingleChoiceItems(
                                 labels.toTypedArray(), checked
                             ) { dialog, index ->
                                 preferenceManager.sharedPreferences?.edit()
-                                    ?.putString("claude_malli", models[index].first)
+                                    ?.putString(key, models[index].first)
                                     ?.apply()
                                 updateSummary()
                                 dialog.dismiss()
@@ -182,21 +239,23 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         private fun fetchModels(
+            url: String,
             apiKey: String,
+            authorize: (javax.net.ssl.HttpsURLConnection, String) -> Unit,
+            parse: (String) -> List<Pair<String, String>>,
             onResult: (List<Pair<String, String>>?) -> Unit,
         ) {
             ioExecutor.execute {
                 val models = try {
-                    val connection = java.net.URL(TextImprover.MODELS_ENDPOINT)
+                    val connection = java.net.URL(url)
                         .openConnection() as javax.net.ssl.HttpsURLConnection
                     try {
                         connection.connectTimeout = 10_000
                         connection.readTimeout = 20_000
-                        connection.setRequestProperty("x-api-key", apiKey)
-                        connection.setRequestProperty("anthropic-version", "2023-06-01")
+                        authorize(connection, apiKey)
                         if (connection.responseCode in 200..299) {
                             connection.inputStream.bufferedReader().use { it.readText() }
-                                .let(TextImprover::parseModels)
+                                .let(parse)
                         } else {
                             null
                         }

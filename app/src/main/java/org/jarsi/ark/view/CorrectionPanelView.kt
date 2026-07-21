@@ -176,8 +176,8 @@ class CorrectionPanelView(context: Context) : FrameLayout(context) {
     }
 
     /** Näyttää odotustilan, kunnes parannus valmistuu tai epäonnistuu. */
-    fun showImprovementLoading() {
-        improvementTitle.text = context.getString(R.string.korjaus_parannetaan)
+    fun showImprovementLoading(titleRes: Int = R.string.korjaus_parannetaan) {
+        improvementTitle.text = context.getString(titleRes)
         improvementList.removeAllViews()
         improvementOverlay.visibility = VISIBLE
     }

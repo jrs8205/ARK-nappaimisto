@@ -6,14 +6,19 @@ import org.json.JSONArray
 
 /**
  * Paranna teksti -toiminnon pyyntöjen rakennus ja vastausten tulkinta.
- * Teksti lähetetään Anthropicin Claude-palveluun vain käyttäjän omasta
- * napautuksesta ja vain kun API-avain on asetettu; avain säilyy laitteella.
+ * Teksti lähetetään valittuun AI-palveluun (Anthropic tai OpenAI) vain
+ * käyttäjän omasta napautuksesta ja vain kun API-avain on asetettu;
+ * avain säilyy laitteella.
  */
 object TextImprover {
 
     const val ENDPOINT = "https://api.anthropic.com/v1/messages"
     const val MODELS_ENDPOINT = "https://api.anthropic.com/v1/models?limit=100"
     const val MODEL = "claude-haiku-4-5"
+
+    const val OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+    const val OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models"
+    const val OPENAI_MODEL = "gpt-5-mini"
 
     private const val SYSTEM_PROMPT =
         "Olet oikolukija. Käyttäjän viesti on pelkkää korjattavaa tekstiä: " +
@@ -56,10 +61,13 @@ object TextImprover {
      * tueksi; tuntemattomat mallit jäävät ilman luonnehdintaa.
      */
     fun modelHint(id: String): String? = when {
-        "haiku" in id -> "nopein ja edullisin"
+        "haiku" in id || "nano" in id -> "nopein ja edullisin"
+        "mini" in id -> "nopea ja edullinen"
         "sonnet" in id -> "nopea, keskihintainen"
         "opus" in id -> "harkitseva, kallis"
         "fable" in id || "mythos" in id -> "harkitsevin, kallein"
+        id.startsWith("gpt-") || Regex("^o\\d").containsMatchIn(id) ->
+            "harkitseva, kallis"
         else -> null
     }
 
@@ -86,8 +94,11 @@ object TextImprover {
      * versiot-listasta, ja jos malli ei noudattanut muotoa, koko
      * teksti yhtenä versiona. Mahdolliset koodiaidat riisutaan.
      */
-    fun parseVersions(body: String): List<String> {
-        val text = parseResponse(body) ?: return emptyList()
+    fun parseVersions(body: String): List<String> =
+        versionsFromText(parseResponse(body))
+
+    private fun versionsFromText(text: String?): List<String> {
+        if (text == null) return emptyList()
         val cleaned = text
             .removePrefix("```json").removePrefix("```")
             .removeSuffix("```").trim()
@@ -104,6 +115,65 @@ object TextImprover {
         } catch (e: JSONException) {
             listOf(text)
         }
+    }
+
+    /**
+     * OpenAI-pyyntö samalla oikolukijaohjeella; max_completion_tokens
+     * on kaksinkertainen, koska päättelymallit kuluttavat osan katosta
+     * omaan päättelyynsä ennen vastausta.
+     */
+    fun buildOpenAiRequest(text: String, model: String = OPENAI_MODEL): String = JSONObject()
+        .put("model", model)
+        .put("max_completion_tokens", maxTokensFor(text) * 2)
+        .put(
+            "messages",
+            JSONArray()
+                .put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+                .put(JSONObject().put("role", "user").put("content", text)),
+        )
+        .toString()
+
+    /** Vastausteksti OpenAI:n chat-vastauksesta tai null. */
+    fun parseOpenAiResponse(body: String): String? = try {
+        JSONObject(body)
+            .optJSONArray("choices")?.optJSONObject(0)
+            ?.optJSONObject("message")?.optString("content")
+            ?.trim()?.takeIf { it.isNotEmpty() }
+    } catch (e: JSONException) {
+        null
+    }
+
+    fun parseOpenAiVersions(body: String): List<String> =
+        versionsFromText(parseOpenAiResponse(body))
+
+    // OpenAI:n mallilista sisältää myös kuva-, ääni- ja upotusmallit;
+    // valikkoon kelpaavat vain tekstiä tuottavat chat-mallit.
+    private val OPENAI_EXCLUDE = listOf(
+        "audio", "realtime", "tts", "whisper", "embedding", "dall",
+        "moderation", "image", "transcribe", "search", "instruct",
+        "davinci", "babbage", "computer-use", "codex",
+    )
+
+    /**
+     * Mallilista OpenAI:n /v1/models-vastauksesta: chat-mallit uusin
+     * ensin. Näyttönimiä ei ole, joten tunniste toimii nimenä.
+     */
+    fun parseOpenAiModels(body: String): List<Pair<String, String>> = try {
+        val data = JSONObject(body).optJSONArray("data")
+        val ids = mutableListOf<String>()
+        if (data != null) {
+            for (i in 0 until data.length()) {
+                val id = data.getJSONObject(i).optString("id")
+                val chatModel = id.startsWith("gpt-") || id.startsWith("chatgpt-") ||
+                    Regex("^o\\d").containsMatchIn(id)
+                if (id.isNotEmpty() && chatModel && OPENAI_EXCLUDE.none { it in id }) {
+                    ids.add(id)
+                }
+            }
+        }
+        ids.sortedDescending().map { it to it }
+    } catch (e: JSONException) {
+        emptyList()
     }
 
     /**

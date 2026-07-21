@@ -63,15 +63,30 @@
     <string name="opitut_tyhjenna_varmistus">Poistetaanko kaikki opitut sanat ja sanaketjut? Tätä ei voi perua.</string>
 
     <string name="asetukset_tekoaly">Tekoäly</string>
+    <string name="asetus_ai_palvelu">AI-palvelu</string>
     <string name="asetus_api_avain">Claude API -avain</string>
-    <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään Anthropicin palveluun vain kun painat nappia; avain säilyy vain tällä laitteella.</string>
+    <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään Anthropicin palveluun vain kun painat nappia; avain säilyy vain tällä laitteella salattuna.</string>
     <string name="asetus_malli">Korjausten Claude-malli</string>
     <string name="asetus_malli_nykyinen">Käytössä: %1$s. Lista haetaan Anthropicilta omalla avaimellasi.</string>
-    <string name="malli_aseta_avain">Aseta ensin Claude API -avain</string>
+    <string name="asetus_openai_avain">ChatGPT API -avain</string>
+    <string name="asetus_openai_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään OpenAI:n palveluun vain kun painat nappia; avain säilyy vain tällä laitteella salattuna.</string>
+    <string name="asetus_openai_malli">Korjausten ChatGPT-malli</string>
+    <string name="asetus_malli_nykyinen_openai">Käytössä: %1$s. Lista haetaan OpenAI:lta omalla avaimellasi.</string>
+    <string name="malli_aseta_avain">Aseta ensin API-avain</string>
+
+    <string-array name="ai_palvelu_nimet">
+        <item>Claude (Anthropic)</item>
+        <item>ChatGPT (OpenAI)</item>
+    </string-array>
+    <string-array name="ai_palvelu_arvot">
+        <item>claude</item>
+        <item>chatgpt</item>
+    </string-array>
     <string name="malli_haku_virhe">Mallilistan haku epäonnistui – tarkista API-avain ja verkkoyhteys</string>
     <string name="korjaus_paranna">Paranna teksti</string>
     <string name="korjaus_parannus_otsikko">Valitse parannus napauttamalla</string>
     <string name="korjaus_parannetaan">Lähetetään teksti Anthropicille…</string>
+    <string name="korjaus_parannetaan_openai">Lähetetään teksti OpenAI:lle…</string>
     <string name="korjaus_paranna_liian_pitka">Teksti on liian pitkä parannettavaksi (enintään 5 000 merkkiä)</string>
     <string name="korjaus_hylkaa">Hylkää</string>
     <string name="korjaus_paranna_virhe">Parannus epäonnistui – tarkista verkkoyhteys ja API-avain</string>

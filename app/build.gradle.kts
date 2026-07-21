@@ -21,8 +21,8 @@ android {
         applicationId = "org.jarsi.ark.nappaimisto"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.10.0"
+        versionCode = 8
+        versionName = "0.11.0"
     }
 
     signingConfigs {
@@ -51,6 +51,19 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // Julkaisu-APK saa versiollisen nimen (esim. ARK-nappaimisto-v0.11.0.apk),
+    // jotta GitHub-releasen lataus on tunnistettava. Debug-nimi säilyy
+    // ennallaan asennusskriptejä varten.
+    applicationVariants.all {
+        if (buildType.name == "release") {
+            val apkName = "ark-nappaimisto-v$versionName.apk"
+            outputs.all {
+                (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl)
+                    .outputFileName = apkName
+            }
+        }
     }
 }
 

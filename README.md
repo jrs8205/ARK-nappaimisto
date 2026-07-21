@@ -67,7 +67,8 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 ## Ominaisuudet (vaihe 1)
 
 * suomalainen QWERTY-asettelu Å-, Ä- ja Ö-kirjaimilla
-* numerorivi aina näkyvissä
+* numerorivi, jonka voi piilottaa asetuksista; piilotettuna numerot
+  löytyvät ylärivin pitkällä painalluksella
 * Shift, isot lukkoon toisella napautuksella, automaattinen iso alkukirjain
 * pitkä painallus lisämerkeille numerorivillä ja välimerkeissä
 * kaksi symbolisivua ja numeronäppäimistö numerokentille
@@ -155,15 +156,22 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   ("sana," → "sana, ") sekä kentässä että käännösrivillä; numeroiden
   välissä (3,14) sääntö ei laukea, ja osoitteen (jarsi.org) välin saa
   pois yhdellä askelpalauttimella. Osoite-, sähköposti- ja
-  salasanakentissä sääntö ei ole käytössä.
+  salasanakentissä sääntö ei ole käytössä. Säännöt toimivat myös
+  monirivisten kenttien rivien lopussa.
+* askelpalautin pohjassa poistaa sanan kerrallaan; napautus poistaa
+  merkin kerrallaan
+* kaksoisvälilyönti lisää pisteen: kaksi nopeaa välilyöntiä sanan
+  perässä muuttuu muotoon ". " (kytkettävissä pois asetuksista)
 * yleissanasto 170 100 sanaa: Parole-taajuuslista täydennettynä Kotuksen
   Nykysuomen sanalistalla (ks. [docs/sanalista.md](docs/sanalista.md))
-* jatkuva sanelu työkalurivin mikrofonista: miettimistauko ei katkaise,
-  ja sanelu päättyy hiljaisuuteen, mikrofonin napautukseen tai kentän
-  vaihtumiseen (esim. viestin lähetys). Puhe käsitellään laitteen
-  puheentunnistuspalvelussa — ensisijaisesti laitteella; jos suomen
-  laitemallia ei ole, laitteen palvelu voi käyttää verkkoa. Sanellut
-  sanat oppivat kuten kirjoitetut.
+* jatkuva sanelu työkalurivin mikrofonista: Android 13:sta alkaen
+  mikrofoni pysyy auki tulosten välillä, joten puhetta ei katoa
+  taukojen katveisiin. Sanelu alkaa aina isolla kirjaimella ja päättyy
+  hiljaisuuteen (raja säädettävissä asetuksista 2–10 sekuntia),
+  mikrofonin napautukseen tai kentän vaihtumiseen. Puhe käsitellään
+  laitteen puheentunnistuspalvelussa — ensisijaisesti laitteella; jos
+  suomen laitemallia ei ole, laitteen palvelu voi käyttää verkkoa.
+  Sanellut sanat oppivat kuten kirjoitetut.
 * leikepöytä työkaluriviltä: tekstit ja kuvat kaksisarakkeisessa
   ruudukossa, kiinnitys neulasta, kolmen pisteen valikosta liittäminen,
   haku verkosta ja poisto, sekä oman kiinnitetyn leikkeen luonti
@@ -178,23 +186,30 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   puheentunnistusta (Android 13 tai uudempi)
 * emojipaneeli työkaluriviltä: kategoriat, viimeksi käytetyt ja
   laitetuen mukainen valikoima
-* käännös työkaluriviltä: kentän tekstin käännös laitteella (Google
-  ML Kit), kielipari vaihdettavissa ja suunta käännettävissä;
+* käännösnäkymä työkaluriviltä: oma kääntäjä näppäimistön sisällä
+  Google Kääntäjän tapaan. Ylhäällä on monirivinen kirjoitusalue, joka
+  kasvaa tekstin mukana, ja sen alla käännös päivittyy livenä
+  laitteella (Google ML Kit) — mitään ei kirjoiteta kenttään
+  itsestään. Käännöksen voi kopioida leikepöydälle tai viedä
+  Lisää-napilla kenttään, jolloin uusi vienti korvaa edellisen.
+  ✨-nappi hakee laadukkaamman käännöksen valitulta AI-palvelulta
+  (vaatii oman API-avaimen). Kielipari ja suunta ovat vaihdettavissa;
   kielimallit ladataan ja poistetaan asetuksista (~30 Mt/kieli).
-  Kirjoitettavaa tekstiä voi muokata rivillä: napautus tai nuolet
-  siirtävät kursoria, ja leikepöydästä liitetty teksti kääntyy heti.
-  Rivillä toimivat myös välitön jälkiväli, shift-nuolta seuraava iso
-  alkukirjain sekä pitkän painalluksen valikko: Kopioi, Valitse
-  kaikki ja Liitä, ja valintaa voi säätää kahvoista. Käännettävä
-  teksti esikäsitellään kokonaisiksi lauseiksi, mikä parantaa
-  käännösten laatua.
+  Kirjoitusalueella toimivat sanaehdotukset, kursorin siirto, valinta
+  kahvoineen, Kopioi/Liitä sekä välimerkkisäännöt, ja teksti säilyy
+  kunnes sen itse tyhjentää — myös sovelluksesta toiseen vaihtaessa.
+  Käännettävä teksti esikäsitellään kokonaisiksi lauseiksi, mikä
+  parantaa käännösten laatua.
 * Paranna teksti (valinnainen): korjausnäkymän nappi lähettää kentän
-  tekstin Anthropicin Claude-palveluun ja näyttää kolme
-  parannusehdotusta, joista valittu korvaa tekstin. Käytettävän
-  Claude-mallin voi valita asetuksista; lista haetaan Anthropicilta,
-  joten uudet mallit näkyvät ilman sovelluspäivitystä. Vaatii oman
-  API-avaimen asetuksiin; ilman avainta nappia ei näytetä eikä mitään
-  lähetetä.
+  tekstin valittuun AI-palveluun (Anthropicin Claude tai OpenAI:n
+  ChatGPT) ja näyttää kolme parannusehdotusta, joista valittu korvaa
+  tekstin; jos korjattavaa ei ole, siitä kerrotaan suoraan. Mallin voi
+  valita asetuksista — lista haetaan palvelusta, joten uudet mallit
+  näkyvät ilman sovelluspäivitystä, uusimmat ja kyvykkäimmät ensin.
+  Vaatii oman API-avaimen; avaimet säilytetään laitteella Android
+  Keystorella salattuina, ja ilman avainta nappia ei näytetä eikä
+  mitään lähetetä. Lähetettävän tekstin pituus on rajattu, ja
+  mahdollisen virheen syy näytetään ilmoituksessa.
 * asetussivujen Material 3 -ilme: iso kutistuva otsikko, korttirivit,
   kuvakkeet ja Material You -värit (Android 12+). Värit täyttävät
   WCAG AAA -kontrastivaatimukset molemmissa teemoissa.
@@ -204,12 +219,13 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 Oppiminen ja ehdotukset ovat kokonaan paikallisia, eikä sovelluksessa ole
 analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus kahta
 tarkoitusta varten: käännöskielten mallien kertalataus (Google ML Kit)
-sekä valinnainen Paranna teksti -toiminto, joka lähettää kentän tekstin
-Anthropicin Claude-palveluun vain kun käyttäjä itse painaa nappia ja on
-ensin asettanut oman API-avaimensa. Itse käännös tehdään laitteella,
-eikä kirjoitettua tekstiä lähetetä minnekään ilman käyttäjän omaa,
-tietoista toimintoa. Oppiminen kytkeytyy kokonaan pois salasana- ja
-muissa arkaluonteisissa kentissä.
+sekä valinnaiset AI-toiminnot (Paranna teksti ja ✨-AI-käännös), jotka
+lähettävät tekstin valittuun AI-palveluun (Anthropic tai OpenAI) vain
+kun käyttäjä itse painaa nappia ja on ensin asettanut oman
+API-avaimensa. API-avaimet säilytetään laitteella Android Keystorella
+salattuina. Live-käännös tehdään laitteella, eikä kirjoitettua tekstiä
+lähetetä minnekään ilman käyttäjän omaa, tietoista toimintoa. Oppiminen
+kytkeytyy kokonaan pois salasana- ja muissa arkaluonteisissa kentissä.
 
 ## Kääntäminen
 

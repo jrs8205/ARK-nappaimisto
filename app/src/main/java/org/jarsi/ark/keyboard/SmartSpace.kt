@@ -24,6 +24,13 @@ object SmartSpace {
     fun isSentenceEnder(c: Char): Boolean = c in SENTENCE_ENDERS
 
     /**
+     * Voiko merkin perään syntyä piste kaksoisvälilyönnillä: kirjaimet,
+     * numerot ja sulkevat merkit kelpaavat, välimerkit eivät (ei "..").
+     */
+    fun canEndSentence(c: Char): Boolean =
+        c.isLetterOrDigit() || c in "\"')]}»>%"
+
+    /**
      * Päättää saako kirjoitettu merkki välin eteensä. [armed] on tosi vain
      * kun välimerkki on juuri kirjoitettu tähän kohtaan, [input] on näppäimen
      * tuottama teksti, [before] kursorin edellä oleva merkki ja [capSentences]

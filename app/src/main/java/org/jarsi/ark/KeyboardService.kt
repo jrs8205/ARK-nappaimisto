@@ -223,6 +223,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // painettu välilyönti ohitetaan tuplavälin estämiseksi.
     private var punctSpaceAdded = false
 
+    // Edellisen välilyöntipainalluksen hetki kaksoisvälilyönnin pisteelle.
+    private var lastSpaceTime = 0L
+    private var doubleSpacePeriodEnabled = true
+
     // Kenttäkohtaiset ehdot: älykäs jälkiväli ei sovi osoite-, sähköposti-
     // eikä koodikenttiin, ja iso alkukirjain seuraa kentän omaa pyyntöä.
     private var smartSpaceField = false
@@ -1200,6 +1204,26 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         feedback(AudioManager.FX_KEYPRESS_DELETE)
     }
 
+    /**
+     * Kaksoisvälilyönti pisteeksi: nopeasti kahdesti painettu väli muuttaa
+     * "sana " -> "sana. ". Laukeaa vain lauseen loppuun sopivan merkin
+     * jäljessä, joten "sana,  " tai "sana.  " eivät saa ylimääräistä
+     * pistettä.
+     */
+    private fun performDoubleSpacePeriod(): Boolean {
+        val ic = currentInputConnection ?: return false
+        val before = ic.getTextBeforeCursor(3, 0)?.toString().orEmpty()
+        if (before.length < 2 || !before.endsWith(" ")) return false
+        if (!SmartSpace.canEndSentence(before[before.length - 2])) return false
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(1, 0)
+        ic.commitText(". ", 1)
+        ic.endBatchEdit()
+        // Heti perään painettu kolmas väli ohitetaan kuten automaattivälin.
+        punctSpaceAdded = true
+        return true
+    }
+
     /** Pohjassa pidetyn askelpalauttimen toistokerta: poistaa sanan kerrallaan. */
     override fun onKeyRepeat(action: KeyAction) {
         if (action != KeyAction.Backspace) {
@@ -1776,6 +1800,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         commonWordsEnabled = prefs.getBoolean("ehdotus_yleiset", true)
         autoCorrectEnabled = prefs.getBoolean("automaattikorjaus", true)
         numberRowEnabled = prefs.getBoolean(PREF_NUMBER_ROW, true)
+        doubleSpacePeriodEnabled = prefs.getBoolean(PREF_DOUBLE_SPACE, true)
+        lastSpaceTime = 0
         symbolOrder = SymbolOrder.load(prefs.getString(SymbolOrder.PREF_KEY, null))
         toolbar?.tools = ToolbarOrder.load(prefs.getString(ToolbarOrder.PREF_KEY, null)).visible
         pendingRevert = null
@@ -2055,9 +2081,19 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             KeyAction.Space -> {
                 val swallowPunctSpace = punctSpaceAdded
                 punctSpaceAdded = false
+                val doubleTap = doubleSpacePeriodEnabled &&
+                    SystemClock.uptimeMillis() - lastSpaceTime < DOUBLE_SPACE_PERIOD_MS
+                lastSpaceTime = SystemClock.uptimeMillis()
                 if (translateMode) {
-                    translateBuffer.smartSpace()
+                    if (doubleTap && translateBuffer.doubleSpacePeriod()) {
+                        // Kaksoisvälilyönti pisteeksi myös käännösrivillä.
+                        lastSpaceTime = 0
+                    } else {
+                        translateBuffer.smartSpace()
+                    }
                     onTranslateBufferChanged()
+                } else if (doubleTap && smartSpaceField && performDoubleSpacePeriod()) {
+                    lastSpaceTime = 0
                 } else if (swallowPunctSpace &&
                     currentInputConnection?.getTextBeforeCursor(1, 0)?.toString() == " "
                 ) {
@@ -2238,6 +2274,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_AI_SERVICE = "ai_palvelu"
         const val PREF_NUMBER_ROW = "numerorivi"
         const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"
+        const val PREF_DOUBLE_SPACE = "kaksoisvali_piste"
+        const val DOUBLE_SPACE_PERIOD_MS = 1100L
         const val LIVE_TRANSLATE_DELAY_MS = 300L
         const val EXTERNAL_SELECTION_MS = 1000L
         const val MAX_IMAGE_CLIP_BYTES = 10L * 1024 * 1024

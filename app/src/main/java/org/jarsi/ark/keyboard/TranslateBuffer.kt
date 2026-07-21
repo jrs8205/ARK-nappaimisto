@@ -60,6 +60,18 @@ class TranslateBuffer {
         insert(" ")
     }
 
+    /**
+     * Kaksoisvälilyönti pisteeksi: kursorin edellä oleva väli muuttuu
+     * muotoon ". " kun sitä edeltää lauseen loppuun sopiva merkki.
+     */
+    fun doubleSpacePeriod(): Boolean {
+        if (cursor < 2 || builder[cursor - 1] != ' ') return false
+        if (!SmartSpace.canEndSentence(builder[cursor - 2])) return false
+        builder.replace(cursor - 1, cursor, ". ")
+        cursor++
+        return true
+    }
+
     /** Poistaa grafeemin kursorin edeltä; alussa ei tee mitään. */
     fun backspace(): Boolean {
         if (cursor == 0) return false

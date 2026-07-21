@@ -19,6 +19,8 @@
     <string name="asetus_varina">Värinä näppäinpainalluksesta</string>
     <string name="asetus_esikatselu">Näppäimen esikatselukupla</string>
     <string name="asetus_numerorivi">Numerorivi</string>
+    <string name="asetus_kaksoisvali">Kaksoisvälilyönti lisää pisteen</string>
+    <string name="asetus_kaksoisvali_kuvaus">Kaksi nopeaa välilyöntiä sanan perässä muuttuu pisteeksi ja väliksi.</string>
     <string name="asetus_numerorivi_kuvaus">Näytä numerot omana rivinään. Piilotettunakin numerot löytyvät ?123-sivulta ja ylärivin pitkällä painalluksella.</string>
 
     <string name="erikoismerkit">Erikoismerkkien järjestys</string>

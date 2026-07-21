@@ -83,4 +83,17 @@ class SmartSpaceTest {
         assertTrue(SmartSpace.isPunctuation(','))
         assertFalse(SmartSpace.isPunctuation('a'))
     }
+
+    @Test
+    fun `kaksoisvalilyonnin pisteelle kelpaavat merkit`() {
+        assertTrue(SmartSpace.canEndSentence('a'))
+        assertTrue(SmartSpace.canEndSentence('ä'))
+        assertTrue(SmartSpace.canEndSentence('9'))
+        assertTrue(SmartSpace.canEndSentence(')'))
+        assertTrue(SmartSpace.canEndSentence('"'))
+        assertFalse(SmartSpace.canEndSentence('.'))
+        assertFalse(SmartSpace.canEndSentence(','))
+        assertFalse(SmartSpace.canEndSentence(' '))
+        assertFalse(SmartSpace.canEndSentence('…'))
+    }
 }

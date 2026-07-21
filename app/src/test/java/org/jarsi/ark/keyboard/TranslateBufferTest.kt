@@ -203,4 +203,24 @@ class TranslateBufferTest {
         assertFalse(b.backspaceWord())
         assertEquals("sana", b.text)
     }
+
+    @Test
+    fun `kaksoisvalilyonti muuttuu pisteeksi`() {
+        val b = TranslateBuffer()
+        b.insert("sana ")
+        assertTrue(b.doubleSpacePeriod())
+        assertEquals("sana. ", b.text)
+        assertEquals(6, b.cursor)
+    }
+
+    @Test
+    fun `kaksoisvalilyonti ei laukea valimerkin jalkeen eika alussa`() {
+        val b = TranslateBuffer()
+        b.insert("sana. ")
+        assertFalse(b.doubleSpacePeriod())
+        assertEquals("sana. ", b.text)
+        val alku = TranslateBuffer()
+        alku.insert(" ")
+        assertFalse(alku.doubleSpacePeriod())
+    }
 }

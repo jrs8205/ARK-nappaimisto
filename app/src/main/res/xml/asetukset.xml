@@ -55,6 +55,13 @@
             android:summary="@string/asetus_numerorivi_kuvaus"
             android:defaultValue="true"
             app:singleLineTitle="false" />
+        <SwitchPreferenceCompat
+            android:key="kaksoisvali_piste"
+            android:icon="@drawable/ic_space_bar"
+            android:title="@string/asetus_kaksoisvali"
+            android:summary="@string/asetus_kaksoisvali_kuvaus"
+            android:defaultValue="true"
+            app:singleLineTitle="false" />
         <Preference
             android:key="erikoismerkit"
             android:icon="@drawable/ic_tag"

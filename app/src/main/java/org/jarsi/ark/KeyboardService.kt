@@ -747,17 +747,30 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
     }
 
+    // Viimeisin kenttään viety käännös: uusi vienti korvaa sen, ettei
+    // jatkettu teksti kahdennu kenttään. Nollataan kentän vaihtuessa.
+    private var lastInsertedTranslation = ""
+
     /**
-     * Kirjoittaa käännöksen kenttään. Tekstit säilyvät näkymässä, jotta
-     * niitä voi yhä muokata ja viedä uudelleen; ✕ tyhjentää.
+     * Kirjoittaa käännöksen kenttään. Jos edellinen viety käännös on
+     * yhä kursorin edellä, se korvataan uudella versiolla — kentässä
+     * pysyy aina yksi ajantasainen kopio käännöksestä. Tekstit säilyvät
+     * näkymässä muokattavina; ✕ tyhjentää.
      */
     private fun commitTranslation(translation: String) {
         val ic = currentInputConnection ?: return
         markOwnEdit()
         ic.beginBatchEdit()
+        val previous = lastInsertedTranslation
+        if (previous.isNotEmpty() &&
+            ic.getTextBeforeCursor(previous.length, 0)?.toString() == previous
+        ) {
+            ic.deleteSurroundingText(previous.length, 0)
+        }
         ic.commitText(translation, 1)
         ic.endBatchEdit()
         textUndo.record(translation)
+        lastInsertedTranslation = translation
         feedback()
     }
 
@@ -1640,6 +1653,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     translateBuffer.clear()
                     currentTranslation = ""
                     translationFresh = false
+                    lastInsertedTranslation = ""
                     updateTranslateBar()
                     updateSuggestions()
                 }
@@ -1701,6 +1715,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
             }
             it.visibility = View.GONE
+            // Käännösalueet kaiken ylle: työkalurivi, ehdotukset ja
+            // näppäimet pysyvät yhtenäisenä pakettina kuten aina.
+            container.addView(it, 0, LinearLayout.LayoutParams(params))
         }
         suggestionBar = SuggestionBarView(this).also {
             it.listener = ::onSuggestionPicked
@@ -1732,9 +1749,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             container.addView(it, LinearLayout.LayoutParams(params))
         }
-        // Käännösnäkymä ehdotusrivin ja näppäimistön väliin: työkalurivi
-        // ja ehdotukset pysyvät aina totutuilla paikoillaan ylhäällä.
-        translateBar?.let { container.addView(it, LinearLayout.LayoutParams(params)) }
         keyboardView = KeyboardView(this).also {
             it.listener = this
             container.addView(it, LinearLayout.LayoutParams(params))
@@ -1891,6 +1905,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Kenttä vaihtui: näkymä sulkeutuu, mutta käännöstyö säilyy
         // puskurissa, koska mikään ei kirjoitu kenttiin itsestään.
         hideTranslateBar()
+        // Uudessa kentässä ei ole vietyä käännöstä korvattavaksi.
+        lastInsertedTranslation = ""
         if (pendingDictation) {
             pendingDictation = false
             if (!passwordField &&

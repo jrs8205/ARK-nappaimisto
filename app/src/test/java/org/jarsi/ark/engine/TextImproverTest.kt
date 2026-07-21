@@ -121,27 +121,28 @@ class TextImproverTest {
     }
 
     @Test
-    fun `openai-pyynnossa on jarjestelmaohje ja tokenkatto`() {
+    fun `openai-pyynnossa on ohje seka tokenkatto ja se osoittaa responses-rajapintaan`() {
         val body = TextImprover.buildOpenAiRequest("moi", "gpt-5-mini")
         assertEquals(true, "\"model\":\"gpt-5-mini\"" in body)
-        assertEquals(true, "\"max_completion_tokens\":${512 + 4 + 6144}" in body)
-        assertEquals(true, "\"role\":\"system\"" in body)
-        assertEquals(true, "\"role\":\"user\"" in body)
+        assertEquals(true, "\"max_output_tokens\":${512 + 4 + 6144}" in body)
+        assertEquals(true, "\"instructions\":" in body)
+        assertEquals(true, "\"input\":\"moi\"" in body)
+        assertEquals(true, TextImprover.OPENAI_ENDPOINT.endsWith("/responses"))
     }
 
     @Test
     fun `openai-paattelytaso vain gpt-5-malleille`() {
         assertEquals(
             true,
-            "\"reasoning_effort\":\"low\"" in TextImprover.buildOpenAiRequest("x", "gpt-5-mini"),
+            "\"reasoning\":{\"effort\":\"low\"}" in TextImprover.buildOpenAiRequest("x", "gpt-5.6-terra"),
         )
         assertEquals(
             false,
-            "reasoning_effort" in TextImprover.buildOpenAiRequest("x", "gpt-4o"),
+            "reasoning" in TextImprover.buildOpenAiRequest("x", "gpt-4o"),
         )
         assertEquals(
             false,
-            "reasoning_effort" in TextImprover.buildOpenAiRequest("x", "o3"),
+            "reasoning" in TextImprover.buildOpenAiRequest("x", "o3"),
         )
     }
 
@@ -151,15 +152,19 @@ class TextImproverTest {
     }
 
     @Test
-    fun `openai-vastaus tulkitaan choices-rakenteesta`() {
-        val body = """{"choices":[{"message":{"role":"assistant",
-            "content":"{\"versiot\": [\"Eka.\", \"Toka.\", \"Kolmas.\"]}"}}]}"""
+    fun `openai-vastaus tulkitaan responses-rakenteesta`() {
+        val body = """{"status":"completed","output":[
+            {"type":"reasoning","summary":[]},
+            {"type":"message","role":"assistant","content":[
+                {"type":"output_text",
+                 "text":"{\"versiot\": [\"Eka.\", \"Toka.\", \"Kolmas.\"]}"}]}]}"""
         assertEquals(
             listOf("Eka.", "Toka.", "Kolmas."),
             TextImprover.parseOpenAiVersions(body),
         )
         assertNull(TextImprover.parseOpenAiResponse("""{"error":{"message":"x"}}"""))
         assertNull(TextImprover.parseOpenAiResponse("ei jsonia"))
+        assertNull(TextImprover.parseOpenAiResponse("""{"output":[{"type":"reasoning"}]}"""))
     }
 
     @Test

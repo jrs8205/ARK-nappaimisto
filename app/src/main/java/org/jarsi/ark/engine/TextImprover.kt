@@ -16,7 +16,10 @@ object TextImprover {
     const val MODELS_ENDPOINT = "https://api.anthropic.com/v1/models?limit=100"
     const val MODEL = "claude-haiku-4-5"
 
-    const val OPENAI_ENDPOINT = "https://api.openai.com/v1/chat/completions"
+    // Responses-rajapinta: OpenAI:n oma suositus päättelymalleille
+    // (gpt-5-suku); chat completions -reitillä ne noudattavat ohjeita
+    // heikommin.
+    const val OPENAI_ENDPOINT = "https://api.openai.com/v1/responses"
     const val OPENAI_MODELS_ENDPOINT = "https://api.openai.com/v1/models"
     const val OPENAI_MODEL = "gpt-5-mini"
 
@@ -118,27 +121,21 @@ object TextImprover {
     }
 
     /**
-     * OpenAI-pyyntö samalla oikolukijaohjeella. Päättelymallit (gpt-5,
-     * o-sarja) kuluttavat max_completion_tokens-katosta ensin näkymätöntä
-     * päättelyä, ja liian pieni katto palaa kokonaan siihen jolloin
-     * vastaus jää tyhjäksi — siksi katossa on kiinteä päättelyvara ja
-     * gpt-5-malleilla päättely rajataan kevyeksi (oikoluku ei tarvitse
-     * syvää pohdintaa).
+     * OpenAI-pyyntö Responses-rajapintaan samalla oikolukijaohjeella.
+     * Katto (max_output_tokens) sisältää myös mallin näkymättömän
+     * päättelyn, joten siinä on kiinteä vara — liian pieni katto palaisi
+     * kokonaan päättelyyn ja vastaus jäisi tyhjäksi. gpt-5-malleilla
+     * päättely rajataan kevyeksi (oikoluku ei tarvitse syvää pohdintaa);
+     * muille parametria ei lähetetä, etteivät ne hylkää pyyntöä.
      */
     fun buildOpenAiRequest(text: String, model: String = OPENAI_MODEL): String {
         val json = JSONObject()
             .put("model", model)
-            .put("max_completion_tokens", openAiMaxTokensFor(text))
-            .put(
-                "messages",
-                JSONArray()
-                    .put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
-                    .put(JSONObject().put("role", "user").put("content", text)),
-            )
-        // Vain gpt-5-sarja tukee tasoa luotettavasti; muut mallit
-        // hylkäisivät koko pyynnön tuntemattoman parametrin takia.
+            .put("max_output_tokens", openAiMaxTokensFor(text))
+            .put("instructions", SYSTEM_PROMPT)
+            .put("input", text)
         if (model.startsWith("gpt-5")) {
-            json.put("reasoning_effort", "low")
+            json.put("reasoning", JSONObject().put("effort", "low"))
         }
         return json.toString()
     }
@@ -147,12 +144,28 @@ object TextImprover {
     fun openAiMaxTokensFor(text: String): Int =
         (maxTokensFor(text) + 6144).coerceAtMost(16384)
 
-    /** Vastausteksti OpenAI:n chat-vastauksesta tai null. */
+    /**
+     * Vastausteksti OpenAI:n Responses-vastauksesta tai null: output-
+     * listasta poimitaan message-kohdan ensimmäinen output_text.
+     */
     fun parseOpenAiResponse(body: String): String? = try {
-        JSONObject(body)
-            .optJSONArray("choices")?.optJSONObject(0)
-            ?.optJSONObject("message")?.optString("content")
-            ?.trim()?.takeIf { it.isNotEmpty() }
+        val output = JSONObject(body).optJSONArray("output")
+        var result: String? = null
+        if (output != null) {
+            outer@ for (i in 0 until output.length()) {
+                val item = output.getJSONObject(i)
+                if (item.optString("type") != "message") continue
+                val content = item.optJSONArray("content") ?: continue
+                for (j in 0 until content.length()) {
+                    val block = content.getJSONObject(j)
+                    if (block.optString("type") == "output_text") {
+                        result = block.optString("text").trim()
+                        break@outer
+                    }
+                }
+            }
+        }
+        result?.takeIf { it.isNotEmpty() }
     } catch (e: JSONException) {
         null
     }

@@ -93,4 +93,26 @@ class TextImproverTest {
         assertNull(TextImprover.parseResponse("ei jsonia"))
         assertNull(TextImprover.parseResponse("""{"content":[{"type":"text","text":"  "}]}"""))
     }
+
+    @Test
+    fun `tokenkatto kasvaa tekstin mukana ja pysyy rajoissa`() {
+        assertEquals(512 + 150, TextImprover.maxTokensFor("a".repeat(100)))
+        assertEquals(8192, TextImprover.maxTokensFor("a".repeat(100_000)))
+        assertEquals(512, TextImprover.maxTokensFor(""))
+    }
+
+    @Test
+    fun `pyynto kayttaa dynaamista tokenkattoa`() {
+        val body = TextImprover.buildRequest("moi")
+        assertEquals(true, body.contains("\"max_tokens\":${512 + 4}"))
+    }
+
+    @Test
+    fun `mallivihje tunnetuille malleille ja null muille`() {
+        assertEquals("nopein ja edullisin", TextImprover.modelHint("claude-haiku-4-5"))
+        assertEquals("nopea, keskihintainen", TextImprover.modelHint("claude-sonnet-5"))
+        assertEquals("harkitseva, kallis", TextImprover.modelHint("claude-opus-4-8"))
+        assertEquals("harkitsevin, kallein", TextImprover.modelHint("claude-fable-5"))
+        assertNull(TextImprover.modelHint("uusi-tuntematon-malli"))
+    }
 }

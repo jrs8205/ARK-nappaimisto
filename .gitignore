@@ -21,3 +21,7 @@ local.properties
 
 # API-avaimet eivät kuulu repoon.
 /claude.txt
+
+# Vertailunäppäimistöjen lähdekoodit (HeliBoard, AOSP LatinIME): vain
+# paikalliseen tutkimiseen, eivät osa tätä projektia.
+/vertailu/

@@ -71,7 +71,8 @@
     <string name="malli_haku_virhe">Mallilistan haku epäonnistui – tarkista API-avain ja verkkoyhteys</string>
     <string name="korjaus_paranna">Paranna teksti</string>
     <string name="korjaus_parannus_otsikko">Valitse parannus napauttamalla</string>
-    <string name="korjaus_parannetaan">Parannetaan…</string>
+    <string name="korjaus_parannetaan">Lähetetään teksti Anthropicille…</string>
+    <string name="korjaus_paranna_liian_pitka">Teksti on liian pitkä parannettavaksi (enintään 5 000 merkkiä)</string>
     <string name="korjaus_hylkaa">Hylkää</string>
     <string name="korjaus_paranna_virhe">Parannus epäonnistui – tarkista verkkoyhteys ja API-avain</string>
 

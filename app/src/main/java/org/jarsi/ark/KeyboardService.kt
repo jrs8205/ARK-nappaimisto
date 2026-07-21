@@ -32,6 +32,7 @@ import androidx.preference.PreferenceManager
 import org.jarsi.ark.clipboard.Clip
 import org.jarsi.ark.clipboard.ClipStore
 import org.jarsi.ark.clipboard.NewClipActivity
+import org.jarsi.ark.data.ApiKeyStore
 import org.jarsi.ark.data.ClipEntity
 import org.jarsi.ark.dictation.DictationController
 import org.jarsi.ark.dictation.DictationText
@@ -796,8 +797,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun showCorrectionPanel() {
         val panel = correctionPanel ?: return
         val kb = keyboardView ?: return
-        // Salasanakentän sisältöä ei näytetä avoimena tekstinä.
-        if (passwordField) return
+        // Salasanakentän sisältöä ei näytetä avoimena tekstinä, eikä
+        // numerokentissä (esim. kortinnumero) ole oikoluettavaa.
+        if (passwordField || page == Page.NUMERIC) return
         hideClipboardPanel()
         hideEmojiPanel()
         hideTranslateBar()
@@ -807,8 +809,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         kb.visibility = View.GONE
         panel.visibility = View.VISIBLE
         toolbar?.correctionActive = true
-        panel.improveEnabled =
-            prefs.getString(PREF_IMPROVE_KEY, null)?.isNotBlank() == true
+        panel.improveEnabled = ApiKeyStore.exists(prefs)
         panel.hideImprovement()
         // Rivi tyhjenee kunnes sanaa napautetaan; vireillä olevat
         // rivipäivitykset mitätöidään.
@@ -928,7 +929,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         feedback()
         val text = correctionText
         if (text.isBlank()) return
-        val apiKey = prefs.getString(PREF_IMPROVE_KEY, null)?.trim().orEmpty()
+        if (text.length > TextImprover.MAX_INPUT_CHARS) {
+            // Merkkiraja estää vahingossa valitun jättitekstin lähettämisen.
+            Toast.makeText(
+                this, R.string.korjaus_paranna_liian_pitka, Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val apiKey = ApiKeyStore.read(prefs).orEmpty()
         if (apiKey.isEmpty()) return
         correctionPanel?.showImprovementLoading()
         val generation = ++improveGeneration
@@ -2174,7 +2182,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val BIAS_WORD_MAX = 100
         const val PREF_TRANSLATE_SOURCE = "kaannos_lahde"
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
-        const val PREF_IMPROVE_KEY = "claude_api_avain"
         const val PREF_IMPROVE_MODEL = "claude_malli"
         const val PREF_NUMBER_ROW = "numerorivi"
         const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"

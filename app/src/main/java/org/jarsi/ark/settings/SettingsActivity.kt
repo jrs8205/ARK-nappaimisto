@@ -17,6 +17,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.jarsi.ark.R
+import org.jarsi.ark.data.ApiKeyStore
 import org.jarsi.ark.data.Backup
 import org.jarsi.ark.engine.TextImprover
 import org.jarsi.ark.data.BackupCodec
@@ -67,12 +68,24 @@ class SettingsActivity : AppCompatActivity() {
 
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.asetukset, rootKey)
-            // API-avain kirjoitetaan piilotettuna kuten salasana.
-            findPreference<EditTextPreference>("claude_api_avain")
-                ?.setOnBindEditTextListener { edit ->
+            // API-avain kirjoitetaan piilotettuna kuten salasana, eikä sitä
+            // tallenneta avoimena: ApiKeyStore salaa sen Android Keystorella.
+            findPreference<EditTextPreference>("claude_api_avain")?.apply {
+                setOnBindEditTextListener { edit ->
                     edit.inputType = InputType.TYPE_CLASS_TEXT or
                         InputType.TYPE_TEXT_VARIATION_PASSWORD
                 }
+                setOnPreferenceChangeListener { _, newValue ->
+                    preferenceManager.sharedPreferences?.let {
+                        ApiKeyStore.save(it, newValue as? String ?: "")
+                    }
+                    false
+                }
+            }
+            // Aiemmin avoimena tallennettu avain salataan kertaalleen.
+            preferenceManager.sharedPreferences?.let { prefs ->
+                ioExecutor.execute { ApiKeyStore.read(prefs) }
+            }
             findPreference<Preference>("avaa_ime_asetukset")?.setOnPreferenceClickListener {
                 startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                 true
@@ -127,7 +140,7 @@ class SettingsActivity : AppCompatActivity() {
             updateSummary()
             pref.setOnPreferenceClickListener {
                 val apiKey = preferenceManager.sharedPreferences
-                    ?.getString("claude_api_avain", null)?.trim().orEmpty()
+                    ?.let(ApiKeyStore::read).orEmpty()
                 if (apiKey.isEmpty()) {
                     Toast.makeText(
                         requireContext(), R.string.malli_aseta_avain, Toast.LENGTH_SHORT
@@ -143,10 +156,16 @@ class SettingsActivity : AppCompatActivity() {
                         val current = preferenceManager.sharedPreferences
                             ?.getString("claude_malli", null) ?: TextImprover.MODEL
                         val checked = models.indexOfFirst { it.first == current }
+                        // Nopeus- ja hintaluokka auttaa valinnassa, kun
+                        // mallilista elää eikä hintoja saada rajapinnasta.
+                        val labels = models.map { model ->
+                            TextImprover.modelHint(model.first)
+                                ?.let { "${model.second} – $it" } ?: model.second
+                        }
                         MaterialAlertDialogBuilder(requireContext())
                             .setTitle(R.string.asetus_malli)
                             .setSingleChoiceItems(
-                                models.map { it.second }.toTypedArray(), checked
+                                labels.toTypedArray(), checked
                             ) { dialog, index ->
                                 preferenceManager.sharedPreferences?.edit()
                                     ?.putString("claude_malli", models[index].first)

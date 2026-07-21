@@ -28,15 +28,40 @@ object TextImprover {
             "ilman selityksiä tai muuta tekstiä. Jos korjattavaa ei ole, " +
             "palauta teksti sellaisenaan kaikissa kolmessa."
 
+    // Pisin teksti, joka lähetetään parannettavaksi: raja estää vahingossa
+    // valitun jättitekstin lähettämisen ja pitää kulut ennakoitavina.
+    const val MAX_INPUT_CHARS = 5000
+
     fun buildRequest(text: String, model: String = MODEL): String = JSONObject()
         .put("model", model)
-        .put("max_tokens", 3072)
+        .put("max_tokens", maxTokensFor(text))
         .put("system", SYSTEM_PROMPT)
         .put(
             "messages",
             JSONArray().put(JSONObject().put("role", "user").put("content", text)),
         )
         .toString()
+
+    /**
+     * Vastauksen tokenkatto tekstin pituudesta: kolme versiota tarvitsee
+     * noin 1,2 tokenia per merkki, lyhyillekin jätetään pieni pohja.
+     * Yläraja pitää kulut kurissa vaikka pyyntö olisi rakennettu ohi
+     * merkkirajan.
+     */
+    fun maxTokensFor(text: String): Int =
+        (512 + text.length * 3 / 2).coerceAtMost(8192)
+
+    /**
+     * Karkea nopeus- ja hintaluokka mallitunnisteesta mallivalinnan
+     * tueksi; tuntemattomat mallit jäävät ilman luonnehdintaa.
+     */
+    fun modelHint(id: String): String? = when {
+        "haiku" in id -> "nopein ja edullisin"
+        "sonnet" in id -> "nopea, keskihintainen"
+        "opus" in id -> "harkitseva, kallis"
+        "fable" in id || "mythos" in id -> "harkitsevin, kallein"
+        else -> null
+    }
 
     /** Parannettu teksti onnistuneesta vastauksesta tai null. */
     fun parseResponse(body: String): String? = try {

@@ -343,6 +343,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     init {
         orientation = VERTICAL
+        // Rako alareunaan erottaa toimintonapit alla olevasta
+        // työkalurivistä, etteivät painallukset osu väärään riviin.
+        setPadding(0, 0, 0, dp(10))
         val rowParams =
             LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         addView(headerRow, rowParams)

@@ -1653,7 +1653,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     translateBuffer.clear()
                     currentTranslation = ""
                     translationFresh = false
-                    lastInsertedTranslation = ""
+                    // Vietyä käännöstä EI unohdeta: tyhjennyksen jälkeen
+                    // kirjoitettu uusi teksti korvaa Lisää-napilla vanhan
+                    // kentästä, joten viestin voi kirjoittaa kokonaan
+                    // uusiksi ennen lähettämistä.
                     updateTranslateBar()
                     updateSuggestions()
                 }

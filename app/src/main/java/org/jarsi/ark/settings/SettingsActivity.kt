@@ -159,8 +159,12 @@ class SettingsActivity : AppCompatActivity() {
         /** Näyttää vain valitun AI-palvelun avaimen ja mallin rivit. */
         private fun setupAiServiceVisibility() {
             val service = findPreference<ListPreference>("ai_palvelu") ?: return
+            val names = resources.getStringArray(R.array.ai_palvelu_nimet)
+            val values = resources.getStringArray(R.array.ai_palvelu_arvot)
             fun update(value: String?) {
                 val chatgpt = value == "chatgpt"
+                val name = names.getOrNull(values.indexOf(value ?: "claude")) ?: names[0]
+                service.summary = getString(R.string.asetus_ai_palvelu_nykyinen, name)
                 findPreference<Preference>("claude_api_avain")?.isVisible = !chatgpt
                 findPreference<Preference>("claude_malli")?.isVisible = !chatgpt
                 findPreference<Preference>("openai_api_avain")?.isVisible = chatgpt
@@ -204,11 +208,14 @@ class SettingsActivity : AppCompatActivity() {
                     ).show()
                     return@setOnPreferenceClickListener true
                 }
-                fetchModels(modelsUrl, apiKey, authorize, parse) { models ->
+                fetchModels(modelsUrl, apiKey, authorize, parse) { models, error ->
                     if (models.isNullOrEmpty()) {
-                        Toast.makeText(
-                            requireContext(), R.string.malli_haku_virhe, Toast.LENGTH_SHORT
-                        ).show()
+                        // Syy näkyviin, jotta väärä tai rajattu avain erottuu
+                        // verkko-ongelmasta ilman arvailua.
+                        val message = error
+                            ?.let { getString(R.string.malli_haku_virhe_syy, it) }
+                            ?: getString(R.string.malli_haku_virhe)
+                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
                     } else {
                         val current = preferenceManager.sharedPreferences
                             ?.getString(key, null) ?: defaultModel
@@ -243,9 +250,10 @@ class SettingsActivity : AppCompatActivity() {
             apiKey: String,
             authorize: (javax.net.ssl.HttpsURLConnection, String) -> Unit,
             parse: (String) -> List<Pair<String, String>>,
-            onResult: (List<Pair<String, String>>?) -> Unit,
+            onResult: (List<Pair<String, String>>?, String?) -> Unit,
         ) {
             ioExecutor.execute {
+                var error: String? = null
                 val models = try {
                     val connection = java.net.URL(url)
                         .openConnection() as javax.net.ssl.HttpsURLConnection
@@ -257,16 +265,21 @@ class SettingsActivity : AppCompatActivity() {
                             connection.inputStream.bufferedReader().use { it.readText() }
                                 .let(parse)
                         } else {
+                            val body = connection.errorStream
+                                ?.bufferedReader()?.use { it.readText() }
+                            error = TextImprover.parseErrorMessage(body)
+                                ?: "HTTP ${connection.responseCode}"
                             null
                         }
                     } finally {
                         connection.disconnect()
                     }
                 } catch (e: Exception) {
+                    error = e.javaClass.simpleName
                     null
                 }
                 activity?.runOnUiThread {
-                    if (isAdded) onResult(models)
+                    if (isAdded) onResult(models, error)
                 }
             }
         }

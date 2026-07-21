@@ -63,7 +63,8 @@
     <string name="opitut_tyhjenna_varmistus">Poistetaanko kaikki opitut sanat ja sanaketjut? Tätä ei voi perua.</string>
 
     <string name="asetukset_tekoaly">Tekoäly</string>
-    <string name="asetus_ai_palvelu">AI-palvelu</string>
+    <string name="asetus_ai_palvelu">AI-palvelu (Claude / ChatGPT)</string>
+    <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s. Napauta vaihtaaksesi palvelua.</string>
     <string name="asetus_api_avain">Claude API -avain</string>
     <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään Anthropicin palveluun vain kun painat nappia; avain säilyy vain tällä laitteella salattuna.</string>
     <string name="asetus_malli">Korjausten Claude-malli</string>
@@ -83,6 +84,7 @@
         <item>chatgpt</item>
     </string-array>
     <string name="malli_haku_virhe">Mallilistan haku epäonnistui – tarkista API-avain ja verkkoyhteys</string>
+    <string name="malli_haku_virhe_syy">Mallilistan haku epäonnistui: %1$s</string>
     <string name="korjaus_paranna">Paranna teksti</string>
     <string name="korjaus_parannus_otsikko">Valitse parannus napauttamalla</string>
     <string name="korjaus_parannetaan">Lähetetään teksti Anthropicille…</string>

@@ -133,7 +133,6 @@
             android:entries="@array/ai_palvelu_nimet"
             android:entryValues="@array/ai_palvelu_arvot"
             android:defaultValue="claude"
-            app:useSimpleSummaryProvider="true"
             app:singleLineTitle="false" />
         <EditTextPreference
             android:key="claude_api_avain"

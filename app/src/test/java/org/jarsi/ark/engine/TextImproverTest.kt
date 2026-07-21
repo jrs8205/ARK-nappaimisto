@@ -142,6 +142,19 @@ class TextImproverTest {
     }
 
     @Test
+    fun `virheviesti tulkitaan molempien palveluiden muodosta`() {
+        assertEquals(
+            "Incorrect API key provided",
+            TextImprover.parseErrorMessage(
+                """{"error":{"message":"Incorrect API key provided","type":"invalid_request_error"}}"""
+            ),
+        )
+        assertNull(TextImprover.parseErrorMessage("ei jsonia"))
+        assertNull(TextImprover.parseErrorMessage(null))
+        assertNull(TextImprover.parseErrorMessage("""{"data":[]}"""))
+    }
+
+    @Test
     fun `openai-mallilista suodattaa muut kuin chat-mallit`() {
         val body = """{"data":[
             {"id":"gpt-5-mini"},

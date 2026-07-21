@@ -177,6 +177,19 @@ object TextImprover {
     }
 
     /**
+     * Virheen selite epäonnistuneesta vastauksesta: molemmat palvelut
+     * palauttavat muodon {"error": {"message": ...}}. Selite näytetään
+     * käyttäjälle, jotta vian syy (väärä avain, rajattu avain, kiintiö)
+     * selviää ilman arvailua.
+     */
+    fun parseErrorMessage(body: String?): String? = try {
+        body?.let { JSONObject(it).optJSONObject("error")?.optString("message") }
+            ?.trim()?.takeIf { it.isNotEmpty() }?.take(160)
+    } catch (e: JSONException) {
+        null
+    }
+
+    /**
      * Mallilistan tulkinta /v1/models-vastauksesta: parit (tunniste,
      * näyttönimi). Lista haetaan aina tuoreena, joten uudet mallit
      * ilmestyvät valikkoon ilman sovelluspäivitystä.

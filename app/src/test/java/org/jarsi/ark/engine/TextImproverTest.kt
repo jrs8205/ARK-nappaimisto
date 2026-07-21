@@ -124,9 +124,30 @@ class TextImproverTest {
     fun `openai-pyynnossa on jarjestelmaohje ja tokenkatto`() {
         val body = TextImprover.buildOpenAiRequest("moi", "gpt-5-mini")
         assertEquals(true, "\"model\":\"gpt-5-mini\"" in body)
-        assertEquals(true, "\"max_completion_tokens\":${(512 + 4) * 2}" in body)
+        assertEquals(true, "\"max_completion_tokens\":${512 + 4 + 6144}" in body)
         assertEquals(true, "\"role\":\"system\"" in body)
         assertEquals(true, "\"role\":\"user\"" in body)
+    }
+
+    @Test
+    fun `openai-paattelytaso vain gpt-5-malleille`() {
+        assertEquals(
+            true,
+            "\"reasoning_effort\":\"low\"" in TextImprover.buildOpenAiRequest("x", "gpt-5-mini"),
+        )
+        assertEquals(
+            false,
+            "reasoning_effort" in TextImprover.buildOpenAiRequest("x", "gpt-4o"),
+        )
+        assertEquals(
+            false,
+            "reasoning_effort" in TextImprover.buildOpenAiRequest("x", "o3"),
+        )
+    }
+
+    @Test
+    fun `openai-tokenkatto pysyy ylarajassa`() {
+        assertEquals(8192 + 6144, TextImprover.openAiMaxTokensFor("a".repeat(100_000)))
     }
 
     @Test

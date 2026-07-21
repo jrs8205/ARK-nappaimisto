@@ -950,7 +950,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         )
         val generation = ++improveGeneration
         improveExecutor.execute {
-            val result = runImprovement(openAi, apiKey, text)
+            val (result, error) = runImprovement(openAi, apiKey, text)
             mainHandler.post {
                 if (generation != improveGeneration || destroyed) return@post
                 val panel = correctionPanel ?: return@post
@@ -959,9 +959,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     panel.showImprovement(result)
                 } else {
                     panel.hideImprovement()
-                    Toast.makeText(
-                        this, R.string.korjaus_paranna_virhe, Toast.LENGTH_SHORT
-                    ).show()
+                    // Syy näkyviin (väärä avain, kiintiö, tyhjä vastaus…),
+                    // jotta vika selviää ilman arvailua.
+                    val message = error
+                        ?.let { getString(R.string.korjaus_paranna_virhe_syy, it) }
+                        ?: getString(R.string.korjaus_paranna_virhe)
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -971,7 +974,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun openAiSelected(): Boolean =
         prefs.getString(PREF_AI_SERVICE, "claude") == "chatgpt"
 
-    private fun runImprovement(openAi: Boolean, apiKey: String, text: String): List<String>? =
+    /** Parannusversiot tai virheen selite käyttäjälle näytettäväksi. */
+    private fun runImprovement(
+        openAi: Boolean,
+        apiKey: String,
+        text: String,
+    ): Pair<List<String>?, String?> =
         try {
             val endpoint = if (openAi) TextImprover.OPENAI_ENDPOINT else TextImprover.ENDPOINT
             val connection = java.net.URL(endpoint)
@@ -997,19 +1005,27 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
                 if (connection.responseCode in 200..299) {
                     val response = connection.inputStream.bufferedReader().use { it.readText() }
-                    if (openAi) {
+                    val versions = if (openAi) {
                         TextImprover.parseOpenAiVersions(response)
                     } else {
                         TextImprover.parseVersions(response)
                     }
+                    if (versions.isEmpty()) {
+                        null to getString(R.string.korjaus_tyhja_vastaus)
+                    } else {
+                        versions to null
+                    }
                 } else {
-                    null
+                    val errorBody = connection.errorStream
+                        ?.bufferedReader()?.use { it.readText() }
+                    null to (TextImprover.parseErrorMessage(errorBody)
+                        ?: "HTTP ${connection.responseCode}")
                 }
             } finally {
                 connection.disconnect()
             }
         } catch (e: Exception) {
-            null
+            null to e.javaClass.simpleName
         }
 
     /** Korvaa kentän koko tekstin hyväksytyllä parannuksella. */

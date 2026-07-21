@@ -92,6 +92,8 @@
     <string name="korjaus_paranna_liian_pitka">Teksti on liian pitkä parannettavaksi (enintään 5 000 merkkiä)</string>
     <string name="korjaus_hylkaa">Hylkää</string>
     <string name="korjaus_paranna_virhe">Parannus epäonnistui – tarkista verkkoyhteys ja API-avain</string>
+    <string name="korjaus_paranna_virhe_syy">Parannus epäonnistui: %1$s</string>
+    <string name="korjaus_tyhja_vastaus">palvelu palautti tyhjän vastauksen</string>
 
     <string name="asetukset_varmuuskopio">Varmuuskopio</string>
     <string name="varmuuskopio_vie">Vie varmuuskopio</string>

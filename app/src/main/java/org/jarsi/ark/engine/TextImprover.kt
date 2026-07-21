@@ -118,20 +118,34 @@ object TextImprover {
     }
 
     /**
-     * OpenAI-pyyntö samalla oikolukijaohjeella; max_completion_tokens
-     * on kaksinkertainen, koska päättelymallit kuluttavat osan katosta
-     * omaan päättelyynsä ennen vastausta.
+     * OpenAI-pyyntö samalla oikolukijaohjeella. Päättelymallit (gpt-5,
+     * o-sarja) kuluttavat max_completion_tokens-katosta ensin näkymätöntä
+     * päättelyä, ja liian pieni katto palaa kokonaan siihen jolloin
+     * vastaus jää tyhjäksi — siksi katossa on kiinteä päättelyvara ja
+     * gpt-5-malleilla päättely rajataan kevyeksi (oikoluku ei tarvitse
+     * syvää pohdintaa).
      */
-    fun buildOpenAiRequest(text: String, model: String = OPENAI_MODEL): String = JSONObject()
-        .put("model", model)
-        .put("max_completion_tokens", maxTokensFor(text) * 2)
-        .put(
-            "messages",
-            JSONArray()
-                .put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
-                .put(JSONObject().put("role", "user").put("content", text)),
-        )
-        .toString()
+    fun buildOpenAiRequest(text: String, model: String = OPENAI_MODEL): String {
+        val json = JSONObject()
+            .put("model", model)
+            .put("max_completion_tokens", openAiMaxTokensFor(text))
+            .put(
+                "messages",
+                JSONArray()
+                    .put(JSONObject().put("role", "system").put("content", SYSTEM_PROMPT))
+                    .put(JSONObject().put("role", "user").put("content", text)),
+            )
+        // Vain gpt-5-sarja tukee tasoa luotettavasti; muut mallit
+        // hylkäisivät koko pyynnön tuntemattoman parametrin takia.
+        if (model.startsWith("gpt-5")) {
+            json.put("reasoning_effort", "low")
+        }
+        return json.toString()
+    }
+
+    /** OpenAI-katto: normaali vastausvara + kiinteä vara päättelylle. */
+    fun openAiMaxTokensFor(text: String): Int =
+        (maxTokensFor(text) + 6144).coerceAtMost(16384)
 
     /** Vastausteksti OpenAI:n chat-vastauksesta tai null. */
     fun parseOpenAiResponse(body: String): String? = try {

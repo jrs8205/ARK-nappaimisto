@@ -16,9 +16,10 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
-import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
+import android.widget.ScrollView
 import android.widget.TextView
 import org.jarsi.ark.R
 import org.jarsi.ark.engine.WordTools
@@ -27,12 +28,14 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Käännösnäkymä: ylärivillä kirjoitetaan lähdekieltä ja alarivillä näkyy
- * käännös livenä — kenttään ei kirjoitu mitään itsestään, vaan käännös
- * viedään Lisää-napilla (tai enterillä). ✨ hakee laadukkaamman
- * käännöksen valitulta AI-palvelulta. Kielikoodia napauttamalla kieli
- * vaihtuu ladattujen joukossa, ⇄ kääntää suunnan ja ✕ tyhjentää rivin.
- * Tekstiä napauttamalla kursorin voi siirtää keskelle muokkausta varten.
+ * Käännösnäkymä Google Kääntäjän tapaan — oma työkalu, joka ei kirjoita
+ * kenttään mitään itsestään. Ylhäällä on monirivinen kirjoitusalue, joka
+ * kasvaa tekstin mukana, ja sen alla käännös samalla tavalla väljänä.
+ * Kopiointinappi vie käännöksen leikepöydälle, Lisää-pikanappi suoraan
+ * kenttään ja ✨ hakee laadukkaamman käännöksen AI-palvelulta.
+ * Kielikoodia napauttamalla kieli vaihtuu ladattujen joukossa, ⇄ kääntää
+ * suunnan ja ✕ tyhjentää. Tekstiä napauttamalla kursori siirtyy;
+ * pitkä painallus valitsee sanan kahvoineen.
  */
 class TranslateBarView(context: Context) : LinearLayout(context) {
 
@@ -53,6 +56,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
         /** Käyttäjä pyysi paremman käännöksen AI-palvelulta. */
         fun onAiTranslate()
+
+        /** Käyttäjä kopioi käännöksen leikepöydälle. */
+        fun onCopyTranslation()
 
         /** Käyttäjä vie näkyvän käännöksen kenttään. */
         fun onInsert()
@@ -179,9 +185,11 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }.apply {
         textSize = 16f
-        maxLines = 1
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(8), dp(14), dp(8), dp(14))
+        // Teksti rivittyy vapaasti kuten Google Kääntäjässä; alue kasvaa
+        // sisällön mukana CappedScrollView'n ylärajaan asti.
+        gravity = Gravity.TOP
+        minimumHeight = dp(48)
+        setPadding(dp(12), dp(10), dp(12), dp(10))
         setOnTouchListener { view, event ->
             val textView = view as TextView
             when (event.actionMasked) {
@@ -189,7 +197,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
                     downX = event.x
                     downY = event.y
                     longPressFired = false
-                    draggingHandle = hitHandle(textView, event.x)
+                    draggingHandle = hitHandle(textView, event.x, event.y)
                     if (draggingHandle != 0) {
                         // Kahvan veto ei saa käynnistää vieritystä eikä valikkoa.
                         view.parent?.requestDisallowInterceptTouchEvent(true)
@@ -237,15 +245,23 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }
 
-    // Pitkä teksti vierii vaakasuunnassa; kursori pidetään näkyvissä.
-    private val bufferScroll = HorizontalScrollView(context).apply {
-        isHorizontalScrollBarEnabled = false
-        isFillViewport = true
+    // Kasvaa sisällön mukana ylärajaan asti, sitten vierii pystysuunnassa.
+    private inner class CappedScrollView(private val maxHeightPx: Int) : ScrollView(context) {
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            super.onMeasure(
+                widthMeasureSpec,
+                MeasureSpec.makeMeasureSpec(maxHeightPx, MeasureSpec.AT_MOST),
+            )
+        }
+    }
+
+    private val sourceScroll = CappedScrollView(dp(120)).apply {
+        isVerticalScrollBarEnabled = false
         addView(
             bufferView,
             ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
             ),
         )
     }
@@ -259,22 +275,22 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onClear() }
     }
 
-    // Alarivi: käännös ja sen toiminnot. Kenttä ei muutu ennen Lisää-nappia.
+    // Käännösalue: monirivinen kuten kirjoitusaluekin. Kenttä ei muutu
+    // ennen kuin käännös kopioidaan tai viedään pikanapilla.
     private val translationView = TextView(context).apply {
         textSize = 16f
-        maxLines = 1
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(12), dp(10), dp(8), dp(10))
+        gravity = Gravity.TOP
+        minimumHeight = dp(44)
+        setPadding(dp(12), dp(10), dp(12), dp(10))
     }
 
-    private val translationScroll = HorizontalScrollView(context).apply {
-        isHorizontalScrollBarEnabled = false
-        isFillViewport = true
+    private val translationScroll = CappedScrollView(dp(120)).apply {
+        isVerticalScrollBarEnabled = false
         addView(
             translationView,
             ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
             ),
         )
     }
@@ -282,51 +298,57 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private val aiLabel = TextView(context).apply {
         text = "✨"
         textSize = 16f
-        setPadding(dp(10), dp(10), dp(10), dp(10))
+        setPadding(dp(12), dp(10), dp(12), dp(10))
         contentDescription = context.getString(R.string.cd_ai_kaannos)
         setOnClickListener { listener?.onAiTranslate() }
+    }
+
+    private val copyIcon = ImageView(context).apply {
+        setImageResource(R.drawable.ic_clipboard)
+        setPadding(dp(12), dp(12), dp(12), dp(12))
+        contentDescription = context.getString(R.string.cd_kopioi_kaannos)
+        setOnClickListener { listener?.onCopyTranslation() }
     }
 
     private val insertLabel = TextView(context).apply {
         text = context.getString(R.string.kaannos_lisaa)
         textSize = 15f
         setTypeface(typeface, Typeface.BOLD)
-        setPadding(dp(10), dp(10), dp(14), dp(10))
+        setPadding(dp(12), dp(10), dp(14), dp(10))
         setOnClickListener { listener?.onInsert() }
     }
 
-    private val topRow = LinearLayout(context).apply {
+    // Otsikkorivi: kielivalinnat vasemmalla, tyhjennys oikealla.
+    private val headerRow = LinearLayout(context).apply {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        // Korkeampi rivi antaa valintakahvoille sormitilaa, ettei veto
-        // osu alapuolella olevaan käännösriviin.
-        minimumHeight = dp(56)
+        minimumHeight = dp(40)
         addView(sourceLabel)
         addView(swapLabel)
         addView(targetLabel)
-        addView(bufferScroll, LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        addView(View(context), LayoutParams(0, 1, 1f))
         addView(clearLabel)
     }
 
-    private val bottomRow = LinearLayout(context).apply {
+    // Toimintorivi käännöksen alla: ✨, kopiointi ja vienti kenttään.
+    private val actionRow = LinearLayout(context).apply {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        minimumHeight = dp(48)
-        addView(translationScroll, LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        minimumHeight = dp(44)
+        addView(View(context), LayoutParams(0, 1, 1f))
         addView(aiLabel)
+        addView(copyIcon, LayoutParams(dp(44), dp(44)))
         addView(insertLabel)
     }
 
     init {
         orientation = VERTICAL
-        addView(
-            topRow,
-            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
-        )
-        addView(
-            bottomRow,
-            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
-        )
+        val rowParams =
+            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        addView(headerRow, rowParams)
+        addView(sourceScroll, rowParams)
+        addView(translationScroll, rowParams)
+        addView(actionRow, rowParams)
     }
 
     fun applySettings(newTheme: KeyboardTheme) {
@@ -338,11 +360,13 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         clearLabel.setTextColor(theme.hint)
         aiLabel.setTextColor(theme.text)
         insertLabel.setTextColor(theme.accent)
-        // Käännösrivi erottuu omaksi alueekseen korttitaustalla.
-        bottomRow.setBackgroundColor(theme.specialKey)
+        copyIcon.setColorFilter(theme.text)
+        // Käännös erottuu omaksi alueekseen korttitaustalla.
+        translationScroll.setBackgroundColor(theme.specialKey)
+        actionRow.setBackgroundColor(theme.specialKey)
     }
 
-    /** Näyttää käännöksen alarivillä tai [hint]-vihjeen sen puuttuessa. */
+    /** Näyttää käännöksen tai [hint]-vihjeen sen puuttuessa. */
     fun setTranslation(text: String, hint: String) {
         if (text.isEmpty()) {
             translationView.text = hint
@@ -351,7 +375,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             translationView.text = text
             translationView.setTextColor(theme.text)
         }
-        insertLabel.alpha = if (text.isEmpty()) 0.4f else 1f
+        val alpha = if (text.isEmpty()) 0.4f else 1f
+        insertLabel.alpha = alpha
+        copyIcon.alpha = alpha
     }
 
     fun setLanguages(source: String, target: String) {
@@ -430,19 +456,21 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         super.onDetachedFromWindow()
     }
 
-    /** Vierittää niin, että kursori pysyy näkyvissä pienellä marginaalilla. */
+    /** Vierittää pystysuunnassa niin, että kursoririvi pysyy näkyvissä. */
     private fun scrollCursorIntoView(position: Int) {
         bufferView.post {
             val layout = bufferView.layout ?: return@post
-            val x = layout.getPrimaryHorizontal(position).roundToInt() + bufferView.paddingLeft
-            val margin = dp(24)
-            val viewport = bufferScroll.width
+            val clamped = position.coerceIn(0, layout.text.length)
+            val line = layout.getLineForOffset(clamped)
+            val top = layout.getLineTop(line) + bufferView.totalPaddingTop
+            val bottom = layout.getLineBottom(line) + bufferView.totalPaddingTop
+            val viewport = sourceScroll.height
             if (viewport <= 0) return@post
-            val scrollX = bufferScroll.scrollX
-            if (x < scrollX + margin) {
-                bufferScroll.smoothScrollTo((x - margin).coerceAtLeast(0), 0)
-            } else if (x > scrollX + viewport - margin) {
-                bufferScroll.smoothScrollTo(x - viewport + margin, 0)
+            val scrollY = sourceScroll.scrollY
+            if (top < scrollY) {
+                sourceScroll.smoothScrollTo(0, top)
+            } else if (bottom > scrollY + viewport) {
+                sourceScroll.smoothScrollTo(0, bottom - viewport)
             }
         }
     }
@@ -457,10 +485,14 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         listener?.onCursorTap(position)
     }
 
-    /** Näyttöindeksin x-koordinaatti lähdetekstin kohdalle; paikkamerkki
-     *  siirtää indeksejä kursorin kohdalla. [boundaryAfter] koskee
-     *  valinnan loppurajaa, joka osuu paikkamerkin jälkeen. */
-    private fun handleX(text: TextView, sourceIndex: Int, boundaryAfter: Boolean): Float? {
+    /** Näyttöindeksin piste (x, rivin alareuna) lähdetekstin kohdalle;
+     *  paikkamerkki siirtää indeksejä kursorin kohdalla. [boundaryAfter]
+     *  koskee valinnan loppurajaa, joka osuu paikkamerkin jälkeen. */
+    private fun handlePoint(
+        text: TextView,
+        sourceIndex: Int,
+        boundaryAfter: Boolean,
+    ): Pair<Float, Float>? {
         val layout = text.layout ?: return null
         val display = if (boundaryAfter) {
             sourceIndex + if (sourceIndex > shownCursor) 1 else 0
@@ -468,19 +500,24 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             sourceIndex + if (sourceIndex >= shownCursor) 1 else 0
         }
         val clamped = display.coerceIn(0, layout.text.length)
-        return layout.getPrimaryHorizontal(clamped) + text.totalPaddingLeft
+        val line = layout.getLineForOffset(clamped)
+        val x = layout.getPrimaryHorizontal(clamped) + text.totalPaddingLeft
+        val y = layout.getLineBottom(line).toFloat() + text.totalPaddingTop
+        return x to y
     }
 
-    private fun hitHandle(text: TextView, x: Float): Int {
+    private fun hitHandle(text: TextView, x: Float, y: Float): Int {
         val sel = selection ?: return 0
-        val startX = handleX(text, sel.first, false) ?: return 0
-        val endX = handleX(text, sel.last + 1, true) ?: return 0
-        val slop = dp(20)
-        val toStart = abs(x - startX)
-        val toEnd = abs(x - endX)
+        val start = handlePoint(text, sel.first, false) ?: return 0
+        val end = handlePoint(text, sel.last + 1, true) ?: return 0
+        val slop = dp(24)
+        fun near(p: Pair<Float, Float>) =
+            abs(x - p.first) <= slop && abs(y - p.second) <= slop
+        val toStart = abs(x - start.first) + abs(y - start.second)
+        val toEnd = abs(x - end.first) + abs(y - end.second)
         return when {
-            toStart <= slop && toStart <= toEnd -> 1
-            toEnd <= slop -> 2
+            near(start) && toStart <= toEnd -> 1
+            near(end) -> 2
             else -> 0
         }
     }
@@ -504,15 +541,12 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     private fun drawSelectionHandles(canvas: Canvas, text: TextView) {
         val sel = selection ?: return
-        val layout = text.layout ?: return
-        val startX = handleX(text, sel.first, false) ?: return
-        val endX = handleX(text, sel.last + 1, true) ?: return
+        val start = handlePoint(text, sel.first, false) ?: return
+        val end = handlePoint(text, sel.last + 1, true) ?: return
         handlePaint.color = theme.accent
-        val bottom = text.totalPaddingTop + layout.getLineBottom(0).toFloat()
-        val cy = minOf(bottom + dp(3), text.height - dp(5).toFloat())
         val radius = dp(5).toFloat()
-        canvas.drawCircle(startX, cy, radius, handlePaint)
-        canvas.drawCircle(endX, cy, radius, handlePaint)
+        canvas.drawCircle(start.first, start.second + dp(3), radius, handlePaint)
+        canvas.drawCircle(end.first, end.second + dp(3), radius, handlePaint)
     }
 
     /** Pitkä painallus maalaa sanan ja avaa Kopioi-valikon sen ylle. */

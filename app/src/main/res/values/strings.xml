@@ -129,6 +129,7 @@
     <string name="kaannos_ai_kaannetaan">✨ Käännetään…</string>
     <string name="kaannos_ai_virhe_syy">AI-käännös epäonnistui: %1$s</string>
     <string name="cd_ai_kaannos">Parempi käännös tekoälyllä</string>
+    <string name="cd_kopioi_kaannos">Kopioi käännös leikepöydälle</string>
 
     <string name="asetukset_kaannos">Käännös</string>
     <string name="asetukset_sanelu">Sanelu</string>

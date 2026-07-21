@@ -1649,6 +1649,24 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onAiTranslate() = requestAiTranslation()
 
+                override fun onCopyTranslation() {
+                    val translation = currentTranslation
+                    if (translation.isBlank()) return
+                    feedback()
+                    clipboardManager?.setPrimaryClip(
+                        ClipData.newPlainText("", translation)
+                    )
+                    // Kopio päätyy myös omaan leikepöytäpaneeliin, josta sen
+                    // voi liittää mihin tahansa kenttään.
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                        Toast.makeText(
+                            this@KeyboardService,
+                            R.string.kaannos_kopioitu,
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+
                 override fun onInsert() {
                     insertTranslation()
                 }
@@ -2176,8 +2194,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             KeyAction.Backspace -> handleBackspaceKey()
             KeyAction.Enter -> {
                 if (translateMode) {
-                    // Käännös viedään kenttään ennen enterin toimintoa.
-                    insertTranslation { handleEnter() }
+                    // Käännösnäkymä on oma työkalunsa: enter tekee
+                    // rivinvaihdon omaan tekstiin kuten Google Kääntäjässä.
+                    translateBuffer.insert("\n")
+                    onTranslateBufferChanged()
+                    feedback()
                     return
                 }
                 // Rivinvaihto päättää sanan muttei katkaise sanaketjua.

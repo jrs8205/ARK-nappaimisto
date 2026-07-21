@@ -205,6 +205,19 @@ class TranslateBufferTest {
     }
 
     @Test
+    fun `deleteBeforeCursor poistaa halutun maaran kursorin edelta`() {
+        val b = TranslateBuffer()
+        b.insert("moikka")
+        b.deleteBeforeCursor(3)
+        assertEquals("moi", b.text)
+        assertEquals(3, b.cursor)
+        b.moveToStart()
+        b.deleteBeforeCursor(5)
+        assertEquals("moi", b.text)
+        assertEquals(0, b.cursor)
+    }
+
+    @Test
     fun `kaksoisvalilyonti muuttuu pisteeksi`() {
         val b = TranslateBuffer()
         b.insert("sana ")

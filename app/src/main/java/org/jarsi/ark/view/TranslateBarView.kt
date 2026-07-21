@@ -27,8 +27,10 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * Live-käännösrivi ehdotusrivin paikalle: tähän kirjoitetaan lähdekieltä,
- * ja kenttään menee käännös sitä mukaa. Kielikoodia napauttamalla kieli
+ * Käännösnäkymä: ylärivillä kirjoitetaan lähdekieltä ja alarivillä näkyy
+ * käännös livenä — kenttään ei kirjoitu mitään itsestään, vaan käännös
+ * viedään Lisää-napilla (tai enterillä). ✨ hakee laadukkaamman
+ * käännöksen valitulta AI-palvelulta. Kielikoodia napauttamalla kieli
  * vaihtuu ladattujen joukossa, ⇄ kääntää suunnan ja ✕ tyhjentää rivin.
  * Tekstiä napauttamalla kursorin voi siirtää keskelle muokkausta varten.
  */
@@ -48,6 +50,12 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
         /** Käyttäjä liittää leikepöydän tekstin käännösriville. */
         fun onPaste()
+
+        /** Käyttäjä pyysi paremman käännöksen AI-palvelulta. */
+        fun onAiTranslate()
+
+        /** Käyttäjä vie näkyvän käännöksen kenttään. */
+        fun onInsert()
     }
 
     var listener: Listener? = null
@@ -251,17 +259,74 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onClear() }
     }
 
-    init {
+    // Alarivi: käännös ja sen toiminnot. Kenttä ei muutu ennen Lisää-nappia.
+    private val translationView = TextView(context).apply {
+        textSize = 16f
+        maxLines = 1
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(12), dp(10), dp(8), dp(10))
+    }
+
+    private val translationScroll = HorizontalScrollView(context).apply {
+        isHorizontalScrollBarEnabled = false
+        isFillViewport = true
+        addView(
+            translationView,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+    }
+
+    private val aiLabel = TextView(context).apply {
+        text = "✨"
+        textSize = 16f
+        setPadding(dp(10), dp(10), dp(10), dp(10))
+        contentDescription = context.getString(R.string.cd_ai_kaannos)
+        setOnClickListener { listener?.onAiTranslate() }
+    }
+
+    private val insertLabel = TextView(context).apply {
+        text = context.getString(R.string.kaannos_lisaa)
+        textSize = 15f
+        setTypeface(typeface, Typeface.BOLD)
+        setPadding(dp(10), dp(10), dp(14), dp(10))
+        setOnClickListener { listener?.onInsert() }
+    }
+
+    private val topRow = LinearLayout(context).apply {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         // Korkeampi rivi antaa valintakahvoille sormitilaa, ettei veto
-        // osu alapuolella olevaan numeroriviin.
+        // osu alapuolella olevaan käännösriviin.
         minimumHeight = dp(56)
         addView(sourceLabel)
         addView(swapLabel)
         addView(targetLabel)
         addView(bufferScroll, LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         addView(clearLabel)
+    }
+
+    private val bottomRow = LinearLayout(context).apply {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = dp(48)
+        addView(translationScroll, LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        addView(aiLabel)
+        addView(insertLabel)
+    }
+
+    init {
+        orientation = VERTICAL
+        addView(
+            topRow,
+            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
+        )
+        addView(
+            bottomRow,
+            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT),
+        )
     }
 
     fun applySettings(newTheme: KeyboardTheme) {
@@ -271,6 +336,22 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         targetLabel.setTextColor(theme.accent)
         swapLabel.setTextColor(theme.text)
         clearLabel.setTextColor(theme.hint)
+        aiLabel.setTextColor(theme.text)
+        insertLabel.setTextColor(theme.accent)
+        // Käännösrivi erottuu omaksi alueekseen korttitaustalla.
+        bottomRow.setBackgroundColor(theme.specialKey)
+    }
+
+    /** Näyttää käännöksen alarivillä tai [hint]-vihjeen sen puuttuessa. */
+    fun setTranslation(text: String, hint: String) {
+        if (text.isEmpty()) {
+            translationView.text = hint
+            translationView.setTextColor(theme.hint)
+        } else {
+            translationView.text = text
+            translationView.setTextColor(theme.text)
+        }
+        insertLabel.alpha = if (text.isEmpty()) 0.4f else 1f
     }
 
     fun setLanguages(source: String, target: String) {

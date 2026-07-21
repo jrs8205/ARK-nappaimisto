@@ -81,6 +81,13 @@ class TranslateBuffer {
         return true
     }
 
+    /** Poistaa [count] merkkiä kursorin edeltä sanan korvausta varten. */
+    fun deleteBeforeCursor(count: Int) {
+        val n = count.coerceIn(0, cursor)
+        builder.delete(cursor - n, cursor)
+        cursor -= n
+    }
+
     /** Poistaa häntävälit ja koko edeltävän sanan kursorin edeltä. */
     fun backspaceWord(): Boolean {
         if (cursor == 0) return false

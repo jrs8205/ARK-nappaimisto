@@ -231,6 +231,19 @@ class TextImproverTest {
     }
 
     @Test
+    fun `kaannospyynnot sisaltavat kielet tekstin ja paattelytason`() {
+        val claude = TextImprover.buildTranslateRequest("moi", "suomi", "englanti")
+        assertEquals(true, "suomi" in claude)
+        assertEquals(true, "englanti" in claude)
+        assertEquals(true, "\"content\":\"moi\"" in claude)
+        val openai = TextImprover.buildOpenAiTranslateRequest("moi", "suomi", "ruotsi", "gpt-5-mini")
+        assertEquals(true, "\"input\":\"moi\"" in openai)
+        assertEquals(true, "ruotsi" in openai)
+        assertEquals(true, "\"reasoning\":{\"effort\":\"low\"}" in openai)
+        assertEquals(false, "reasoning" in TextImprover.buildOpenAiTranslateRequest("x", "a", "b", "gpt-4o"))
+    }
+
+    @Test
     fun `openai-sukupolven sisalla kyvykkain ensin`() {
         val body = """{"data":[
             {"id":"gpt-5.6-terra","created":102},

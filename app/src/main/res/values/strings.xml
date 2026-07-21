@@ -124,6 +124,11 @@
     <string name="kaannos_ladataan">Valmistellaan käännösmalleja…</string>
     <string name="kaannos_lataus_virhe">Käännösmallin lataus epäonnistui – tarkista verkkoyhteys</string>
     <string name="kaannos_virhe">Käännös epäonnistui – yritä uudelleen</string>
+    <string name="kaannos_lisaa">Lisää</string>
+    <string name="kaannos_tyhja">Käännös ilmestyy tähän</string>
+    <string name="kaannos_ai_kaannetaan">✨ Käännetään…</string>
+    <string name="kaannos_ai_virhe_syy">AI-käännös epäonnistui: %1$s</string>
+    <string name="cd_ai_kaannos">Parempi käännös tekoälyllä</string>
 
     <string name="asetukset_kaannos">Käännös</string>
     <string name="asetukset_sanelu">Sanelu</string>

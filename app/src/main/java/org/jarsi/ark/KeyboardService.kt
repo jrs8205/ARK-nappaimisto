@@ -119,10 +119,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private val translateBuffer = TranslateBuffer()
     private var translateRunnable: Runnable? = null
 
-    // Rivin sisältö, jonka viimeisin onnistunut live-käännös kattoi: sulku
-    // voi viimeistellä näkyvän käännöksen synkronisesti vain kun ne täsmäävät.
-    private var lastTranslatedText = ""
+    // Näkyvä käännös ja sen tuoreus: tuore käännös vastaa rivin nykyistä
+    // sisältöä ja kelpaa vietäväksi kenttään sellaisenaan.
+    private var currentTranslation = ""
+    private var translationFresh = false
     private var translationGeneration = 0
+    private var aiTranslateGeneration = 0
     private var translator: Translator? = null
     private var translatorReady = false
     private var translationLangs: List<String> =
@@ -556,64 +558,50 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         Locale(code).getDisplayLanguage(fiLocale).replaceFirstChar { it.titlecase(fiLocale) }
 
     /**
-     * Live-käännöstila: käännösrivi korvaa ehdotusrivin, näppäily kertyy
-     * riville ja kenttään kirjoittuu käännös keskeneräisenä tekstinä.
+     * Käännösnäkymä: näppäily kertyy ylärivin lähdetekstiin ja käännös
+     * näkyy alarivillä livenä. Kenttään ei kirjoitu mitään itsestään —
+     * käännös viedään Lisää-napilla tai enterillä. Ehdotusrivi jää
+     * näkyviin ja palvelee lähdetekstiä.
      */
     private fun showTranslateBar() {
         val bar = translateBar ?: return
         // Salasanakenttiä ei käännetä.
         if (passwordField) return
-        // Sanelu ja käännös käyttävät samaa keskeneräistä tekstiä; vain
-        // toinen voi olla kerrallaan päällä.
+        // Sanelu ja käännös eivät voi olla yhtä aikaa päällä.
         dictation.stop()
         hideAllPanels()
         translateMode = true
-        translateBuffer.clear()
-        lastTranslatedText = ""
+        currentTranslation = ""
+        translationFresh = false
         bar.visibility = View.VISIBLE
-        suggestionBar?.visibility = View.GONE
         toolbar?.translationActive = true
         refreshTranslationLanguages()
         updateTranslateBar()
         prepareTranslator()
+        updateSuggestions()
     }
 
     /**
-     * Sulkee käännöstilan. [flush] kääntää vielä rivin viimeisimmän sisällön
-     * ja jättää tuloksen kenttään; kentän vaihtuessa kutsutaan ilman flushia,
-     * ettei vanhaan kenttään tarkoitettu teksti valu uuteen.
+     * Sulkee käännösnäkymän. Kenttään ei kosketa: viemättä jäänyt käännös
+     * jää yksinkertaisesti viemättä. Rivin teksti säilyy, jotta vahinko-
+     * sulku ei hävitä kirjoitettua; [clearBuffer] tyhjentää sen kentän
+     * vaihtuessa, ettei vanha teksti kulkeudu uuteen kenttään.
      */
-    private fun hideTranslateBar(flush: Boolean = true) {
+    private fun hideTranslateBar(clearBuffer: Boolean = false) {
         if (!translateMode) return
         translateMode = false
         translateRunnable?.let { mainHandler.removeCallbacks(it) }
         translationGeneration++
-        val text = translateBuffer.toString()
-        val client = translator
-        val ready = translatorReady
+        aiTranslateGeneration++
+        translator?.close()
         translator = null
         translatorReady = false
-        translateBuffer.clear()
+        if (clearBuffer) translateBuffer.clear()
+        currentTranslation = ""
+        translationFresh = false
         translateBar?.visibility = View.GONE
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         toolbar?.translationActive = false
-        // Sulku on täysin synkroninen, jotta heti perään tulevat näppäilyt
-        // eivät voi kiilata viivästetyn kirjoituksen edelle. Kääntämättä
-        // jäänyt häntä jätetään lähdetekstinä talteen — ei arvausta.
-        if (flush) {
-            val ic = currentInputConnection
-            if (text.isNotBlank() && text != lastTranslatedText) {
-                markOwnEdit()
-                ic?.beginBatchEdit()
-                ic?.setComposingText(text, 1)
-                ic?.finishComposingText()
-                ic?.endBatchEdit()
-            } else {
-                ic?.finishComposingText()
-            }
-        }
-        lastTranslatedText = ""
-        client?.close()
         updateSuggestions()
     }
 
@@ -630,6 +618,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         bar.pasteAvailable = clipboardManager?.hasPrimaryClip() == true
         bar.setBuffer(translateBuffer.text, translateBuffer.cursor, hint)
+        bar.setTranslation(currentTranslation, getString(R.string.kaannos_tyhja))
         // Shift-nuoli seuraa käännösrivin tekstiä kuten kenttää.
         if (translateMode) updateAutoCaps()
     }
@@ -670,8 +659,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun onTranslateBufferChanged() {
+        // Rivin muutos vanhentaa näkyvän käännöksen, kunnes uusi valmistuu.
+        translationFresh = false
         updateTranslateBar()
         scheduleLiveTranslate()
+        updateSuggestions()
     }
 
     // Käännetään pienellä viiveellä, ettei jokaista näppäilyä käännetä erikseen.
@@ -684,10 +676,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun runLiveTranslate() {
         if (!translateMode || !translatorReady) return
-        val ic = currentInputConnection ?: return
         val text = translateBuffer.toString()
         if (text.isBlank()) {
-            ic.setComposingText("", 1)
+            currentTranslation = ""
+            translationFresh = false
+            translateBar?.setTranslation("", getString(R.string.kaannos_tyhja))
             return
         }
         val client = translator ?: return
@@ -699,25 +692,29 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (translateMode && generation == translationGeneration &&
                 text == translateBuffer.toString()
             ) {
-                markOwnEdit()
-                lastTranslatedText = text
-                currentInputConnection?.setComposingText(
-                    TranslatePrep.clean(result, prepared, english), 1
+                currentTranslation = TranslatePrep.clean(result, prepared, english)
+                translationFresh = true
+                translateBar?.setTranslation(
+                    currentTranslation, getString(R.string.kaannos_tyhja)
                 )
             }
         }
     }
 
     /**
-     * Viimeistelee käännöksen ennen enterin toimintoa. Toiminto suoritetaan
-     * vain onnistuneen käännöksen jälkeen: kesken latauksen tai virheessä
-     * lähdeteksti säilyy rivillä eikä kenttä lähetä mitään vanhentunutta.
+     * Vie näkyvän käännöksen kenttään ja suorittaa [onDone] vasta sen
+     * jälkeen. Tuore käännös viedään heti; muuten käännetään ensin, ettei
+     * kenttään mene rivin sisältöä vastaamatonta tekstiä.
      */
-    private fun finishTranslation(onDone: () -> Unit) {
+    private fun insertTranslation(onDone: () -> Unit = {}) {
         translateRunnable?.let { mainHandler.removeCallbacks(it) }
         val text = translateBuffer.toString()
         if (text.isBlank()) {
-            currentInputConnection?.finishComposingText()
+            onDone()
+            return
+        }
+        if (translationFresh && currentTranslation.isNotBlank()) {
+            commitTranslation(currentTranslation)
             onDone()
             return
         }
@@ -732,25 +729,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val english = translationTarget() == TranslateLanguage.ENGLISH
         client.translate(prepared.text)
             .addOnSuccessListener { result ->
-                // Vanhentunut tulos hylätään: käyttäjä ehti jatkaa, painaa
-                // enteriä uudelleen, sulkea tilan, vaihtaa kenttää tai
-                // syötenäkymä ehti sulkeutua.
+                // Vanhentunut tulos hylätään: käyttäjä ehti jatkaa, sulkea
+                // tilan, vaihtaa kenttää tai syötenäkymä ehti sulkeutua.
                 if (!translateMode || generation != translationGeneration ||
                     session != editorSessionId || translateBuffer.toString() != text
                 ) {
                     return@addOnSuccessListener
                 }
-                val ic = currentInputConnection ?: return@addOnSuccessListener
-                val cleaned = TranslatePrep.clean(result, prepared, english)
-                markOwnEdit()
-                ic.beginBatchEdit()
-                ic.setComposingText(cleaned, 1)
-                ic.finishComposingText()
-                ic.endBatchEdit()
-                textUndo.record(cleaned)
-                translateBuffer.clear()
-                lastTranslatedText = ""
-                updateTranslateBar()
+                commitTranslation(TranslatePrep.clean(result, prepared, english))
                 onDone()
             }
             .addOnFailureListener {
@@ -760,6 +746,89 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     Toast.makeText(this, R.string.kaannos_virhe, Toast.LENGTH_SHORT).show()
                 }
             }
+    }
+
+    /** Kirjoittaa käännöksen kenttään ja tyhjentää rivin seuraavaa varten. */
+    private fun commitTranslation(translation: String) {
+        val ic = currentInputConnection ?: return
+        markOwnEdit()
+        ic.beginBatchEdit()
+        ic.commitText(translation, 1)
+        ic.endBatchEdit()
+        textUndo.record(translation)
+        translateBuffer.clear()
+        currentTranslation = ""
+        translationFresh = false
+        updateTranslateBar()
+        updateSuggestions()
+        feedback()
+    }
+
+    /** Hakee laadukkaamman käännöksen valitulta AI-palvelulta alariville. */
+    private fun requestAiTranslation() {
+        feedback()
+        val text = translateBuffer.toString()
+        if (text.isBlank()) return
+        if (text.length > TextImprover.MAX_INPUT_CHARS) {
+            Toast.makeText(
+                this, R.string.korjaus_paranna_liian_pitka, Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        val openAi = openAiSelected()
+        val apiKey = ApiKeyStore.read(
+            prefs,
+            if (openAi) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
+        ).orEmpty()
+        if (apiKey.isEmpty()) {
+            Toast.makeText(this, R.string.malli_aseta_avain, Toast.LENGTH_SHORT).show()
+            return
+        }
+        translateBar?.setTranslation("", getString(R.string.kaannos_ai_kaannetaan))
+        val sourceName = languageName(translationSource())
+        val targetName = languageName(translationTarget())
+        val generation = ++aiTranslateGeneration
+        improveExecutor.execute {
+            val body = if (openAi) {
+                val model = prefs.getString(PREF_OPENAI_MODEL, null)
+                    ?.takeIf { it.isNotBlank() } ?: TextImprover.OPENAI_MODEL
+                TextImprover.buildOpenAiTranslateRequest(text, sourceName, targetName, model)
+            } else {
+                val model = prefs.getString(PREF_IMPROVE_MODEL, null)
+                    ?.takeIf { it.isNotBlank() } ?: TextImprover.MODEL
+                TextImprover.buildTranslateRequest(text, sourceName, targetName, model)
+            }
+            val (response, error) = postAi(openAi, apiKey, body)
+            val translation = response?.let {
+                if (openAi) {
+                    TextImprover.parseOpenAiResponse(it)
+                } else {
+                    TextImprover.parseResponse(it)
+                }
+            }
+            mainHandler.post {
+                if (generation != aiTranslateGeneration || destroyed || !translateMode) {
+                    return@post
+                }
+                if (text != translateBuffer.toString()) return@post
+                if (!translation.isNullOrBlank()) {
+                    currentTranslation = translation
+                    translationFresh = true
+                    translateBar?.setTranslation(
+                        translation, getString(R.string.kaannos_tyhja)
+                    )
+                } else {
+                    // Live-käännös palaa näkyviin ja syy kerrotaan.
+                    updateTranslateBar()
+                    val reason = error ?: getString(R.string.korjaus_tyhja_vastaus)
+                    Toast.makeText(
+                        this,
+                        getString(R.string.kaannos_ai_virhe_syy, reason),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }
     }
 
     /** Kielivalinnat kiertävät ladattujen mallien joukossa. */
@@ -993,54 +1062,69 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         openAi: Boolean,
         apiKey: String,
         text: String,
-    ): Pair<List<String>?, String?> =
-        try {
-            val endpoint = if (openAi) TextImprover.OPENAI_ENDPOINT else TextImprover.ENDPOINT
-            val connection = java.net.URL(endpoint)
-                .openConnection() as javax.net.ssl.HttpsURLConnection
-            try {
-                connection.requestMethod = "POST"
-                connection.connectTimeout = 10_000
-                connection.readTimeout = 60_000
-                connection.doOutput = true
-                connection.setRequestProperty("content-type", "application/json")
-                val body = if (openAi) {
-                    connection.setRequestProperty("authorization", "Bearer $apiKey")
-                    val model = prefs.getString(PREF_OPENAI_MODEL, null)
-                        ?.takeIf { it.isNotBlank() } ?: TextImprover.OPENAI_MODEL
-                    TextImprover.buildOpenAiRequest(text, model)
-                } else {
-                    connection.setRequestProperty("x-api-key", apiKey)
-                    connection.setRequestProperty("anthropic-version", "2023-06-01")
-                    val model = prefs.getString(PREF_IMPROVE_MODEL, null)
-                        ?.takeIf { it.isNotBlank() } ?: TextImprover.MODEL
-                    TextImprover.buildRequest(text, model)
-                }
-                connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-                if (connection.responseCode in 200..299) {
-                    val response = connection.inputStream.bufferedReader().use { it.readText() }
-                    val versions = if (openAi) {
-                        TextImprover.parseOpenAiVersions(response)
-                    } else {
-                        TextImprover.parseVersions(response)
-                    }
-                    if (versions.isEmpty()) {
-                        null to getString(R.string.korjaus_tyhja_vastaus)
-                    } else {
-                        versions to null
-                    }
-                } else {
-                    val errorBody = connection.errorStream
-                        ?.bufferedReader()?.use { it.readText() }
-                    null to (TextImprover.parseErrorMessage(errorBody)
-                        ?: "HTTP ${connection.responseCode}")
-                }
-            } finally {
-                connection.disconnect()
-            }
-        } catch (e: Exception) {
-            null to e.javaClass.simpleName
+    ): Pair<List<String>?, String?> {
+        val body = if (openAi) {
+            val model = prefs.getString(PREF_OPENAI_MODEL, null)
+                ?.takeIf { it.isNotBlank() } ?: TextImprover.OPENAI_MODEL
+            TextImprover.buildOpenAiRequest(text, model)
+        } else {
+            val model = prefs.getString(PREF_IMPROVE_MODEL, null)
+                ?.takeIf { it.isNotBlank() } ?: TextImprover.MODEL
+            TextImprover.buildRequest(text, model)
         }
+        val (response, error) = postAi(openAi, apiKey, body)
+        if (response == null) return null to error
+        val versions = if (openAi) {
+            TextImprover.parseOpenAiVersions(response)
+        } else {
+            TextImprover.parseVersions(response)
+        }
+        return if (versions.isEmpty()) {
+            null to getString(R.string.korjaus_tyhja_vastaus)
+        } else {
+            versions to null
+        }
+    }
+
+    /**
+     * Lähettää pyynnön valittuun AI-palveluun ja palauttaa vastausrungon
+     * tai virheen selitteen käyttäjälle näytettäväksi.
+     */
+    private fun postAi(
+        openAi: Boolean,
+        apiKey: String,
+        body: String,
+    ): Pair<String?, String?> = try {
+        val endpoint = if (openAi) TextImprover.OPENAI_ENDPOINT else TextImprover.ENDPOINT
+        val connection = java.net.URL(endpoint)
+            .openConnection() as javax.net.ssl.HttpsURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 60_000
+            connection.doOutput = true
+            connection.setRequestProperty("content-type", "application/json")
+            if (openAi) {
+                connection.setRequestProperty("authorization", "Bearer $apiKey")
+            } else {
+                connection.setRequestProperty("x-api-key", apiKey)
+                connection.setRequestProperty("anthropic-version", "2023-06-01")
+            }
+            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            if (connection.responseCode in 200..299) {
+                connection.inputStream.bufferedReader().use { it.readText() } to null
+            } else {
+                val errorBody = connection.errorStream
+                    ?.bufferedReader()?.use { it.readText() }
+                null to (TextImprover.parseErrorMessage(errorBody)
+                    ?: "HTTP ${connection.responseCode}")
+            }
+        } finally {
+            connection.disconnect()
+        }
+    } catch (e: Exception) {
+        null to e.javaClass.simpleName
+    }
 
     /** Korvaa kentän koko tekstin hyväksytyllä parannuksella. */
     private fun applyImprovement(text: String) {
@@ -1556,11 +1640,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onClear() {
                     feedback()
-                    markOwnEdit()
                     translateBuffer.clear()
-                    lastTranslatedText = ""
-                    currentInputConnection?.setComposingText("", 1)
+                    currentTranslation = ""
+                    translationFresh = false
                     updateTranslateBar()
+                    updateSuggestions()
+                }
+
+                override fun onAiTranslate() = requestAiTranslation()
+
+                override fun onInsert() {
+                    insertTranslation()
                 }
 
                 override fun onCursorTap(position: Int) {
@@ -1781,8 +1871,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
         dictation.stop()
         hideAllPanels()
-        // Kenttä vaihtui: keskeneräistä käännöstä ei saa kirjoittaa uuteen kenttään.
-        hideTranslateBar(flush = false)
+        // Kenttä vaihtui: vanha lähdeteksti ei saa kulkeutua uuteen kenttään.
+        hideTranslateBar(clearBuffer = true)
         if (pendingDictation) {
             pendingDictation = false
             if (!passwordField &&
@@ -1838,6 +1928,27 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             replaceCorrectionWord(word)
             return
         }
+        if (translateMode) {
+            // Valinta korvaa käännösrivin keskeneräisen sanan; oppiminen
+            // toimii kuten kentässä.
+            val beforeCursor = translateBuffer.text.substring(0, translateBuffer.cursor)
+            val current = WordTools.currentWord(beforeCursor)
+            translateBuffer.deleteBeforeCursor(current.length)
+            translateBuffer.insert(if (spaceAfterSuggestion) "$word " else word)
+            if (learningEnabled) {
+                learning.onSuggestionsIgnored(shownCompletions, word)
+                shownCompletions = emptyList()
+                if (word == current) {
+                    learning.onTypedWordAccepted(word)
+                } else {
+                    learning.onSuggestionAccepted(word)
+                }
+                maybeFlush()
+            }
+            feedback()
+            onTranslateBufferChanged()
+            return
+        }
         val ic = currentInputConnection ?: return
         val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
         val current = WordTools.currentWord(before)
@@ -1883,14 +1994,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val bar = suggestionBar ?: return
         // Korjausnäkymä hallitsee riviä itse; tavalliset päivitykset ohitetaan.
         if (correctionPanel?.visibility == View.VISIBLE) return
-        // Käännöstilassa ehdotusrivi on piilossa käännösrivin alla.
-        if (translateMode) return
         // Nuolitilassa kursoria liikutellaan tekstin yli; ehdotukset olisivat vain häiriöksi.
         if (!suggestionsVisible || page == Page.ARROWS) {
             bar.setSuggestions(emptyList())
             return
         }
-        val before = currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        // Käännöstilassa ehdotukset lasketaan käännösrivin tekstistä.
+        val before: CharSequence = if (translateMode) {
+            translateBuffer.text.substring(0, translateBuffer.cursor)
+        } else {
+            currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        }
         // Lauseen alussa (automaattinen iso kirjain päällä) ehdotukset alkavat isolla.
         val shiftActive = shiftState != ShiftState.OFF
         val generation = ++suggestGeneration
@@ -2062,8 +2176,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             KeyAction.Backspace -> handleBackspaceKey()
             KeyAction.Enter -> {
                 if (translateMode) {
-                    // Käännös viimeistellään kenttään ennen enterin toimintoa.
-                    finishTranslation { handleEnter() }
+                    // Käännös viedään kenttään ennen enterin toimintoa.
+                    insertTranslation { handleEnter() }
                     return
                 }
                 // Rivinvaihto päättää sanan muttei katkaise sanaketjua.

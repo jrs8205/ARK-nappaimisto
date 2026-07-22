@@ -158,26 +158,17 @@
     <string name="asetus_sanelu_hiljaisuus">Lopetus hiljaisuuteen (sekuntia)</string>
     <string name="asetus_sanelu_hiljaisuus_kuvaus">Sanelu päättyy itsestään, kun puheessa on ollut näin pitkä tauko.</string>
     <string name="asetus_sanelu_moottori">Sanelun tunnistus</string>
-    <string name="asetus_sanelu_moottori_nykyinen">Käytössä: %1$s.\nNapauta valitaksesi laitteen tunnistuksen ja ladattavien Whisper-mallien välillä. Whisper toimii kokonaan laitteella eikä lopeta kuuntelua melussa, mutta vaatii tehokkaan ja uudehkon puhelimen; teksti ilmestyy pätkissä pienellä viiveellä ja malli ladataan kerran valinnan yhteydessä.</string>
+    <string name="asetus_sanelu_moottori_nykyinen">Käytössä: %1$s.\nNapauta valitaksesi laitteen tunnistuksen ja OpenAI-tunnistuksen välillä. OpenAI tunnistaa suomea selvästi tarkemmin eikä lopeta kuuntelua melussa; puhe lähetetään tunnistusta varten OpenAI:lle omalla avaimellasi, ja teksti ilmestyy lausepätkinä pienellä viiveellä.</string>
     <string-array name="sanelu_moottori_nimet">
         <item>Laitteen puheentunnistus (oletus)</item>
-        <item>Whisper base – kevyin (lataus 57 Mt)</item>
-        <item>Whisper small – tarkempi (lataus 182 Mt)</item>
-        <item>Whisper large-turbo – tarkin ja hitain (lataus 547 Mt)</item>
+        <item>OpenAI-puheentunnistus – tarkin (vaatii OpenAI-avaimen)</item>
     </string-array>
     <string-array name="sanelu_moottori_arvot">
         <item>jarjestelma</item>
-        <item>whisper_base</item>
-        <item>whisper_small</item>
-        <item>whisper_turbo</item>
+        <item>openai</item>
     </string-array>
-    <string name="whisper_lataa_otsikko">Ladataanko tunnistusmalli?</string>
-    <string name="whisper_lataa_viesti">Malli (%1$d Mt) ladataan kerran, ja tunnistus toimii sen jälkeen kokonaan laitteella.</string>
-    <string name="whisper_ladataan">Ladataan mallia… %1$d %%</string>
-    <string name="whisper_lataus_virhe">Mallin lataus epäonnistui – tarkista verkkoyhteys</string>
-    <string name="whisper_malli_virhe">Tunnistusmallin avaaminen epäonnistui</string>
-    <string name="whisper_malli_puuttuu">Sanelumallia ei ole ladattu – käytetään laitteen tunnistusta</string>
-    <string name="whisper_poista_viesti">Poistetaanko käyttämätön %1$s-malli laitteelta (%2$d Mt)?</string>
+    <string name="sanelu_openai_ei_avainta">OpenAI-avainta ei ole asetettu – sanelu käyttää laitteen tunnistusta</string>
+    <string name="sanelu_verkkovirhe">Sanelun tunnistus epäonnistui: %1$s</string>
     <string name="kaannoskielet">Käännöskielet</string>
     <string name="kaannoskielet_kuvaus">Lataa ja poista käännösmalleja (noin 30 Mt kieltä kohden)</string>
     <string name="kieli_ladattu">Ladattu</string>

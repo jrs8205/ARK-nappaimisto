@@ -36,10 +36,8 @@ import org.jarsi.ark.data.ApiKeyStore
 import org.jarsi.ark.data.ClipEntity
 import org.jarsi.ark.dictation.DictationController
 import org.jarsi.ark.dictation.DictationText
+import org.jarsi.ark.dictation.OpenAiDictation
 import org.jarsi.ark.dictation.RecordAudioPermissionActivity
-import org.jarsi.ark.dictation.WhisperDictation
-import org.jarsi.ark.dictation.WhisperModel
-import org.jarsi.ark.dictation.WhisperModels
 import org.jarsi.ark.data.BigramEntity
 import org.jarsi.ark.data.LearnedDataStamp
 import org.jarsi.ark.data.LearnedDatabase
@@ -185,6 +183,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     Toast.makeText(this@KeyboardService, messageResId, Toast.LENGTH_SHORT).show()
                 }
 
+                override fun onDictationErrorMessage(message: String) {
+                    Toast.makeText(
+                        this@KeyboardService,
+                        getString(R.string.sanelu_verkkovirhe, message),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+
                 override fun onSpeechLevel(level: Float) {
                     toolbar?.micLevel = level
                 }
@@ -197,39 +203,37 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
     }
 
-    // Whisper-moottori luodaan vasta, kun se on asetuksista valittu.
-    private var whisper: WhisperDictation? = null
+    // OpenAI-tunnistus luodaan vasta, kun se on asetuksista valittu.
+    private var openAiDictation: OpenAiDictation? = null
 
-    // Kentän tai tilan vaihtuessa Whisper-tulokset hylätään, ettei vanha
+    // Kentän tai tilan vaihtuessa OpenAI-tulokset hylätään, ettei vanha
     // puhe valu uuteen kenttään; mikkinapin pysäytys viimeistelee ne.
     private fun stopDictation() {
         dictation.stop()
-        whisper?.cancel()
+        openAiDictation?.cancel()
     }
 
     private fun dictationActive(): Boolean =
-        dictation.isActive || whisper?.isActive == true
+        dictation.isActive || openAiDictation?.isActive == true
 
     /**
      * Käynnistää sanelun asetusten hiljaisuusrajalla ja valitulla
-     * moottorilla; alku isolla kirjaimella. Jos Whisper on valittu mutta
-     * mallia ei ole laitteella, pudotaan laitteen tunnistukseen, jottei
-     * sanelu jää mykäksi.
+     * moottorilla; alku isolla kirjaimella. Jos OpenAI-tunnistus on
+     * valittu mutta avainta ei ole, pudotaan laitteen tunnistukseen,
+     * jottei sanelu jää mykäksi.
      */
     private fun startDictation() {
         val silence = prefs.getInt(PREF_DICTATION_SILENCE, 5).coerceIn(2, 10) * 1000L
         dictationCapNext = true
-        val model = WhisperModel.fromPref(prefs.getString(PREF_DICTATION_ENGINE, null))
-        if (model != null && WhisperModels.isDownloaded(this, model)) {
-            val engine = whisper
-                ?: WhisperDictation(this, dictationListener).also { whisper = it }
-            engine.silenceLimitMs = silence
-            engine.model = model
-            engine.start()
-            return
-        }
-        if (model != null) {
-            Toast.makeText(this, R.string.whisper_malli_puuttuu, Toast.LENGTH_SHORT).show()
+        if (prefs.getString(PREF_DICTATION_ENGINE, null) == "openai") {
+            if (ApiKeyStore.exists(prefs, ApiKeyStore.Slot.OPENAI)) {
+                val engine = openAiDictation
+                    ?: OpenAiDictation(prefs, dictationListener).also { openAiDictation = it }
+                engine.silenceLimitMs = silence
+                engine.start()
+                return
+            }
+            Toast.makeText(this, R.string.sanelu_openai_ei_avainta, Toast.LENGTH_SHORT).show()
         }
         dictation.silenceLimitMs = silence
         dictation.start()
@@ -360,7 +364,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     override fun onDestroy() {
         editorSessionId++
         dictation.stop()
-        whisper?.destroy()
+        openAiDictation?.destroy()
         translator?.close()
         clipboardManager?.removePrimaryClipChangedListener(clipChangedListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
@@ -1656,7 +1660,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         passwordField -> Unit
                         dictationActive() -> {
                             dictation.stop()
-                            whisper?.stop()
+                            openAiDictation?.stop()
                         }
                         checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                             PackageManager.PERMISSION_GRANTED -> startDictation()

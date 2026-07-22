@@ -1,30 +1,32 @@
 package org.jarsi.ark.dictation
 
-import android.content.Context
+import android.annotation.SuppressLint
+import android.content.SharedPreferences
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.content.pm.ApplicationInfo
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import org.jarsi.ark.R
+import org.jarsi.ark.data.ApiKeyStore
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import kotlin.math.max
-import kotlin.math.min
 
 /**
- * Sanelu omalla Whisper-mallilla kokonaan laitteella. Mikrofoni pysyy
- * auki koko istunnon eikä kuuntelu katkea melussa: puhe pätkitään
- * [SpeechSegmenter]illä ja pätkät tunnistetaan taustalla, joten teksti
- * ilmestyy pieninä erinä puheen perässä. Istunto päättyy vain omaan
- * hiljaisuusrajaan tai pysäytykseen. Malli ladataan muistiin
- * tunnistusjonon kärjessä nauhoituksen jo käydessä, ja se pidetään
- * hetki latauskustannuksen takia lämpimänä peräkkäisiä saneluja varten.
- * Kutsut päälangalta; jakaa [DictationController.Listener]-rajapinnan.
+ * Sanelu OpenAI:n puheentunnistuksella käyttäjän omalla API-avaimella.
+ * Mikrofoni pysyy auki koko istunnon eikä kuuntelu katkea melussa: puhe
+ * pätkitään [SpeechSegmenter]illä ja pätkät tunnistetaan verkossa
+ * järjestyksessä, joten teksti ilmestyy lausepätkinä pienellä viiveellä.
+ * Istunto päättyy vain omaan hiljaisuusrajaan tai pysäytykseen; sulussa
+ * jonossa olevat pätkät tunnistetaan loppuun. Kutsut päälangalta; jakaa
+ * [DictationController.Listener]-rajapinnan.
  */
-class WhisperDictation(
-    private val context: Context,
+class OpenAiDictation(
+    private val prefs: SharedPreferences,
     private val listener: DictationController.Listener,
 ) {
 
@@ -34,17 +36,10 @@ class WhisperDictation(
     /** Hiljaisuus, jonka jälkeen sanelu päättyy itsestään. */
     var silenceLimitMs = 5_000L
 
-    /** Käytettävä malli; asetetaan ennen [start]-kutsua. */
-    var model: WhisperModel = WhisperModel.BASE
-
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // Mallin elinkaari ja tunnistus elävät samassa säikeessä, joten
-    // lataus, käyttö ja vapautus eivät voi ajautua päällekkäin.
+    // Yksi tunnistusjono pitää pätkien tekstit oikeassa järjestyksessä.
     private val transcribeExecutor = Executors.newSingleThreadExecutor()
-    private var engine: WhisperEngine? = null
-    private var engineModel: WhisperModel? = null
-
     private var captureThread: Thread? = null
 
     @Volatile
@@ -52,32 +47,18 @@ class WhisperDictation(
     private var session = 0
     private var promptContext = ""
 
-    private val releaseEngine = Runnable {
-        transcribeExecutor.execute {
-            engine?.close()
-            engine = null
-            engineModel = null
-        }
-    }
-
     fun start() {
         if (isActive) return
         isActive = true
         stopRequested = false
         promptContext = ""
-        mainHandler.removeCallbacks(releaseEngine)
         listener.onDictationStateChanged(true)
         val mySession = ++session
-        val wanted = model
-        transcribeExecutor.execute { ensureEngine(wanted) }
-        captureThread = Thread({ runCapture(mySession) }, "whisper-sanelu")
+        captureThread = Thread({ runCapture(mySession) }, "openai-sanelu")
             .also { it.start() }
     }
 
-    /**
-     * Pysäyttää kuuntelun; jonossa olevat pätkät tunnistetaan loppuun
-     * ja niiden teksti viedään vielä kenttään.
-     */
+    /** Pysäyttää kuuntelun; jonossa olevat pätkät tunnistetaan loppuun. */
     fun stop() {
         if (!isActive) return
         stopRequested = true
@@ -94,44 +75,15 @@ class WhisperDictation(
             isActive = false
             listener.onDictationStateChanged(false)
         }
-        mainHandler.removeCallbacks(releaseEngine)
-        mainHandler.postDelayed(releaseEngine, ENGINE_KEEP_MS)
     }
 
     fun destroy() {
-        stopRequested = true
-        session++
-        mainHandler.removeCallbacks(releaseEngine)
-        transcribeExecutor.execute {
-            engine?.close()
-            engine = null
-            engineModel = null
-        }
+        cancel()
         transcribeExecutor.shutdown()
     }
 
-    private fun ensureEngine(wanted: WhisperModel) {
-        if (engineModel == wanted && engine != null) return
-        engine?.close()
-        // Epäonnistuminen ei saa jäädä hiljaiseksi: käyttäjä saa virheen
-        // ja sanelu pysähtyy sen sijaan, että mikrofoni kuuntelisi tyhjää.
-        engine = try {
-            WhisperEngine.load(WhisperModels.file(context, wanted).absolutePath)
-        } catch (e: Throwable) {
-            null
-        }
-        engineModel = if (engine != null) wanted else null
-        debugLog("malli ${wanted.prefValue}: ${if (engine != null) "ladattu" else "EPÄONNISTUI"}")
-        if (engine == null) {
-            mainHandler.post {
-                listener.onDictationError(R.string.whisper_malli_virhe)
-            }
-            stopRequested = true
-        }
-    }
-
     // RECORD_AUDIO tarkistetaan kutsupolulla ennen sanelun käynnistystä.
-    @android.annotation.SuppressLint("MissingPermission")
+    @SuppressLint("MissingPermission")
     private fun runCapture(mySession: Int) {
         val minBuffer = AudioRecord.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
@@ -157,16 +109,11 @@ class WhisperDictation(
             record.startRecording()
             val segmenter = SpeechSegmenter(SAMPLE_RATE, silenceLimitMs)
             val shorts = ShortArray(SAMPLE_RATE / 10)
-            var logCountdown = 0
             while (!stopRequested && mySession == session) {
                 val read = record.read(shorts, 0, shorts.size)
                 if (read <= 0) continue
                 val floats = FloatArray(read) { shorts[it] / 32768f }
                 val event = segmenter.feed(floats)
-                if (debuggable && --logCountdown <= 0) {
-                    logCountdown = 10
-                    debugLog("taso=%.4f".format(segmenter.currentLevel))
-                }
                 mainHandler.post {
                     if (mySession == session && isActive) {
                         listener.onSpeechLevel(segmenter.currentLevel)
@@ -193,26 +140,93 @@ class WhisperDictation(
     }
 
     private fun queueTranscription(samples: FloatArray, mySession: Int) {
-        debugLog("segmentti: ${samples.size / (SAMPLE_RATE / 1000)} ms")
         runOnTranscribe {
             if (mySession != session) return@runOnTranscribe
-            val startedAt = android.os.SystemClock.elapsedRealtime()
-            val text = engine?.transcribe(
-                samples, promptContext.takeLast(PROMPT_CHARS), THREADS
-            ).orEmpty()
-            debugLog(
-                "tulos: ${text.length} merkkiä, " +
-                    "${android.os.SystemClock.elapsedRealtime() - startedAt} ms"
-            )
+            val apiKey = ApiKeyStore.read(prefs, ApiKeyStore.Slot.OPENAI).orEmpty()
+            if (apiKey.isEmpty()) return@runOnTranscribe
+            val text = try {
+                transcribe(DictationWav.encode(samples), apiKey)
+            } catch (e: Exception) {
+                // Yksittäisen pätkän virhe ei kaada istuntoa, mutta syy
+                // näytetään, ettei sanelu vaikuta mykältä.
+                mainHandler.post {
+                    if (mySession == session) {
+                        listener.onDictationErrorMessage(e.message.orEmpty())
+                    }
+                }
+                return@runOnTranscribe
+            }
             if (text.isBlank()) return@runOnTranscribe
             promptContext = "$promptContext $text".takeLast(PROMPT_KEEP_CHARS)
             // Teksti viedään, vaikka istunto olisi jo päättynyt: puhe
-            // sanottiin sen aikana, ja hitaalla laitteella tunnistus voi
-            // valmistua vasta hiljaisuusrajan jälkeen.
+            // sanottiin sen aikana ja tunnistus vain valmistui myöhemmin.
             mainHandler.post {
-                if (mySession == session) listener.onFinalText(text)
+                if (mySession == session) listener.onFinalText(text.trim())
             }
         }
+    }
+
+    /** Lähettää pätkän OpenAI:n tunnistukseen ja palauttaa tekstin. */
+    private fun transcribe(wav: ByteArray, apiKey: String): String {
+        val boundary = "ark-sanelu-${System.nanoTime()}"
+        val connection = URL(ENDPOINT).openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.connectTimeout = 10_000
+            connection.readTimeout = 30_000
+            connection.setRequestProperty("Authorization", "Bearer $apiKey")
+            connection.setRequestProperty(
+                "Content-Type", "multipart/form-data; boundary=$boundary"
+            )
+            connection.outputStream.use { output ->
+                fun field(name: String, value: String) {
+                    output.write(
+                        (
+                            "--$boundary\r\n" +
+                                "Content-Disposition: form-data; name=\"$name\"\r\n\r\n" +
+                                "$value\r\n"
+                            ).toByteArray()
+                    )
+                }
+                field("model", MODEL)
+                field("language", "fi")
+                if (promptContext.isNotBlank()) {
+                    field("prompt", promptContext.takeLast(PROMPT_CHARS))
+                }
+                output.write(
+                    (
+                        "--$boundary\r\n" +
+                            "Content-Disposition: form-data; name=\"file\"; " +
+                            "filename=\"puhe.wav\"\r\n" +
+                            "Content-Type: audio/wav\r\n\r\n"
+                        ).toByteArray()
+                )
+                output.write(wav)
+                output.write("\r\n--$boundary--\r\n".toByteArray())
+            }
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                val error = connection.errorStream?.bufferedReader()?.use { it.readText() }
+                throw IllegalStateException(shortError(code, error))
+            }
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            return JSONObject(body).optString("text")
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /** Tiivistää virhevastauksen ilmoitukseen sopivaksi syyksi. */
+    private fun shortError(code: Int, body: String?): String {
+        val message = body?.let {
+            try {
+                JSONObject(it).optJSONObject("error")?.optString("message")
+            } catch (e: Exception) {
+                null
+            }
+        }
+        return if (message.isNullOrBlank()) "HTTP $code" else message.take(120)
     }
 
     private fun finishSession(mySession: Int) {
@@ -225,10 +239,6 @@ class WhisperDictation(
                     isActive = false
                     listener.onDictationStateChanged(false)
                 }
-                // Malli pidetään hetki muistissa: heti perään alkava uusi
-                // sanelu käynnistyy ilman latausviivettä.
-                mainHandler.removeCallbacks(releaseEngine)
-                mainHandler.postDelayed(releaseEngine, ENGINE_KEEP_MS)
             }
         }
     }
@@ -236,24 +246,16 @@ class WhisperDictation(
     private fun runOnTranscribe(task: Runnable) {
         try {
             transcribeExecutor.execute(task)
-        } catch (e: java.util.concurrent.RejectedExecutionException) {
+        } catch (e: RejectedExecutionException) {
             // Palvelu on tuhottu ja jono suljettu; siivous on jo tehty.
         }
     }
 
-    // Kehityslokit vianetsintään; julkaisuversiossa hiljaa.
-    private val debuggable =
-        context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-
-    private fun debugLog(message: String) {
-        if (debuggable) Log.d("ArkWhisper", message)
-    }
-
     private companion object {
         const val SAMPLE_RATE = 16_000
-        const val ENGINE_KEEP_MS = 60_000L
+        const val ENDPOINT = "https://api.openai.com/v1/audio/transcriptions"
+        const val MODEL = "gpt-4o-mini-transcribe"
         const val PROMPT_CHARS = 200
         const val PROMPT_KEEP_CHARS = 500
-        val THREADS = min(4, Runtime.getRuntime().availableProcessors())
     }
 }

@@ -34,6 +34,9 @@ class DictationController(
         fun onDictationStateChanged(active: Boolean)
         fun onDictationError(messageResId: Int)
 
+        /** Virhe tarkalla syyllä (esim. verkkovirhe); syy näytetään aina. */
+        fun onDictationErrorMessage(message: String) {}
+
         /** Puheen voimakkuus 0–1 mikrofonin sykettä varten. */
         fun onSpeechLevel(level: Float)
     }

@@ -16,7 +16,6 @@ val keystoreProperties = Properties().apply {
 android {
     namespace = "org.jarsi.ark"
     compileSdk = 36
-    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "org.jarsi.ark.nappaimisto"
@@ -31,14 +30,6 @@ android {
             // yli puolet (~35 Mt).
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
-
-        externalNativeBuild {
-            cmake {
-                // Uudet laitteet käyttävät 16 kt:n muistisivuja; ilman
-                // tätä ne kieltäytyvät lataamasta Whisper-kirjastoa.
-                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
-            }
-        }
     }
 
     signingConfigs {
@@ -52,24 +43,7 @@ android {
         }
     }
 
-    // Whisper-sanelun natiiviosa (whisper.cpp CPU-taustalla).
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-        }
-    }
-
     buildTypes {
-        debug {
-            externalNativeBuild {
-                cmake {
-                    // Optimoimaton whisper on kymmeniä kertoja liian
-                    // hidas puheentunnistukseen — natiiviosa käännetään
-                    // optimoituna myös debug-buildiin.
-                    arguments += "-DCMAKE_BUILD_TYPE=Release"
-                }
-            }
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

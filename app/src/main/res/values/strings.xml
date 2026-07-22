@@ -158,7 +158,7 @@
     <string name="asetus_sanelu_hiljaisuus">Lopetus hiljaisuuteen (sekuntia)</string>
     <string name="asetus_sanelu_hiljaisuus_kuvaus">Sanelu päättyy itsestään, kun puheessa on ollut näin pitkä tauko.</string>
     <string name="asetus_sanelu_moottori">Sanelun tunnistus</string>
-    <string name="asetus_sanelu_moottori_nykyinen">Käytössä: %1$s. Whisper toimii kokonaan laitteella eikä lopeta kuuntelua melussa, mutta vaatii tehokkaan ja uudehkon puhelimen — teksti ilmestyy pätkissä pienellä viiveellä.</string>
+    <string name="asetus_sanelu_moottori_nykyinen">Käytössä: %1$s.\nNapauta valitaksesi laitteen tunnistuksen ja ladattavien Whisper-mallien välillä. Whisper toimii kokonaan laitteella eikä lopeta kuuntelua melussa, mutta vaatii tehokkaan ja uudehkon puhelimen; teksti ilmestyy pätkissä pienellä viiveellä ja malli ladataan kerran valinnan yhteydessä.</string>
     <string-array name="sanelu_moottori_nimet">
         <item>Laitteen puheentunnistus (oletus)</item>
         <item>Whisper base – kevyin (lataus 57 Mt)</item>

@@ -6,8 +6,12 @@ package org.jarsi.ark.dictation
  */
 object WhisperNative {
 
-    init {
+    /** Onnistuiko natiivikirjaston lataus; ilman sitä Whisper ei toimi. */
+    val available: Boolean = try {
         System.loadLibrary("ark_whisper")
+        true
+    } catch (e: UnsatisfiedLinkError) {
+        false
     }
 
     /** Lataa mallin; palauttaa kahvan tai 0 jos lataus epäonnistui. */
@@ -32,6 +36,7 @@ class WhisperEngine private constructor(private var handle: Long) {
 
     companion object {
         fun load(modelPath: String): WhisperEngine? {
+            if (!WhisperNative.available) return null
             val handle = WhisperNative.nativeInit(modelPath)
             return if (handle == 0L) null else WhisperEngine(handle)
         }

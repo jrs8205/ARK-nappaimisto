@@ -3,7 +3,10 @@
 cmake_minimum_required(VERSION 3.22)
 project(ark_whisper C CXX)
 
-set(BUILD_SHARED_LIBS OFF)
+# CACHE FORCE: whisper.cpp lukee nämä option()-muuttujina, ja pelkkä
+# tavallinen muuttuja jäi huomiotta — kirjastot paloittuivat erillisiksi
+# .so-tiedostoiksi. Staattisina kaikki päätyy yhteen libark_whisperiin.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_SERVER OFF CACHE BOOL "" FORCE)

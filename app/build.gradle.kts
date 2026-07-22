@@ -31,6 +31,14 @@ android {
             // yli puolet (~35 Mt).
             abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
+
+        externalNativeBuild {
+            cmake {
+                // Uudet laitteet käyttävät 16 kt:n muistisivuja; ilman
+                // tätä ne kieltäytyvät lataamasta Whisper-kirjastoa.
+                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+            }
+        }
     }
 
     signingConfigs {

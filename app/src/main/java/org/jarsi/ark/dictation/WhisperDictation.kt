@@ -92,7 +92,13 @@ class WhisperDictation(
     private fun ensureEngine(wanted: WhisperModel) {
         if (engineModel == wanted && engine != null) return
         engine?.close()
-        engine = WhisperEngine.load(WhisperModels.file(context, wanted).absolutePath)
+        // Epäonnistuminen ei saa jäädä hiljaiseksi: käyttäjä saa virheen
+        // ja sanelu pysähtyy sen sijaan, että mikrofoni kuuntelisi tyhjää.
+        engine = try {
+            WhisperEngine.load(WhisperModels.file(context, wanted).absolutePath)
+        } catch (e: Throwable) {
+            null
+        }
         engineModel = if (engine != null) wanted else null
         if (engine == null) {
             mainHandler.post {

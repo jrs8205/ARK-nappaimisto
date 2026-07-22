@@ -16,8 +16,10 @@ Uusin versio on [Releases-sivulla](https://github.com/jrs8205/ARK-nappaimisto/re
 (`ark-nappaimisto-vX.Y.Z.apk`).
 
 1. Lataa APK puhelimella ja avaa se; salli asennus kysyttäessä.
-2. Avaa ARK-näppäimistö-sovellus ja valitse **Ota näppäimistö käyttöön**.
-3. Valitse **Vaihda näppäimistöksi** ja poimi ARK-näppäimistö listasta.
+2. Avaa ARK-näppäimistö-sovellus: ensimmäinen avaus opastaa
+   käyttöönoton (näppäimistön salliminen ja valinta oletukseksi) ja
+   esittelee tärkeimmät ominaisuudet. Esittelyn voi katsoa uudelleen
+   asetuksista.
 
 Päivitykset asentuvat vanhan version päälle ja opitut sanat säilyvät.
 Oppimisdatan voi siirtää laitteelta toiselle varmuuskopiolla
@@ -194,7 +196,8 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   Lisää-napilla kenttään, jolloin uusi vienti korvaa edellisen.
   ✨-nappi hakee laadukkaamman käännöksen valitulta AI-palvelulta
   (vaatii oman API-avaimen). Kielipari ja suunta ovat vaihdettavissa;
-  kielimallit ladataan ja poistetaan asetuksista (~30 Mt/kieli).
+  kielimallit ladataan vasta käyttäjän luvalla (~30 Mt/kieli, kertalataus)
+  ja niitä hallitaan asetuksista.
   Kirjoitusalueella toimivat sanaehdotukset, kursorin siirto, valinta
   kahvoineen, Kopioi/Liitä sekä välimerkkisäännöt, ja teksti säilyy
   kunnes sen itse tyhjentää — myös sovelluksesta toiseen vaihtaessa.

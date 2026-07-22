@@ -64,6 +64,12 @@ class TranslationLanguagesActivity : AppCompatActivity() {
 
     private fun onRowClicked(row: Row) {
         if (row.code in downloading) return
+        // Suomi on kääntäjän oletuskieli: sen mallin poisto vain rikkoisi
+        // käännösnäkymän, joten poistoa ei tarjota.
+        if (row.code == TranslateLanguage.FINNISH && row.code in downloaded) {
+            Toast.makeText(this, R.string.kieli_oletus_ei_poistoa, Toast.LENGTH_SHORT).show()
+            return
+        }
         if (row.code in downloaded) {
             MaterialAlertDialogBuilder(this)
                 .setTitle(row.name)
@@ -146,6 +152,9 @@ class TranslationLanguagesActivity : AppCompatActivity() {
             name.text = row.name
             status.text = when {
                 row.code in downloading -> getString(R.string.kieli_ladataan)
+                // Suomi on aina käytettävissä oletuskielenä; "Ladattu" jää
+                // kielille, jotka käyttäjä on itse ottanut käyttöön.
+                row.code == TranslateLanguage.FINNISH -> getString(R.string.kieli_oletus)
                 row.code in downloaded -> getString(R.string.kieli_ladattu)
                 else -> ""
             }

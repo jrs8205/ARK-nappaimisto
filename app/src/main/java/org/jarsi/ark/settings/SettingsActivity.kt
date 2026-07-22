@@ -151,6 +151,10 @@ class SettingsActivity : AppCompatActivity() {
                     preferenceManager.sharedPreferences?.let {
                         ApiKeyStore.save(it, newValue as? String ?: "", slot)
                     }
+                    // Palvelurivin "Käytössä / Ei käytössä" seuraa avainta heti.
+                    refreshAiServiceRows(
+                        findPreference<ListPreference>("ai_palvelu")?.value
+                    )
                     false
                 }
             }
@@ -159,22 +163,39 @@ class SettingsActivity : AppCompatActivity() {
         /** Näyttää vain valitun AI-palvelun avaimen ja mallin rivit. */
         private fun setupAiServiceVisibility() {
             val service = findPreference<ListPreference>("ai_palvelu") ?: return
-            val names = resources.getStringArray(R.array.ai_palvelu_nimet)
-            val values = resources.getStringArray(R.array.ai_palvelu_arvot)
-            fun update(value: String?) {
-                val chatgpt = value == "chatgpt"
-                val name = names.getOrNull(values.indexOf(value ?: "claude")) ?: names[0]
-                service.summary = getString(R.string.asetus_ai_palvelu_nykyinen, name)
-                findPreference<Preference>("claude_api_avain")?.isVisible = !chatgpt
-                findPreference<Preference>("claude_malli")?.isVisible = !chatgpt
-                findPreference<Preference>("openai_api_avain")?.isVisible = chatgpt
-                findPreference<Preference>("openai_malli")?.isVisible = chatgpt
-            }
-            update(service.value)
+            refreshAiServiceRows(service.value)
             service.setOnPreferenceChangeListener { _, newValue ->
-                update(newValue as? String)
+                refreshAiServiceRows(newValue as? String)
                 true
             }
+        }
+
+        private fun refreshAiServiceRows(value: String?) {
+            val service = findPreference<ListPreference>("ai_palvelu") ?: return
+            val names = resources.getStringArray(R.array.ai_palvelu_nimet)
+            val values = resources.getStringArray(R.array.ai_palvelu_arvot)
+            val chatgpt = value == "chatgpt"
+            val name = names.getOrNull(values.indexOf(value ?: "claude")) ?: names[0]
+            // "Käytössä" vasta kun valitulla palvelulla on avain — muuten
+            // rivi kertoo, mitä puuttuu.
+            val hasKey = preferenceManager.sharedPreferences?.let {
+                ApiKeyStore.exists(
+                    it,
+                    if (chatgpt) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
+                )
+            } == true
+            service.summary = getString(
+                if (hasKey) {
+                    R.string.asetus_ai_palvelu_nykyinen
+                } else {
+                    R.string.asetus_ai_palvelu_ei_avainta
+                },
+                name,
+            )
+            findPreference<Preference>("claude_api_avain")?.isVisible = !chatgpt
+            findPreference<Preference>("claude_malli")?.isVisible = !chatgpt
+            findPreference<Preference>("openai_api_avain")?.isVisible = chatgpt
+            findPreference<Preference>("openai_malli")?.isVisible = chatgpt
         }
 
         /**

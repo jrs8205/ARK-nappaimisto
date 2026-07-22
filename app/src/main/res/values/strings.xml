@@ -67,6 +67,7 @@
     <string name="asetukset_tekoaly">Tekoäly</string>
     <string name="asetus_ai_palvelu">AI-palvelu (Claude / ChatGPT)</string>
     <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s. Napauta vaihtaaksesi palvelua.</string>
+    <string name="asetus_ai_palvelu_ei_avainta">Ei käytössä: lisää %1$s-avain alle, niin AI-toiminnot tulevat näkyviin.</string>
     <string name="asetus_api_avain">Claude API -avain</string>
     <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään Anthropicin palveluun vain kun painat nappia; avain säilyy vain tällä laitteella salattuna.</string>
     <string name="asetus_malli">Korjausten Claude-malli</string>
@@ -126,7 +127,7 @@
     <string name="kaannos_virhe">Käännös epäonnistui – yritä uudelleen</string>
     <string name="kaannos_lisaa">Lisää</string>
     <string name="kaannos_tyhja">Käännös ilmestyy tähän</string>
-    <string name="kaannos_ai_kaannetaan">✨ Käännetään…</string>
+    <string name="kaannos_ai_kaannetaan">Käännetään…</string>
     <string name="kaannos_ai_virhe_syy">AI-käännös epäonnistui: %1$s</string>
     <string name="cd_ai_kaannos">Parempi käännös tekoälyllä</string>
     <string name="cd_kopioi_kaannos">Kopioi käännös leikepöydälle</string>
@@ -139,6 +140,8 @@
     <string name="kaannoskielet_kuvaus">Lataa ja poista käännösmalleja (noin 30 Mt kieltä kohden)</string>
     <string name="kieli_ladattu">Ladattu</string>
     <string name="kieli_ladataan">Ladataan…</string>
+    <string name="kieli_oletus">Oletus</string>
+    <string name="kieli_oletus_ei_poistoa">Suomi on kääntäjän oletuskieli, eikä sitä voi poistaa.</string>
     <string name="kieli_lataa_otsikko">Ladataanko käännösmalli?</string>
     <string name="kieli_lataa_varmistus">Malli on noin 30 Mt ja se ladataan kerran; käännökset tehdään sen jälkeen laitteella.</string>
     <string name="kieli_poista_varmistus">Poistetaanko kielen käännösmalli laitteelta?</string>

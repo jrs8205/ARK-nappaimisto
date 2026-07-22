@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -54,10 +55,10 @@ class LearnedWordsActivity : AppCompatActivity() {
             setPadding(dp(16), dp(12), dp(16), dp(12))
         }
         // Haun pikatyhjennys; näkyy vain kun kentässä on tekstiä.
-        val clearSearch = TextView(this).apply {
-            text = "✕"
-            textSize = 18f
-            gravity = Gravity.CENTER
+        // Vektori-ikoni piirtyy samannäköisenä kaikilla laitteilla.
+        val clearSearch = ImageView(this).apply {
+            setImageResource(R.drawable.ic_close)
+            setColorFilter(search.currentHintTextColor)
             setPadding(dp(12), dp(12), dp(16), dp(12))
             visibility = View.GONE
             setOnClickListener { search.setText("") }

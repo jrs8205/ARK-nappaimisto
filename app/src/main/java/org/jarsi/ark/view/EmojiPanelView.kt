@@ -6,6 +6,7 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.emoji2.emojipicker.EmojiPickerView
@@ -67,11 +68,11 @@ class EmojiPanelView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onClose() }
     }
 
-    private val backspaceButton = TextView(context).apply {
-        text = "⌫"
-        textSize = 20f
-        gravity = Gravity.CENTER
-        setPadding(dp(20), dp(4), dp(20), dp(4))
+    // Vektori-ikoni tekstimerkin sijaan, jotta nappi näyttää samalta
+    // kaikilla laitteilla emoji-fontista riippumatta.
+    private val backspaceButton = ImageView(context).apply {
+        setImageResource(R.drawable.ic_backspace)
+        setPadding(dp(20), dp(6), dp(20), dp(6))
         contentDescription = context.getString(R.string.cd_poista_merkki)
         setOnClickListener { listener?.onBackspace() }
     }
@@ -113,6 +114,6 @@ class EmojiPanelView(context: Context) : LinearLayout(context) {
         theme = newTheme
         setBackgroundColor(theme.background)
         abcButton.setTextColor(theme.text)
-        backspaceButton.setTextColor(theme.text)
+        backspaceButton.setColorFilter(theme.text)
     }
 }

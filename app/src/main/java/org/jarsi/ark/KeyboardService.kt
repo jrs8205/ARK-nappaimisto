@@ -616,6 +616,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             getString(R.string.kaannos_ladataan)
         }
         bar.pasteAvailable = clipboardManager?.hasPrimaryClip() == true
+        // ✨ piilotetaan kokonaan, kun valitulla palvelulla ei ole avainta —
+        // nappi joka ei tee mitään hämmentäisi.
+        bar.aiEnabled = ApiKeyStore.exists(
+            prefs,
+            if (openAiSelected()) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
+        )
         bar.setBuffer(translateBuffer.text, translateBuffer.cursor, hint)
         bar.setTranslation(currentTranslation, getString(R.string.kaannos_tyhja))
         // Shift-nuoli seuraa käännösrivin tekstiä kuten kenttää.

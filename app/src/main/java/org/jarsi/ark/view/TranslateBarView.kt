@@ -69,6 +69,13 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     /** Onko leikepöydällä liitettävää tekstiä; palvelu päivittää. */
     var pasteAvailable = false
 
+    /** ✨ näytetään vain, kun valitulla AI-palvelulla on API-avain. */
+    var aiEnabled = true
+        set(value) {
+            field = value
+            aiLabel.visibility = if (value) VISIBLE else GONE
+        }
+
     private var theme = KeyboardTheme.load(context)
     private val density = resources.displayMetrics.density
     private fun dp(value: Int) = (value * density).roundToInt()
@@ -143,10 +150,11 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onCycleSource() }
     }
 
-    private val swapLabel = TextView(context).apply {
-        text = "⇄"
-        textSize = 16f
-        setPadding(dp(4), dp(8), dp(4), dp(8))
+    // Ikonit ovat vektoreita eivätkä tekstimerkkejä, jotta ne piirtyvät
+    // samannäköisinä kaikilla laitteilla emoji-fontista riippumatta.
+    private val swapLabel = ImageView(context).apply {
+        setImageResource(R.drawable.ic_swap)
+        setPadding(dp(8), dp(8), dp(8), dp(8))
         contentDescription = context.getString(R.string.cd_vaihda_suunta)
         setOnClickListener { listener?.onSwap() }
     }
@@ -266,10 +274,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         )
     }
 
-    private val clearLabel = TextView(context).apply {
-        text = "✕"
-        textSize = 16f
-        setPadding(dp(12), dp(8), dp(12), dp(8))
+    private val clearLabel = ImageView(context).apply {
+        setImageResource(R.drawable.ic_close)
+        setPadding(dp(10), dp(10), dp(10), dp(10))
         visibility = GONE
         contentDescription = context.getString(R.string.cd_tyhjenna_rivi)
         setOnClickListener { listener?.onClear() }
@@ -295,10 +302,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         )
     }
 
-    private val aiLabel = TextView(context).apply {
-        text = "✨"
-        textSize = 16f
-        setPadding(dp(12), dp(10), dp(12), dp(10))
+    private val aiLabel = ImageView(context).apply {
+        setImageResource(R.drawable.ic_sparkle)
+        setPadding(dp(12), dp(12), dp(12), dp(12))
         contentDescription = context.getString(R.string.cd_ai_kaannos)
         setOnClickListener { listener?.onAiTranslate() }
     }
@@ -336,7 +342,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         gravity = Gravity.CENTER_VERTICAL
         minimumHeight = dp(44)
         addView(View(context), LayoutParams(0, 1, 1f))
-        addView(aiLabel)
+        addView(aiLabel, LayoutParams(dp(44), dp(44)))
         addView(copyIcon, LayoutParams(dp(44), dp(44)))
         addView(insertLabel)
     }
@@ -359,9 +365,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setBackgroundColor(theme.background)
         sourceLabel.setTextColor(theme.accent)
         targetLabel.setTextColor(theme.accent)
-        swapLabel.setTextColor(theme.text)
-        clearLabel.setTextColor(theme.hint)
-        aiLabel.setTextColor(theme.text)
+        swapLabel.setColorFilter(theme.text)
+        clearLabel.setColorFilter(theme.hint)
+        aiLabel.setColorFilter(theme.text)
         insertLabel.setTextColor(theme.accent)
         copyIcon.setColorFilter(theme.text)
         // Käännös erottuu omaksi alueekseen korttitaustalla.

@@ -74,9 +74,28 @@ class WhisperDictation(
             .also { it.start() }
     }
 
+    /**
+     * Pysäyttää kuuntelun; jonossa olevat pätkät tunnistetaan loppuun
+     * ja niiden teksti viedään vielä kenttään.
+     */
     fun stop() {
         if (!isActive) return
         stopRequested = true
+    }
+
+    /**
+     * Keskeyttää heti ja hylkää jonossa olevat tulokset — käytetään kun
+     * kenttä vaihtuu eikä vanha puhe saa valua uuteen kenttään.
+     */
+    fun cancel() {
+        stopRequested = true
+        session++
+        if (isActive) {
+            isActive = false
+            listener.onDictationStateChanged(false)
+        }
+        mainHandler.removeCallbacks(releaseEngine)
+        mainHandler.postDelayed(releaseEngine, ENGINE_KEEP_MS)
     }
 
     fun destroy() {
@@ -175,31 +194,46 @@ class WhisperDictation(
 
     private fun queueTranscription(samples: FloatArray, mySession: Int) {
         debugLog("segmentti: ${samples.size / (SAMPLE_RATE / 1000)} ms")
-        transcribeExecutor.execute {
-            if (mySession != session) return@execute
+        runOnTranscribe {
+            if (mySession != session) return@runOnTranscribe
             val text = engine?.transcribe(
                 samples, promptContext.takeLast(PROMPT_CHARS), THREADS
             ).orEmpty()
             debugLog("tulos: ${text.length} merkkiä")
-            if (text.isBlank()) return@execute
+            if (text.isBlank()) return@runOnTranscribe
             promptContext = "$promptContext $text".takeLast(PROMPT_KEEP_CHARS)
+            // Teksti viedään, vaikka istunto olisi jo päättynyt: puhe
+            // sanottiin sen aikana, ja hitaalla laitteella tunnistus voi
+            // valmistua vasta hiljaisuusrajan jälkeen.
             mainHandler.post {
-                if (mySession == session && isActive) listener.onFinalText(text)
+                if (mySession == session) listener.onFinalText(text)
             }
         }
     }
 
     private fun finishSession(mySession: Int) {
-        mainHandler.post {
-            if (mySession != session) return@post
-            if (isActive) {
-                isActive = false
-                listener.onDictationStateChanged(false)
+        // Sulku ajetaan tunnistusjonon hännästä: jonossa olevat pätkät
+        // valmistuvat ensin, joten viimeinenkin lause ehtii kenttään.
+        runOnTranscribe {
+            mainHandler.post {
+                if (mySession != session) return@post
+                if (isActive) {
+                    isActive = false
+                    listener.onDictationStateChanged(false)
+                }
+                // Malli pidetään hetki muistissa: heti perään alkava uusi
+                // sanelu käynnistyy ilman latausviivettä.
+                mainHandler.removeCallbacks(releaseEngine)
+                mainHandler.postDelayed(releaseEngine, ENGINE_KEEP_MS)
             }
-            // Malli pidetään hetki muistissa: heti perään alkava uusi
-            // sanelu käynnistyy ilman latausviivettä.
-            mainHandler.removeCallbacks(releaseEngine)
-            mainHandler.postDelayed(releaseEngine, ENGINE_KEEP_MS)
+        }
+    }
+
+    private fun runOnTranscribe(task: Runnable) {
+        try {
+            transcribeExecutor.execute(task)
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            // Palvelu on tuhottu ja jono suljettu; siivous on jo tehty.
         }
     }
 

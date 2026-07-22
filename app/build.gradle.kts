@@ -60,6 +60,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            externalNativeBuild {
+                cmake {
+                    // Optimoimaton whisper on kymmeniä kertoja liian
+                    // hidas puheentunnistukseen — natiiviosa käännetään
+                    // optimoituna myös debug-buildiin.
+                    arguments += "-DCMAKE_BUILD_TYPE=Release"
+                }
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

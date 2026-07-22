@@ -200,9 +200,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // Whisper-moottori luodaan vasta, kun se on asetuksista valittu.
     private var whisper: WhisperDictation? = null
 
+    // Kentän tai tilan vaihtuessa Whisper-tulokset hylätään, ettei vanha
+    // puhe valu uuteen kenttään; mikkinapin pysäytys viimeistelee ne.
     private fun stopDictation() {
         dictation.stop()
-        whisper?.stop()
+        whisper?.cancel()
     }
 
     private fun dictationActive(): Boolean =
@@ -1652,7 +1654,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     }
                     when {
                         passwordField -> Unit
-                        dictationActive() -> stopDictation()
+                        dictationActive() -> {
+                            dictation.stop()
+                            whisper?.stop()
+                        }
                         checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                             PackageManager.PERMISSION_GRANTED -> startDictation()
                         else -> {

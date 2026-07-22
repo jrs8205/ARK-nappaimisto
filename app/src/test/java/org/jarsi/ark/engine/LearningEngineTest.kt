@@ -63,6 +63,47 @@ class LearningEngineTest {
     }
 
     @Test
+    fun `kerran kirjoitettu sana ei ole viela vakiintunut oikoluvulle`() {
+        val e = engine()
+        e.onWordCommitted("Kuki")
+        assertTrue(e.isOwnWord("Kuki"))
+        assertFalse(e.isEstablishedWord("Kuki"))
+    }
+
+    @Test
+    fun `toistuvasti kirjoitettu sana vakiintuu`() {
+        val e = engine()
+        e.onWordCommitted("prx4")
+        e.onWordCommitted("prx4")
+        assertTrue(e.isEstablishedWord("prx4"))
+    }
+
+    @Test
+    fun `hyvaksytty ehdotus vakiinnuttaa sanan heti`() {
+        val e = engine()
+        e.onWordCommitted("prx4")
+        e.onSuggestionAccepted("prx4")
+        assertTrue(e.isEstablishedWord("prx4"))
+    }
+
+    @Test
+    fun `kiinnitetty sana on vakiintunut`() {
+        val e = engine()
+        e.onWordCommitted("prx4")
+        e.setPinned("prx4", true)
+        assertTrue(e.isEstablishedWord("prx4"))
+    }
+
+    @Test
+    fun `estetty sana ei ole vakiintunut`() {
+        val e = engine()
+        e.onWordCommitted("moro")
+        e.onWordCommitted("moro")
+        e.blockWord("moro")
+        assertFalse(e.isEstablishedWord("moro"))
+    }
+
+    @Test
     fun `estetty ei nay ja esto toimii vieraalle sanalle`() {
         val e = engine()
         e.onWordCommitted("moro")

@@ -111,7 +111,7 @@
     <string name="sanelu_virhe">Sanelu ei onnistunut</string>
     <string name="sanelu_ei_saatavilla">Sanelu ei ole käytettävissä tällä laitteella</string>
 
-    <string name="korjaus_tyhja">Kentässä ei ole tekstiä</string>
+    <string name="korjaus_tyhja">Kentässä ei ole tekstiä.\n\nOikoluku alleviivaa kentän tuntemattomat sanat, ja sanaa napauttamalla näet korjausvaihtoehdot ehdotusrivillä. Paranna teksti -AI-nappi tulee näkyviin, kun API-avain on asetettu asetuksissa.</string>
 
     <!-- Saavutettavuuskuvaukset kuvakenapeille -->
     <string name="cd_poista_merkki">Poista merkki</string>

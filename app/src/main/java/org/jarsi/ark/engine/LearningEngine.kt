@@ -359,6 +359,20 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     fun isOwnWord(word: String): Boolean =
         words[keyOf(word)]?.let { it.count > 0 && !it.blocked } == true
 
+    /**
+     * Onko sana vakiintunut käyttäjän omaksi: käytetty useammin kuin
+     * kerran, hyväksytty ehdotuksesta tai kiinnitetty. Oikoluku ohittaa
+     * vain vakiintuneet — kerran kirjoitettu tuntematon voi olla
+     * lyöntivirhe, joten se alleviivataan vielä. Automaattikorjaus
+     * käyttää löyhempää [isOwnWord]-ehtoa, ettei kertaalleen kirjoitettu
+     * sana ala korjautua toiseksi.
+     */
+    @Synchronized
+    fun isEstablishedWord(word: String): Boolean =
+        words[keyOf(word)]?.let {
+            !it.blocked && (it.count > 1 || it.acceptedCount > 0 || it.pinned)
+        } == true
+
     @Synchronized
     fun isBlocked(word: String): Boolean = words[keyOf(word)]?.blocked == true
 

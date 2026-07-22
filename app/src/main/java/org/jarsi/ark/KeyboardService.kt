@@ -1001,12 +1001,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val text = correctionText
         val words = correctionWords
         executeSuggest {
-            // Alleviivataan sanat, joita ei löydy sanastosta eikä opituista.
+            // Alleviivataan sanat, joita ei löydy sanastosta eikä
+            // vakiintuneista omista. Kerran kirjoitettu tuntematon
+            // alleviivataan vielä — muuten tuore lyöntivirhe "opittaisiin"
+            // heti eikä oikoluku huomaisi sitä koskaan.
             val unknown = words.indices.filterTo(HashSet()) { i ->
                 val word = text.substring(words[i])
                 word.any { it.isLetter() } &&
                     dictionary.frequencyOf(word) == 0L &&
-                    !learning.isOwnWord(word)
+                    !learning.isEstablishedWord(word)
             }
             mainHandler.post {
                 if (text == correctionText && correctionPanel?.visibility == View.VISIBLE) {

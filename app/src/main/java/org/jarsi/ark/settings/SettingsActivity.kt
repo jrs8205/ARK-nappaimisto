@@ -44,6 +44,13 @@ class SettingsActivity : AppCompatActivity() {
             supportFragmentManager.beginTransaction()
                 .replace(R.id.asetus_sisalto, SettingsFragment())
                 .commit()
+            // Ensimmäinen avaus ohjataan esittelyyn, joka opastaa myös
+            // näppäimistön käyttöönoton.
+            val prefs = androidx.preference.PreferenceManager
+                .getDefaultSharedPreferences(this)
+            if (!prefs.getBoolean(IntroActivity.PREF_SEEN, false)) {
+                startActivity(Intent(this, IntroActivity::class.java))
+            }
         }
     }
 
@@ -89,6 +96,10 @@ class SettingsActivity : AppCompatActivity() {
                 val imm = requireContext()
                     .getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 imm.showInputMethodPicker()
+                true
+            }
+            findPreference<Preference>("esittely")?.setOnPreferenceClickListener {
+                startActivity(Intent(requireContext(), IntroActivity::class.java))
                 true
             }
             findPreference<Preference>("opitut_sanat")?.setOnPreferenceClickListener {

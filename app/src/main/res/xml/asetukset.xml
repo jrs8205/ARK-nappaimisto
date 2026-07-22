@@ -15,6 +15,12 @@
             android:title="@string/vaihda_nappaimistoksi"
             android:summary="@string/vaihda_nappaimistoksi_kuvaus"
             app:singleLineTitle="false" />
+        <Preference
+            android:key="esittely"
+            android:icon="@drawable/ic_lightbulb"
+            android:title="@string/esittely"
+            android:summary="@string/esittely_kuvaus"
+            app:singleLineTitle="false" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_ulkoasu">

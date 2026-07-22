@@ -44,6 +44,11 @@
         </activity>
 
         <activity
+            android:name=".settings.IntroActivity"
+            android:exported="false"
+            android:label="@string/esittely" />
+
+        <activity
             android:name=".settings.LearnedWordsActivity"
             android:exported="false"
             android:label="@string/opitut_sanat" />

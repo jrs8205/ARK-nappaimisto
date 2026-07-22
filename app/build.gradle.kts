@@ -87,6 +87,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.recyclerview)
     implementation(libs.androidx.emojipicker)
+    // Ensiasennuksen esittelysivut pyyhkäistävinä.
+    implementation(libs.androidx.viewpager2)
     // Paikallinen käännös: mallit ladataan kerran, käännös tapahtuu laitteella.
     implementation(libs.mlkit.translate)
     implementation(libs.androidx.room.runtime)

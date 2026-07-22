@@ -134,6 +134,25 @@
     <string name="cd_ai_kaannos">Parempi käännös tekoälyllä</string>
     <string name="cd_kopioi_kaannos">Kopioi käännös leikepöydälle</string>
 
+    <!-- Ensiasennuksen esittely -->
+    <string name="esittely">Esittely</string>
+    <string name="esittely_kuvaus">Katso käyttöönoton opastus uudelleen</string>
+    <string name="esittely_ohita">Ohita</string>
+    <string name="esittely_seuraava">Seuraava</string>
+    <string name="esittely_valmis_nappi">Valmis</string>
+    <string name="esittely_tervetuloa_otsikko">Tervetuloa!</string>
+    <string name="esittely_tervetuloa_teksti">ARK-näppäimistö oppii omat sanasi, sanaparisi ja kirjoitustapasi — kokonaan omalla laitteellasi. Mitään kirjoittamaasi ei lähetetä minnekään.</string>
+    <string name="esittely_kayttoonotto_otsikko">Ota käyttöön</string>
+    <string name="esittely_kayttoonotto_teksti">Näppäimistö otetaan käyttöön puhelimen asetuksista kahdessa askeleessa.</string>
+    <string name="esittely_askel_kayttoon">1. Ota näppäimistö käyttöön</string>
+    <string name="esittely_askel_vaihda">2. Vaihda näppäimistöksi</string>
+    <string name="esittely_ehdotukset_otsikko">Ehdotukset oppivat sinulta</string>
+    <string name="esittely_ehdotukset_teksti">Ehdotusrivi täydentää ja ennustaa sanoja, ja omat sanasi nousevat kärkeen heti ensimmäisestä kerrasta. Pitkä painallus ehdotukseen poistaa tai estää sanan, ja kaikkea opittua voi hallita asetuksista.</string>
+    <string name="esittely_tyokalut_otsikko">Työkalurivi</string>
+    <string name="esittely_tyokalut_teksti">Ylärivillä ovat sanelu, leikepöytä, kääntäjä, korjausnäkymä ja emojit. Nappien järjestystä ja näkyvyyttä voi muokata asetuksista.</string>
+    <string name="esittely_valmis_otsikko">Valmis!</string>
+    <string name="esittely_valmis_teksti">Hyviä kirjoitushetkiä! Kaikki asetukset, opittujen sanojen hallinta ja varmuuskopiointi löytyvät tästä sovelluksesta.</string>
+
     <string name="asetukset_kaannos">Käännös</string>
     <string name="asetukset_sanelu">Sanelu</string>
     <string name="asetus_sanelu_hiljaisuus">Lopetus hiljaisuuteen (sekuntia)</string>

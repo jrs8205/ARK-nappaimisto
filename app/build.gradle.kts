@@ -16,6 +16,7 @@ val keystoreProperties = Properties().apply {
 android {
     namespace = "org.jarsi.ark"
     compileSdk = 36
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "org.jarsi.ark.nappaimisto"
@@ -40,6 +41,13 @@ android {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
             }
+        }
+    }
+
+    // Whisper-sanelun natiiviosa (whisper.cpp CPU-taustalla).
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
         }
     }
 

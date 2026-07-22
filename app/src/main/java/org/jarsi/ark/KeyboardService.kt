@@ -37,6 +37,9 @@ import org.jarsi.ark.data.ClipEntity
 import org.jarsi.ark.dictation.DictationController
 import org.jarsi.ark.dictation.DictationText
 import org.jarsi.ark.dictation.RecordAudioPermissionActivity
+import org.jarsi.ark.dictation.WhisperDictation
+import org.jarsi.ark.dictation.WhisperModel
+import org.jarsi.ark.dictation.WhisperModels
 import org.jarsi.ark.data.BigramEntity
 import org.jarsi.ark.data.LearnedDataStamp
 import org.jarsi.ark.data.LearnedDatabase
@@ -141,10 +144,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private val clipChangedListener =
         ClipboardManager.OnPrimaryClipChangedListener { handleClipChanged() }
 
-    private val dictation by lazy {
-        DictationController(
-            this,
-            object : DictationController.Listener {
+    // Jaettu kuuntelija: sama tulosten käsittely laitteen tunnistimelle
+    // ja omalle Whisper-moottorille.
+    private val dictationListener = object : DictationController.Listener {
                 override fun onPartialText(text: String) {
                     lastEditTime = SystemClock.uptimeMillis()
                     val shown = if (dictationCapNext) DictationText.capitalize(text) else text
@@ -186,18 +188,48 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 override fun onSpeechLevel(level: Float) {
                     toolbar?.micLevel = level
                 }
-            },
-        ).also {
+    }
+
+    private val dictation by lazy {
+        DictationController(this, dictationListener).also {
             // Omat opitut sanat vihjeiksi tunnistimelle (prx4, jarsi.org…).
             it.biasWords = { learning.biasWords(BIAS_WORD_MAX) }
         }
     }
 
-    /** Käynnistää sanelun asetusten hiljaisuusrajalla; alku isolla kirjaimella. */
+    // Whisper-moottori luodaan vasta, kun se on asetuksista valittu.
+    private var whisper: WhisperDictation? = null
+
+    private fun stopDictation() {
+        dictation.stop()
+        whisper?.stop()
+    }
+
+    private fun dictationActive(): Boolean =
+        dictation.isActive || whisper?.isActive == true
+
+    /**
+     * Käynnistää sanelun asetusten hiljaisuusrajalla ja valitulla
+     * moottorilla; alku isolla kirjaimella. Jos Whisper on valittu mutta
+     * mallia ei ole laitteella, pudotaan laitteen tunnistukseen, jottei
+     * sanelu jää mykäksi.
+     */
     private fun startDictation() {
-        dictation.silenceLimitMs =
-            prefs.getInt(PREF_DICTATION_SILENCE, 5).coerceIn(2, 10) * 1000L
+        val silence = prefs.getInt(PREF_DICTATION_SILENCE, 5).coerceIn(2, 10) * 1000L
         dictationCapNext = true
+        val model = WhisperModel.fromPref(prefs.getString(PREF_DICTATION_ENGINE, null))
+        if (model != null && WhisperModels.isDownloaded(this, model)) {
+            val engine = whisper
+                ?: WhisperDictation(this, dictationListener).also { whisper = it }
+            engine.silenceLimitMs = silence
+            engine.model = model
+            engine.start()
+            return
+        }
+        if (model != null) {
+            Toast.makeText(this, R.string.whisper_malli_puuttuu, Toast.LENGTH_SHORT).show()
+        }
+        dictation.silenceLimitMs = silence
         dictation.start()
     }
     // Seuraava sanelujakso alkaa isolla kirjaimella (istunnon ja lauseen alut).
@@ -326,6 +358,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     override fun onDestroy() {
         editorSessionId++
         dictation.stop()
+        whisper?.destroy()
         translator?.close()
         clipboardManager?.removePrimaryClipChangedListener(clipChangedListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
@@ -342,7 +375,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Lupa-aktiviteetin avaus piilottaa näppäimistön hetkeksi; silloin
         // sanelua ei pysäytetä, jotta se voi alkaa luvan myöntämisen jälkeen.
         if (!pendingDictation) {
-            dictation.stop()
+            stopDictation()
         }
         flushLearned()
         learning.resetContext()
@@ -571,7 +604,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Salasanakenttiä ei käännetä.
         if (passwordField) return
         // Sanelu ja käännös eivät voi olla yhtä aikaa päällä.
-        dictation.stop()
+        stopDictation()
         hideAllPanels()
         translateMode = true
         currentTranslation = ""
@@ -1619,7 +1652,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     }
                     when {
                         passwordField -> Unit
-                        dictation.isActive -> dictation.stop()
+                        dictationActive() -> stopDictation()
                         checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
                             PackageManager.PERMISSION_GRANTED -> startDictation()
                         else -> {
@@ -1969,7 +2002,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         learning.resetContext()
         reloadLearnedIfChanged()
         // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
-        dictation.stop()
+        stopDictation()
         hideAllPanels()
         // Kenttä vaihtui: näkymä sulkeutuu, mutta käännöstyö säilyy
         // puskurissa, koska mikään ei kirjoitu kenttiin itsestään.
@@ -2494,6 +2527,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_AI_SERVICE = "ai_palvelu"
         const val PREF_NUMBER_ROW = "numerorivi"
         const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"
+        const val PREF_DICTATION_ENGINE = "sanelu_moottori"
         const val PREF_DOUBLE_SPACE = "kaksoisvali_piste"
         const val DOUBLE_SPACE_PERIOD_MS = 1100L
         const val LIVE_TRANSLATE_DELAY_MS = 300L

@@ -136,6 +136,14 @@
             app:min="2"
             app:singleLineTitle="false"
             app:showSeekBarValue="true" />
+        <ListPreference
+            android:key="sanelu_moottori"
+            android:icon="@drawable/ic_mic"
+            android:title="@string/asetus_sanelu_moottori"
+            android:defaultValue="jarjestelma"
+            android:entries="@array/sanelu_moottori_nimet"
+            android:entryValues="@array/sanelu_moottori_arvot"
+            app:singleLineTitle="false" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_tekoaly">

@@ -19,6 +19,8 @@ import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.jarsi.ark.R
 import org.jarsi.ark.data.ApiKeyStore
+import org.jarsi.ark.dictation.WhisperModel
+import org.jarsi.ark.dictation.WhisperModels
 import org.jarsi.ark.data.Backup
 import org.jarsi.ark.engine.TextImprover
 import org.jarsi.ark.data.BackupCodec
@@ -88,6 +90,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
             setupAiServiceVisibility()
+            setupDictationEngine()
             findPreference<Preference>("avaa_ime_asetukset")?.setOnPreferenceClickListener {
                 startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                 true
@@ -169,6 +172,95 @@ class SettingsActivity : AppCompatActivity() {
                     false
                 }
             }
+        }
+
+        /**
+         * Sanelumoottorin valinta: Whisper-vaihtoehto astuu voimaan vasta,
+         * kun sen malli on ladattu — valinta käynnistää kertalatauksen
+         * lupakyselyllä. Käyttämättä jäänyt malli tarjotaan poistettavaksi.
+         */
+        private fun setupDictationEngine() {
+            val pref = findPreference<ListPreference>("sanelu_moottori") ?: return
+            val names = resources.getStringArray(R.array.sanelu_moottori_nimet)
+            val values = resources.getStringArray(R.array.sanelu_moottori_arvot)
+            pref.summaryProvider = Preference.SummaryProvider<ListPreference> { p ->
+                val name = names.getOrNull(values.indexOf(p.value ?: "jarjestelma"))
+                    ?: names[0]
+                getString(R.string.asetus_sanelu_moottori_nykyinen, name)
+            }
+            pref.setOnPreferenceChangeListener { _, newValue ->
+                val model = WhisperModel.fromPref(newValue as? String)
+                val previous = WhisperModel.fromPref(pref.value)
+                if (model == null || WhisperModels.isDownloaded(requireContext(), model)) {
+                    offerModelCleanup(previous, model)
+                    true
+                } else {
+                    confirmModelDownload(model) { success ->
+                        if (success) {
+                            pref.value = model.prefValue
+                            offerModelCleanup(previous, model)
+                        }
+                    }
+                    false
+                }
+            }
+        }
+
+        private fun confirmModelDownload(model: WhisperModel, onDone: (Boolean) -> Unit) {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.whisper_lataa_otsikko)
+                .setMessage(getString(R.string.whisper_lataa_viesti, model.sizeMb))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.kieli_lataa) { _, _ ->
+                    runModelDownload(model, onDone)
+                }
+                .show()
+        }
+
+        private fun runModelDownload(model: WhisperModel, onDone: (Boolean) -> Unit) {
+            val appContext = requireContext().applicationContext
+            val cancel = java.util.concurrent.atomic.AtomicBoolean(false)
+            val dialog = MaterialAlertDialogBuilder(requireContext())
+                .setMessage(getString(R.string.whisper_ladataan, 0))
+                .setNegativeButton(android.R.string.cancel) { _, _ -> cancel.set(true) }
+                .setCancelable(false)
+                .show()
+            Thread {
+                val ok = WhisperModels.download(appContext, model, cancel) { percent ->
+                    activity?.runOnUiThread {
+                        if (dialog.isShowing) {
+                            dialog.setMessage(getString(R.string.whisper_ladataan, percent))
+                        }
+                    }
+                }
+                activity?.runOnUiThread {
+                    dialog.dismiss()
+                    if (!ok && !cancel.get()) {
+                        Toast.makeText(
+                            appContext, R.string.whisper_lataus_virhe, Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    onDone(ok)
+                }
+            }.start()
+        }
+
+        /** Tarjoaa vaihdossa syrjään jääneen mallin poistoa levyltä. */
+        private fun offerModelCleanup(previous: WhisperModel?, current: WhisperModel?) {
+            if (previous == null || previous == current) return
+            if (!WhisperModels.isDownloaded(requireContext(), previous)) return
+            val name = when (previous) {
+                WhisperModel.BASE -> "base"
+                WhisperModel.SMALL -> "small"
+                WhisperModel.TURBO -> "large-turbo"
+            }
+            MaterialAlertDialogBuilder(requireContext())
+                .setMessage(getString(R.string.whisper_poista_viesti, name, previous.sizeMb))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.kieli_poista) { _, _ ->
+                    WhisperModels.delete(requireContext(), previous)
+                }
+                .show()
         }
 
         /** Näyttää vain valitun AI-palvelun avaimen ja mallin rivit. */

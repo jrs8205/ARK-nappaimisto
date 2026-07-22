@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Asetussivujen yhteinen runko: iso kutistuva otsikko ja sisältö alla. -->
+<!-- Asetussivujen yhteinen runko: kutistuva otsikko ja sisältö alla.
+     Keskikoko ison sijaan: iso M3-otsikko jätti yläpuolelleen turhan
+     paljon tyhjää tilaa. -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -16,9 +18,9 @@
 
         <com.google.android.material.appbar.CollapsingToolbarLayout
             android:id="@+id/asetus_otsikko"
-            style="?attr/collapsingToolbarLayoutLargeStyle"
+            style="?attr/collapsingToolbarLayoutMediumStyle"
             android:layout_width="match_parent"
-            android:layout_height="?attr/collapsingToolbarLayoutLargeSize"
+            android:layout_height="?attr/collapsingToolbarLayoutMediumSize"
             app:layout_scrollFlags="scroll|exitUntilCollapsed|snap">
 
             <com.google.android.material.appbar.MaterialToolbar

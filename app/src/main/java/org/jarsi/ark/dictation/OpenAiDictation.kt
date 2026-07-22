@@ -189,7 +189,11 @@ class OpenAiDictation(
                             ).toByteArray()
                     )
                 }
-                field("model", MODEL)
+                field(
+                    "model",
+                    prefs.getString(PREF_MODEL, null)?.takeIf { it.isNotBlank() }
+                        ?: DEFAULT_MODEL,
+                )
                 field("language", "fi")
                 if (promptContext.isNotBlank()) {
                     field("prompt", promptContext.takeLast(PROMPT_CHARS))
@@ -251,15 +255,18 @@ class OpenAiDictation(
         }
     }
 
-    private companion object {
-        const val SAMPLE_RATE = 16_000
-        const val ENDPOINT = "https://api.openai.com/v1/audio/transcriptions"
+    companion object {
+        /**
+         * Oletuksena tarkin eräpohjainen tunnistusmalli. Puhemallit ovat
+         * oma perheensä eivätkä seuraa Paranna teksti -mallivalintaa;
+         * valinnan lista haetaan livenä [TextImprover.parseTranscribeModels].
+         */
+        const val DEFAULT_MODEL = "gpt-4o-transcribe"
+        const val PREF_MODEL = "sanelu_malli"
 
-        // Tarkin eräpohjainen tunnistusmalli; mini-versio kuuli suomea
-        // selvästi heikommin. Puhemallit ovat oma perheensä eivätkä seuraa
-        // asetusten Paranna teksti -mallivalintaa.
-        const val MODEL = "gpt-4o-transcribe"
-        const val PROMPT_CHARS = 200
-        const val PROMPT_KEEP_CHARS = 500
+        private const val SAMPLE_RATE = 16_000
+        private const val ENDPOINT = "https://api.openai.com/v1/audio/transcriptions"
+        private const val PROMPT_CHARS = 200
+        private const val PROMPT_KEEP_CHARS = 500
     }
 }

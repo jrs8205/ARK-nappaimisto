@@ -167,6 +167,7 @@
         <item>jarjestelma</item>
         <item>openai</item>
     </string-array>
+    <string name="asetus_sanelu_malli">Sanelun malli</string>
     <string name="sanelu_openai_ei_avainta">OpenAI-avainta ei ole asetettu – sanelu käyttää laitteen tunnistusta</string>
     <string name="sanelu_verkkovirhe">Sanelun tunnistus epäonnistui: %1$s</string>
     <string name="kaannoskielet">Käännöskielet</string>

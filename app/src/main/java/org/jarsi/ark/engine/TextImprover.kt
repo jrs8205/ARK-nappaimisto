@@ -282,6 +282,32 @@ object TextImprover {
     }
 
     /**
+     * Sanelun mallilista: /v1/models-vastauksesta vain eräpohjaiset
+     * puheentunnistusmallit (transcribe-perhe ja whisper-1), uusin ensin.
+     * Suoratoistomallit eivät toimi transkriptiorajapinnassa ja jäävät
+     * pois, samoin chat- ja puhesynteesimallit.
+     */
+    fun parseTranscribeModels(body: String): List<Pair<String, String>> = try {
+        val data = JSONObject(body).optJSONArray("data")
+        val models = mutableListOf<Pair<String, Long>>()
+        if (data != null) {
+            for (i in 0 until data.length()) {
+                val item = data.getJSONObject(i)
+                val id = item.optString("id")
+                val transcribeModel =
+                    ("transcribe" in id || id.startsWith("whisper")) &&
+                        "realtime" !in id
+                if (id.isNotEmpty() && transcribeModel) {
+                    models.add(id to item.optLong("created"))
+                }
+            }
+        }
+        models.sortedByDescending { it.second }.map { it.first to it.first }
+    } catch (e: JSONException) {
+        emptyList()
+    }
+
+    /**
      * Virheen selite epäonnistuneesta vastauksesta: molemmat palvelut
      * palauttavat muodon {"error": {"message": ...}}. Selite näytetään
      * käyttäjälle, jotta vian syy (väärä avain, rajattu avain, kiintiö)

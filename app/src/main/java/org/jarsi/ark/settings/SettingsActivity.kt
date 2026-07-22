@@ -19,6 +19,7 @@ import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.jarsi.ark.R
 import org.jarsi.ark.data.ApiKeyStore
+import org.jarsi.ark.dictation.OpenAiDictation
 import org.jarsi.ark.data.Backup
 import org.jarsi.ark.engine.TextImprover
 import org.jarsi.ark.data.BackupCodec
@@ -193,7 +194,14 @@ class SettingsActivity : AppCompatActivity() {
                     ?: names[0]
                 getString(R.string.asetus_sanelu_moottori_nykyinen, name)
             }
+            // Mallivalinta koskee vain OpenAI-tunnistusta; muulloin piilossa.
+            fun updateModelRow(value: String?) {
+                findPreference<Preference>(OpenAiDictation.PREF_MODEL)?.isVisible =
+                    value == "openai"
+            }
+            updateModelRow(pref.value)
             pref.setOnPreferenceChangeListener { _, newValue ->
+                updateModelRow(newValue as? String)
                 val needsKey = newValue == "openai" &&
                     preferenceManager.sharedPreferences?.let {
                         ApiKeyStore.exists(it, ApiKeyStore.Slot.OPENAI)
@@ -207,6 +215,17 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 true
             }
+            setupModelPreference(
+                key = OpenAiDictation.PREF_MODEL,
+                defaultModel = OpenAiDictation.DEFAULT_MODEL,
+                slot = ApiKeyStore.Slot.OPENAI,
+                modelsUrl = TextImprover.OPENAI_MODELS_ENDPOINT,
+                summaryRes = R.string.asetus_malli_nykyinen_openai,
+                authorize = { connection, apiKey ->
+                    connection.setRequestProperty("authorization", "Bearer $apiKey")
+                },
+                parse = TextImprover::parseTranscribeModels,
+            )
         }
 
         /** Näyttää vain valitun AI-palvelun avaimen ja mallin rivit. */

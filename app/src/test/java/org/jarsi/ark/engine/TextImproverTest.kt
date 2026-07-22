@@ -208,6 +208,21 @@ class TextImproverTest {
     }
 
     @Test
+    fun `sanelumallilista sisaltaa vain puheentunnistusmallit uusin ensin`() {
+        val body = """{"data":[
+            {"id":"gpt-4o-transcribe","created":2},
+            {"id":"gpt-4o-mini-transcribe","created":3},
+            {"id":"whisper-1","created":1},
+            {"id":"gpt-5-mini","created":9},
+            {"id":"gpt-realtime-whisper","created":8},
+            {"id":"tts-1","created":7}]}"""
+        assertEquals(
+            listOf("gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"),
+            TextImprover.parseTranscribeModels(body).map { it.first },
+        )
+    }
+
+    @Test
     fun `openai-mallilista rajautuu kahteentoista uusimpaan`() {
         val items = (1..20).joinToString(",") { """{"id":"gpt-m$it","created":$it}""" }
         val models = TextImprover.parseOpenAiModels("""{"data":[$items]}""")

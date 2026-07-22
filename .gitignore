@@ -25,3 +25,6 @@ local.properties
 # Vertailunäppäimistöjen lähdekoodit (HeliBoard, AOSP LatinIME): vain
 # paikalliseen tutkimiseen, eivät osa tätä projektia.
 /vertailu/
+
+# Testauksen kuvakaappaukset projektikansiossa.
+Screenshot_*.png

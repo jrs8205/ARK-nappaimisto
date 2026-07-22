@@ -254,7 +254,11 @@ class OpenAiDictation(
     private companion object {
         const val SAMPLE_RATE = 16_000
         const val ENDPOINT = "https://api.openai.com/v1/audio/transcriptions"
-        const val MODEL = "gpt-4o-mini-transcribe"
+
+        // Tarkin eräpohjainen tunnistusmalli; mini-versio kuuli suomea
+        // selvästi heikommin. Puhemallit ovat oma perheensä eivätkä seuraa
+        // asetusten Paranna teksti -mallivalintaa.
+        const val MODEL = "gpt-4o-transcribe"
         const val PROMPT_CHARS = 200
         const val PROMPT_KEEP_CHARS = 500
     }

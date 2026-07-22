@@ -23,6 +23,13 @@ android {
         targetSdk = 36
         versionCode = 8
         versionName = "0.11.0"
+
+        ndk {
+            // Vain puhelinten arkkitehtuurit: ML Kitin käännöskirjaston
+            // x86-versiot ovat emulaattoreita varten ja veivät APK:sta
+            // yli puolet (~35 Mt).
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {

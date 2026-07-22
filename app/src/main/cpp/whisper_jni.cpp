@@ -36,6 +36,13 @@ Java_org_jarsi_ark_dictation_WhisperNative_nativeTranscribe(
     params.language = "fi";
     params.translate = false;
     params.no_timestamps = true;
+    // Enkooderi käsittelisi aina täyden 30 s ikkunan (1500 askelta,
+    // 50/s) puheen pituudesta riippumatta; rajaus pätkän todelliseen
+    // pituuteen nopeuttaa lyhyet pätkät moninkertaisesti.
+    const int audioCtx = n / (16000 / 50) + 32;
+    if (audioCtx < 1500) {
+        params.audio_ctx = audioCtx;
+    }
     // Jokainen pätkä tunnistetaan itsenäisesti; jatkuvuus annetaan
     // edellisen pätkän tekstinä kehotteessa.
     params.no_context = true;

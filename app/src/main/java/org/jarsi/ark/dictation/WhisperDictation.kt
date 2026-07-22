@@ -196,10 +196,14 @@ class WhisperDictation(
         debugLog("segmentti: ${samples.size / (SAMPLE_RATE / 1000)} ms")
         runOnTranscribe {
             if (mySession != session) return@runOnTranscribe
+            val startedAt = android.os.SystemClock.elapsedRealtime()
             val text = engine?.transcribe(
                 samples, promptContext.takeLast(PROMPT_CHARS), THREADS
             ).orEmpty()
-            debugLog("tulos: ${text.length} merkkiä")
+            debugLog(
+                "tulos: ${text.length} merkkiä, " +
+                    "${android.os.SystemClock.elapsedRealtime() - startedAt} ms"
+            )
             if (text.isBlank()) return@runOnTranscribe
             promptContext = "$promptContext $text".takeLast(PROMPT_KEEP_CHARS)
             // Teksti viedään, vaikka istunto olisi jo päättynyt: puhe

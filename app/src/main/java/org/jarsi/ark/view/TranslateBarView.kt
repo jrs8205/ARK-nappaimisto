@@ -62,6 +62,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
         /** Käyttäjä vie näkyvän käännöksen kenttään. */
         fun onInsert()
+
+        /** Käyttäjä antoi luvan kieliparin mallien lataukseen. */
+        fun onDownloadModels()
     }
 
     var listener: Listener? = null
@@ -73,8 +76,24 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     var aiEnabled = true
         set(value) {
             field = value
-            aiLabel.visibility = if (value) VISIBLE else GONE
+            refreshActionRow()
         }
+
+    // Kieliparin mallit puuttuvat: toimintorivillä näkyy vain Lataa-nappi,
+    // kunnes käyttäjä antaa luvan kertalataukselle.
+    private var modelsMissing = false
+
+    fun setModelsMissing(missing: Boolean) {
+        modelsMissing = missing
+        refreshActionRow()
+    }
+
+    private fun refreshActionRow() {
+        downloadLabel.visibility = if (modelsMissing) VISIBLE else GONE
+        aiLabel.visibility = if (!modelsMissing && aiEnabled) VISIBLE else GONE
+        copyIcon.visibility = if (modelsMissing) GONE else VISIBLE
+        insertLabel.visibility = if (modelsMissing) GONE else VISIBLE
+    }
 
     private var theme = KeyboardTheme.load(context)
     private val density = resources.displayMetrics.density
@@ -324,6 +343,15 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onInsert() }
     }
 
+    private val downloadLabel = TextView(context).apply {
+        text = context.getString(R.string.kaannos_lataa_mallit)
+        textSize = 15f
+        setTypeface(typeface, Typeface.BOLD)
+        setPadding(dp(12), dp(10), dp(14), dp(10))
+        visibility = GONE
+        setOnClickListener { listener?.onDownloadModels() }
+    }
+
     // Otsikkorivi: kielivalinnat vasemmalla, tyhjennys oikealla.
     private val headerRow = LinearLayout(context).apply {
         orientation = HORIZONTAL
@@ -345,6 +373,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         addView(aiLabel, LayoutParams(dp(44), dp(44)))
         addView(copyIcon, LayoutParams(dp(44), dp(44)))
         addView(insertLabel)
+        addView(downloadLabel)
     }
 
     init {
@@ -369,6 +398,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         clearLabel.setColorFilter(theme.hint)
         aiLabel.setColorFilter(theme.text)
         insertLabel.setTextColor(theme.accent)
+        downloadLabel.setTextColor(theme.accent)
         copyIcon.setColorFilter(theme.text)
         // Käännös erottuu omaksi alueekseen korttitaustalla.
         translationScroll.setBackgroundColor(theme.specialKey)

@@ -123,6 +123,8 @@
     <string name="kaannos_valitse_kaikki">Valitse kaikki</string>
     <string name="kaannos_kopioitu">Kopioitu</string>
     <string name="kaannos_ladataan">Valmistellaan käännösmalleja…</string>
+    <string name="kaannos_mallit_puuttuvat">Kääntäjä lataa kieliparin mallit kerran (noin 30 Mt kieltä kohden). Sen jälkeen käännökset tehdään laitteella.</string>
+    <string name="kaannos_lataa_mallit">Lataa mallit</string>
     <string name="kaannos_lataus_virhe">Käännösmallin lataus epäonnistui – tarkista verkkoyhteys</string>
     <string name="kaannos_virhe">Käännös epäonnistui – yritä uudelleen</string>
     <string name="kaannos_lisaa">Lisää</string>

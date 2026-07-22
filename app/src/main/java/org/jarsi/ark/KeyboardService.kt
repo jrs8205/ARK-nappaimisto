@@ -127,6 +127,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var aiTranslateGeneration = 0
     private var translator: Translator? = null
     private var translatorReady = false
+
+    // Kieliparilta puuttuu ladattu malli; lataus odottaa käyttäjän lupaa.
+    private var translationModelsMissing = false
     private var translationLangs: List<String> =
         listOf(TranslateLanguage.FINNISH, TranslateLanguage.ENGLISH)
     private var correctionText = ""
@@ -577,7 +580,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         toolbar?.translationActive = true
         refreshTranslationLanguages()
         updateTranslateBar()
-        prepareTranslator()
+        checkTranslationModels()
         updateSuggestions()
     }
 
@@ -596,6 +599,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         translator?.close()
         translator = null
         translatorReady = false
+        translationModelsMissing = false
         currentTranslation = ""
         translationFresh = false
         translateBar?.visibility = View.GONE
@@ -610,7 +614,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             translationSource().uppercase(fiLocale),
             translationTarget().uppercase(fiLocale),
         )
-        val hint = if (translatorReady) {
+        // Kirjoittaa saa heti myös malleja odottaessa; vain valmistelu
+        // näyttää oman vihjeensä.
+        val hint = if (translatorReady || translationModelsMissing) {
             getString(R.string.kaannos_kirjoita, languageName(translationSource()))
         } else {
             getString(R.string.kaannos_ladataan)
@@ -623,15 +629,58 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (openAiSelected()) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
         )
         bar.setBuffer(translateBuffer.text, translateBuffer.cursor, hint)
-        bar.setTranslation(currentTranslation, getString(R.string.kaannos_tyhja))
+        bar.setTranslation(
+            currentTranslation,
+            getString(
+                if (translationModelsMissing) {
+                    R.string.kaannos_mallit_puuttuvat
+                } else {
+                    R.string.kaannos_tyhja
+                }
+            ),
+        )
+        bar.setModelsMissing(translationModelsMissing)
         // Shift-nuoli seuraa käännösrivin tekstiä kuten kenttää.
         if (translateMode) updateAutoCaps()
     }
 
     private fun onTranslatePairChanged() {
         updateTranslateBar()
-        prepareTranslator()
+        checkTranslationModels()
         scheduleLiveTranslate()
+    }
+
+    /**
+     * Mallit ladataan vasta käyttäjän luvalla: jos kieliparilta puuttuu
+     * malli, käännösalue näyttää kertalatauksen kehotteen Lataa-nappeineen
+     * eikä mitään ladata itsestään. Tarkistusvirheessä toimitaan kuten
+     * ennen, ettei kääntäjä jää verkko-ongelmasta lukkoon.
+     */
+    private fun checkTranslationModels() {
+        val generation = ++translationGeneration
+        translator?.close()
+        translator = null
+        translatorReady = false
+        RemoteModelManager.getInstance()
+            .getDownloadedModels(TranslateRemoteModel::class.java)
+            .addOnSuccessListener { models ->
+                if (generation != translationGeneration || !translateMode) {
+                    return@addOnSuccessListener
+                }
+                val have = models.mapTo(mutableSetOf()) { it.language }
+                translationModelsMissing =
+                    translationSource() !in have || translationTarget() !in have
+                if (translationModelsMissing) {
+                    updateTranslateBar()
+                } else {
+                    prepareTranslator()
+                }
+            }
+            .addOnFailureListener {
+                if (generation == translationGeneration && translateMode) {
+                    prepareTranslator()
+                }
+            }
     }
 
     /** Avaa kääntäjän kieliparille ja varmistaa mallit (kertalataus). */
@@ -1689,6 +1738,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onInsert() {
                     insertTranslation()
+                }
+
+                override fun onDownloadModels() {
+                    feedback()
+                    translationModelsMissing = false
+                    updateTranslateBar()
+                    // Käyttäjä antoi luvan: lataus ja valmistelu käyntiin.
+                    prepareTranslator()
                 }
 
                 override fun onCursorTap(position: Int) {

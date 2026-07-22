@@ -84,6 +84,27 @@ class SpeechSegmenterTest {
     }
 
     @Test
+    fun `valiton puhe ilman hiljaista alkua tunnistetaan`() {
+        // Sanelu alkaa usein niin, että puhe on käynnissä heti — taustan
+        // kalibrointi ei saa lukita kynnystä puheen tasolle.
+        val result = events(
+            0.1f to 2_000,
+            0.001f to 1_000,
+        )
+        assertEquals(1, result.filterIsInstance<SpeechSegmenter.Event.Segment>().size)
+    }
+
+    @Test
+    fun `melu taustalla ei esta puheen tunnistusta`() {
+        val result = events(
+            0.02f to 500, // tasainen työmelu
+            0.15f to 2_000, // puhe melun päälle
+            0.02f to 1_000, // takaisin meluun
+        )
+        assertEquals(1, result.filterIsInstance<SpeechSegmenter.Event.Segment>().size)
+    }
+
+    @Test
     fun `lyhyt piikki ei tuota segmenttia`() {
         val result = events(
             0.001f to 500,

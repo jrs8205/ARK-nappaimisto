@@ -58,20 +58,26 @@ class SpeechSegmenter(
         val rms = sqrt(sum / chunk.size).toFloat()
         currentLevel = min(1f, rms / LEVEL_FULL_SCALE)
 
-        // Taustataso: alku kalibroi, myöhemmin hiljaiset palat päivittävät
-        // hitaasti, jotta kynnys seuraa ympäristön melua.
+        // Taustataso: kalibrointi ottaa alun hiljaisimman palan (puhe voi
+        // olla käynnissä heti), ja jatkossa taso laskee nopeasti mutta
+        // nousee vain hitaasti — oma puhe ei saa vetää kynnystä ylös.
         if (calibrationSamples < msToSamples(CALIBRATION_MS)) {
-            background = if (calibrationSamples == 0) {
-                rms
-            } else {
-                (background + rms) / 2f
-            }
+            background = if (calibrationSamples == 0) rms else min(background, rms)
             calibrationSamples += chunk.size
         }
-        val threshold = max(background * THRESHOLD_FACTOR, MIN_THRESHOLD)
-        val speech = rms >= threshold && calibrationSamples >= msToSamples(CALIBRATION_MS)
+        // Kynnyksellä on katto: tätä kovempi ääni on aina puhetta, vaikka
+        // kalibrointi olisi osunut puheen päälle.
+        val threshold = max(
+            min(background * THRESHOLD_FACTOR, THRESHOLD_CAP),
+            MIN_THRESHOLD,
+        )
+        val speech = rms >= threshold
         if (!speech) {
-            background = background * BACKGROUND_DECAY + rms * (1f - BACKGROUND_DECAY)
+            background = if (rms < background) {
+                background * FAST_DROP + rms * (1f - FAST_DROP)
+            } else {
+                background * SLOW_RISE + rms * (1f - SLOW_RISE)
+            }
         }
 
         if (speech) {
@@ -149,8 +155,10 @@ class SpeechSegmenter(
         const val MAX_SEGMENT_MS = 10_000L
         const val MIN_SPEECH_MS = 300L
         const val THRESHOLD_FACTOR = 2.5f
-        const val MIN_THRESHOLD = 0.008f
-        const val BACKGROUND_DECAY = 0.95f
+        const val MIN_THRESHOLD = 0.006f
+        const val THRESHOLD_CAP = 0.04f
+        const val FAST_DROP = 0.7f
+        const val SLOW_RISE = 0.99f
         const val LEVEL_FULL_SCALE = 0.25f
     }
 }

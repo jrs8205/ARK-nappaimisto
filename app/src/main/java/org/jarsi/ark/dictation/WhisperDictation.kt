@@ -4,8 +4,10 @@ import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.content.pm.ApplicationInfo
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import org.jarsi.ark.R
 import java.util.concurrent.Executors
 import kotlin.math.max
@@ -100,6 +102,7 @@ class WhisperDictation(
             null
         }
         engineModel = if (engine != null) wanted else null
+        debugLog("malli ${wanted.prefValue}: ${if (engine != null) "ladattu" else "EPÄONNISTUI"}")
         if (engine == null) {
             mainHandler.post {
                 listener.onDictationError(R.string.whisper_malli_virhe)
@@ -135,11 +138,16 @@ class WhisperDictation(
             record.startRecording()
             val segmenter = SpeechSegmenter(SAMPLE_RATE, silenceLimitMs)
             val shorts = ShortArray(SAMPLE_RATE / 10)
+            var logCountdown = 0
             while (!stopRequested && mySession == session) {
                 val read = record.read(shorts, 0, shorts.size)
                 if (read <= 0) continue
                 val floats = FloatArray(read) { shorts[it] / 32768f }
                 val event = segmenter.feed(floats)
+                if (debuggable && --logCountdown <= 0) {
+                    logCountdown = 10
+                    debugLog("taso=%.4f".format(segmenter.currentLevel))
+                }
                 mainHandler.post {
                     if (mySession == session && isActive) {
                         listener.onSpeechLevel(segmenter.currentLevel)
@@ -166,11 +174,13 @@ class WhisperDictation(
     }
 
     private fun queueTranscription(samples: FloatArray, mySession: Int) {
+        debugLog("segmentti: ${samples.size / (SAMPLE_RATE / 1000)} ms")
         transcribeExecutor.execute {
             if (mySession != session) return@execute
             val text = engine?.transcribe(
                 samples, promptContext.takeLast(PROMPT_CHARS), THREADS
             ).orEmpty()
+            debugLog("tulos: ${text.length} merkkiä")
             if (text.isBlank()) return@execute
             promptContext = "$promptContext $text".takeLast(PROMPT_KEEP_CHARS)
             mainHandler.post {
@@ -191,6 +201,14 @@ class WhisperDictation(
             mainHandler.removeCallbacks(releaseEngine)
             mainHandler.postDelayed(releaseEngine, ENGINE_KEEP_MS)
         }
+    }
+
+    // Kehityslokit vianetsintään; julkaisuversiossa hiljaa.
+    private val debuggable =
+        context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+
+    private fun debugLog(message: String) {
+        if (debuggable) Log.d("ArkWhisper", message)
     }
 
     private companion object {

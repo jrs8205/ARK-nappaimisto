@@ -215,9 +215,15 @@ class TextImproverTest {
             {"id":"whisper-1","created":1},
             {"id":"gpt-5-mini","created":9},
             {"id":"gpt-realtime-whisper","created":8},
+            {"id":"gpt-realtime-2.1","created":8},
             {"id":"tts-1","created":7}]}"""
         assertEquals(
-            listOf("gpt-4o-mini-transcribe", "gpt-4o-transcribe", "whisper-1"),
+            listOf(
+                "gpt-realtime-whisper",
+                "gpt-4o-mini-transcribe",
+                "gpt-4o-transcribe",
+                "whisper-1",
+            ),
             TextImprover.parseTranscribeModels(body).map { it.first },
         )
     }

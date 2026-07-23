@@ -7,23 +7,26 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Handler
 import android.os.Looper
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import org.jarsi.ark.R
 import org.jarsi.ark.data.ApiKeyStore
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.concurrent.Executors
-import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 /**
- * Sanelu OpenAI:n puheentunnistuksella käyttäjän omalla API-avaimella.
- * Mikrofoni pysyy auki koko istunnon eikä kuuntelu katkea melussa: puhe
- * pätkitään [SpeechSegmenter]illä ja pätkät tunnistetaan verkossa
- * järjestyksessä, joten teksti ilmestyy lausepätkinä pienellä viiveellä.
- * Istunto päättyy vain omaan hiljaisuusrajaan tai pysäytykseen; sulussa
- * jonossa olevat pätkät tunnistetaan loppuun. Kutsut päälangalta; jakaa
- * [DictationController.Listener]-rajapinnan.
+ * Sanelu OpenAI:n realtime-puheentunnistuksella käyttäjän omalla
+ * API-avaimella. Kaikki mikrofonin ääni virtaa WebSocketilla palvelulle
+ * jatkuvana — laitteella ei pätkitä mitään, joten puhetta ei katoa
+ * pätkärajoille eikä kuuntelu katkea melussa. Suoratoistomallilla
+ * (gpt-realtime-*) teksti ilmestyy deltoina puheen tahdissa ja lopullinen
+ * transkriptio valmistuu lopetuksen commitista; eräpohjaisilla malleilla
+ * palvelimen VAD jakaa virran lausumiin ja tekstit valmistuvat pitkin
+ * matkaa. Istunto päättyy vain omaan hiljaisuusrajaan tai pysäytykseen.
+ * Kutsut päälangalta; jakaa [DictationController.Listener]-rajapinnan.
  */
 class OpenAiDictation(
     private val prefs: SharedPreferences,
@@ -38,39 +41,77 @@ class OpenAiDictation(
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // Yksi tunnistusjono pitää pätkien tekstit oikeassa järjestyksessä.
-    private val transcribeExecutor = Executors.newSingleThreadExecutor()
+    private val httpClient by lazy {
+        OkHttpClient.Builder()
+            .pingInterval(20, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private var webSocket: WebSocket? = null
     private var captureThread: Thread? = null
+    private var transcript = DictationTranscript()
 
     @Volatile
     private var stopRequested = false
     private var session = 0
-    private var promptContext = ""
+    private var finishing = false
+    private var streamingModel = true
+
+    @Volatile
+    private var socketOpen = false
+
+    @Volatile
+    private var sentSamples = 0L
+
+    // Mikrofoni käy heti käynnistyksestä: yhteyden avautumista odottavat
+    // palat puskuroidaan, ettei puheen alku katoa kättelyn aikana.
+    private val backlog = ArrayDeque<ByteArray>()
+
+    private val finishRunnable = Runnable { finishNow(session) }
 
     fun start() {
         if (isActive) return
+        val apiKey = ApiKeyStore.read(prefs, ApiKeyStore.Slot.OPENAI).orEmpty()
+        if (apiKey.isEmpty()) {
+            listener.onDictationError(R.string.sanelu_virhe)
+            return
+        }
         isActive = true
         stopRequested = false
-        promptContext = ""
+        finishing = false
+        socketOpen = false
+        sentSamples = 0
+        transcript = DictationTranscript()
+        synchronized(backlog) { backlog.clear() }
+        val model = prefs.getString(PREF_MODEL, null)?.takeIf { it.isNotBlank() }
+            ?: DEFAULT_MODEL
+        streamingModel = model.startsWith("gpt-realtime")
         listener.onDictationStateChanged(true)
         val mySession = ++session
+        openSocket(apiKey, model, mySession)
         captureThread = Thread({ runCapture(mySession) }, "openai-sanelu")
             .also { it.start() }
     }
 
-    /** Pysäyttää kuuntelun; jonossa olevat pätkät tunnistetaan loppuun. */
+    /** Pysäyttää kuuntelun; kesken olevat tunnistukset valmistuvat loppuun. */
     fun stop() {
         if (!isActive) return
         stopRequested = true
+        // Jos mikrofoni kaatui jo, lopetus ei jää sen säikeen varaan.
+        if (captureThread?.isAlive != true) beginFinish(session)
     }
 
     /**
-     * Keskeyttää heti ja hylkää jonossa olevat tulokset — käytetään kun
+     * Keskeyttää heti ja hylkää kesken olevat tulokset — käytetään kun
      * kenttä vaihtuu eikä vanha puhe saa valua uuteen kenttään.
      */
     fun cancel() {
         stopRequested = true
         session++
+        mainHandler.removeCallbacks(finishRunnable)
+        webSocket?.cancel()
+        webSocket = null
+        socketOpen = false
         if (isActive) {
             isActive = false
             listener.onDictationStateChanged(false)
@@ -79,7 +120,67 @@ class OpenAiDictation(
 
     fun destroy() {
         cancel()
-        transcribeExecutor.shutdown()
+        httpClient.dispatcher.executorService.shutdown()
+    }
+
+    private fun openSocket(apiKey: String, model: String, mySession: Int) {
+        val request = Request.Builder()
+            .url(ENDPOINT)
+            .header("Authorization", "Bearer $apiKey")
+            .build()
+        webSocket = httpClient.newWebSocket(
+            request,
+            object : WebSocketListener() {
+                override fun onOpen(ws: WebSocket, response: Response) {
+                    ws.send(RealtimeEvents.sessionUpdate(model, "fi"))
+                    synchronized(backlog) {
+                        socketOpen = true
+                        while (backlog.isNotEmpty()) {
+                            ws.send(RealtimeEvents.appendAudio(backlog.removeFirst()))
+                        }
+                    }
+                }
+
+                override fun onMessage(ws: WebSocket, text: String) {
+                    val event = RealtimeEvents.parse(text) ?: return
+                    mainHandler.post { handleEvent(event, mySession) }
+                }
+
+                override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
+                    mainHandler.post {
+                        if (mySession != session) return@post
+                        listener.onDictationErrorMessage(
+                            t.message ?: t.javaClass.simpleName
+                        )
+                        // Kertyneet deltat pelastetaan kenttään finishNow'ssa.
+                        stopRequested = true
+                        finishNow(mySession)
+                    }
+                }
+            },
+        )
+    }
+
+    private fun handleEvent(event: RealtimeEvents.Incoming, mySession: Int) {
+        if (mySession != session) return
+        when (event) {
+            is RealtimeEvents.Incoming.Delta -> {
+                val shown = transcript.onDelta(event.text)
+                if (shown.isNotEmpty() && isActive) listener.onPartialText(shown)
+            }
+            is RealtimeEvents.Incoming.Completed -> {
+                val text = transcript.onCompleted(event.text)
+                if (text.isNotEmpty()) listener.onFinalText(text)
+                if (finishing) {
+                    // Lopetus odottaa vain hetken lisää mahdollisia
+                    // jälkitulevia lausumia, sitten istunto suljetaan.
+                    mainHandler.removeCallbacks(finishRunnable)
+                    mainHandler.postDelayed(finishRunnable, FINISH_EXTRA_MS)
+                }
+            }
+            is RealtimeEvents.Incoming.Failure ->
+                listener.onDictationErrorMessage(event.message)
+        }
     }
 
     // RECORD_AUDIO tarkistetaan kutsupolulla ennen sanelun käynnistystä.
@@ -101,8 +202,12 @@ class OpenAiDictation(
         }
         if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
             record?.release()
-            mainHandler.post { listener.onDictationError(R.string.sanelu_virhe) }
-            finishSession(mySession)
+            mainHandler.post {
+                if (mySession == session) {
+                    listener.onDictationError(R.string.sanelu_virhe)
+                    beginFinish(mySession)
+                }
+            }
             return
         }
         try {
@@ -112,22 +217,23 @@ class OpenAiDictation(
             while (!stopRequested && mySession == session) {
                 val read = record.read(shorts, 0, shorts.size)
                 if (read <= 0) continue
+                sendAudio(RealtimeEvents.pcmBytes(shorts, read))
+                sentSamples += read
                 val floats = FloatArray(read) { shorts[it] / 32768f }
+                // Segmentterin pätkintää ei käytetä — se toimii vain
+                // hiljaisuusvahtina ja mikrofonisykkeen mittarina.
                 val event = segmenter.feed(floats)
                 mainHandler.post {
                     if (mySession == session && isActive) {
                         listener.onSpeechLevel(segmenter.currentLevel)
                     }
                 }
-                when (event) {
-                    is SpeechSegmenter.Event.Segment ->
-                        queueTranscription(event.samples, mySession)
-                    is SpeechSegmenter.Event.SessionTimeout -> break
-                    null -> Unit
-                }
+                if (event is SpeechSegmenter.Event.SessionTimeout) break
             }
         } catch (e: SecurityException) {
-            mainHandler.post { listener.onDictationError(R.string.sanelu_virhe) }
+            mainHandler.post {
+                if (mySession == session) listener.onDictationError(R.string.sanelu_virhe)
+            }
         } finally {
             try {
                 record.stop()
@@ -136,137 +242,83 @@ class OpenAiDictation(
             }
             record.release()
         }
-        finishSession(mySession)
+        mainHandler.post { beginFinish(mySession) }
     }
 
-    private fun queueTranscription(samples: FloatArray, mySession: Int) {
-        runOnTranscribe {
-            if (mySession != session) return@runOnTranscribe
-            val apiKey = ApiKeyStore.read(prefs, ApiKeyStore.Slot.OPENAI).orEmpty()
-            if (apiKey.isEmpty()) return@runOnTranscribe
-            val text = try {
-                transcribe(DictationWav.encode(samples), apiKey)
-            } catch (e: Exception) {
-                // Yksittäisen pätkän virhe ei kaada istuntoa, mutta syy
-                // näytetään, ettei sanelu vaikuta mykältä.
-                mainHandler.post {
-                    if (mySession == session) {
-                        listener.onDictationErrorMessage(e.message.orEmpty())
-                    }
-                }
-                return@runOnTranscribe
-            }
-            if (text.isBlank()) return@runOnTranscribe
-            promptContext = "$promptContext $text".takeLast(PROMPT_KEEP_CHARS)
-            // Teksti viedään, vaikka istunto olisi jo päättynyt: puhe
-            // sanottiin sen aikana ja tunnistus vain valmistui myöhemmin.
-            mainHandler.post {
-                if (mySession == session) listener.onFinalText(text.trim())
+    private fun sendAudio(pcm: ByteArray) {
+        synchronized(backlog) {
+            if (socketOpen) {
+                webSocket?.send(RealtimeEvents.appendAudio(pcm))
+            } else {
+                backlog.addLast(pcm)
+                if (backlog.size > BACKLOG_MAX_CHUNKS) backlog.removeFirst()
             }
         }
     }
 
-    /** Lähettää pätkän OpenAI:n tunnistukseen ja palauttaa tekstin. */
-    private fun transcribe(wav: ByteArray, apiKey: String): String {
-        val boundary = "ark-sanelu-${System.nanoTime()}"
-        val connection = URL(ENDPOINT).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.doOutput = true
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 30_000
-            connection.setRequestProperty("Authorization", "Bearer $apiKey")
-            connection.setRequestProperty(
-                "Content-Type", "multipart/form-data; boundary=$boundary"
-            )
-            connection.outputStream.use { output ->
-                fun field(name: String, value: String) {
-                    output.write(
-                        (
-                            "--$boundary\r\n" +
-                                "Content-Disposition: form-data; name=\"$name\"\r\n\r\n" +
-                                "$value\r\n"
-                            ).toByteArray()
-                    )
-                }
-                field(
-                    "model",
-                    prefs.getString(PREF_MODEL, null)?.takeIf { it.isNotBlank() }
-                        ?: DEFAULT_MODEL,
-                )
-                field("language", "fi")
-                if (promptContext.isNotBlank()) {
-                    field("prompt", promptContext.takeLast(PROMPT_CHARS))
-                }
-                output.write(
-                    (
-                        "--$boundary\r\n" +
-                            "Content-Disposition: form-data; name=\"file\"; " +
-                            "filename=\"puhe.wav\"\r\n" +
-                            "Content-Type: audio/wav\r\n\r\n"
-                        ).toByteArray()
-                )
-                output.write(wav)
-                output.write("\r\n--$boundary--\r\n".toByteArray())
-            }
-            val code = connection.responseCode
-            if (code !in 200..299) {
-                val error = connection.errorStream?.bufferedReader()?.use { it.readText() }
-                throw IllegalStateException(shortError(code, error))
-            }
-            val body = connection.inputStream.bufferedReader().use { it.readText() }
-            return JSONObject(body).optString("text")
-        } finally {
-            connection.disconnect()
+    /**
+     * Mikrofoni on pysäytetty: viimeistellään kesken oleva tunnistus.
+     * Suoratoistomalli saa commitin, eräpohjaisille syötetään hetki
+     * hiljaisuutta, jotta palvelimen VAD sulkee viimeisen lausuman.
+     */
+    private fun beginFinish(mySession: Int) {
+        if (mySession != session || finishing) return
+        finishing = true
+        val ws = webSocket
+        if (ws == null || !socketOpen || sentSamples < MIN_COMMIT_SAMPLES) {
+            finishNow(mySession)
+            return
         }
+        if (streamingModel) {
+            ws.send(RealtimeEvents.commit())
+        } else {
+            val silence = ByteArray(SAMPLE_RATE / 5 * 2)
+            repeat(5) { ws.send(RealtimeEvents.appendAudio(silence)) }
+        }
+        mainHandler.postDelayed(finishRunnable, FINISH_WAIT_MS)
     }
 
-    /** Tiivistää virhevastauksen ilmoitukseen sopivaksi syyksi. */
-    private fun shortError(code: Int, body: String?): String {
-        val message = body?.let {
-            try {
-                JSONObject(it).optJSONObject("error")?.optString("message")
-            } catch (e: Exception) {
-                null
-            }
+    /** Sulkee istunnon; toimittamatta jääneet deltat pelastetaan kenttään. */
+    private fun finishNow(mySession: Int) {
+        if (mySession != session) return
+        mainHandler.removeCallbacks(finishRunnable)
+        if (transcript.hasPartial) {
+            listener.onFinalText(transcript.onCompleted(transcript.partial))
         }
-        return if (message.isNullOrBlank()) "HTTP $code" else message.take(120)
-    }
-
-    private fun finishSession(mySession: Int) {
-        // Sulku ajetaan tunnistusjonon hännästä: jonossa olevat pätkät
-        // valmistuvat ensin, joten viimeinenkin lause ehtii kenttään.
-        runOnTranscribe {
-            mainHandler.post {
-                if (mySession != session) return@post
-                if (isActive) {
-                    isActive = false
-                    listener.onDictationStateChanged(false)
-                }
-            }
-        }
-    }
-
-    private fun runOnTranscribe(task: Runnable) {
-        try {
-            transcribeExecutor.execute(task)
-        } catch (e: RejectedExecutionException) {
-            // Palvelu on tuhottu ja jono suljettu; siivous on jo tehty.
+        webSocket?.close(1000, null)
+        webSocket = null
+        socketOpen = false
+        session++
+        if (isActive) {
+            isActive = false
+            listener.onDictationStateChanged(false)
         }
     }
 
     companion object {
         /**
-         * Oletuksena tarkin eräpohjainen tunnistusmalli. Puhemallit ovat
-         * oma perheensä eivätkä seuraa Paranna teksti -mallivalintaa;
-         * valinnan lista haetaan livenä [TextImprover.parseTranscribeModels].
+         * Oletuksena suoratoistomalli: teksti ilmestyy puheen tahdissa.
+         * Puhemallit ovat oma perheensä eivätkä seuraa Paranna teksti
+         * -mallivalintaa; lista haetaan livenä
+         * [TextImprover.parseTranscribeModels].
          */
-        const val DEFAULT_MODEL = "gpt-4o-transcribe"
+        const val DEFAULT_MODEL = "gpt-realtime-whisper"
         const val PREF_MODEL = "sanelu_malli"
 
-        private const val SAMPLE_RATE = 16_000
-        private const val ENDPOINT = "https://api.openai.com/v1/audio/transcriptions"
-        private const val PROMPT_CHARS = 200
-        private const val PROMPT_KEEP_CHARS = 500
+        private const val SAMPLE_RATE = RealtimeEvents.SAMPLE_RATE
+        private const val ENDPOINT =
+            "wss://api.openai.com/v1/realtime?intent=transcription"
+
+        /** Lopetuksen odotus lopulliselle tekstille. */
+        private const val FINISH_WAIT_MS = 4_000L
+
+        /** Lisäodotus, jos lausumia valmistuu vielä lopetuksen aikana. */
+        private const val FINISH_EXTRA_MS = 1_200L
+
+        /** Alle 0,2 s ääntä ei commitoida (palvelu hylkäisi tyhjän). */
+        private const val MIN_COMMIT_SAMPLES = SAMPLE_RATE / 5L
+
+        /** Puskuri yhteyden avausta odottaville palasille (~30 s). */
+        private const val BACKLOG_MAX_CHUNKS = 300
     }
 }

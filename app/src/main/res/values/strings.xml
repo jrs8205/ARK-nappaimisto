@@ -158,7 +158,7 @@
     <string name="asetus_sanelu_hiljaisuus">Lopetus hiljaisuuteen (sekuntia)</string>
     <string name="asetus_sanelu_hiljaisuus_kuvaus">Sanelu päättyy itsestään, kun puheessa on ollut näin pitkä tauko.</string>
     <string name="asetus_sanelu_moottori">Sanelun tunnistus</string>
-    <string name="asetus_sanelu_moottori_nykyinen">Käytössä: %1$s.\nNapauta valitaksesi laitteen tunnistuksen ja OpenAI-tunnistuksen välillä. OpenAI tunnistaa suomea selvästi tarkemmin eikä lopeta kuuntelua melussa; puhe lähetetään tunnistusta varten OpenAI:lle omalla avaimellasi, ja teksti ilmestyy lausepätkinä pienellä viiveellä.</string>
+    <string name="asetus_sanelu_moottori_nykyinen">Käytössä: %1$s.\nNapauta valitaksesi laitteen tunnistuksen ja OpenAI-tunnistuksen välillä. OpenAI tunnistaa suomea selvästi tarkemmin eikä lopeta kuuntelua melussa; puhe virtaa tunnistusta varten OpenAI:lle omalla avaimellasi, ja teksti ilmestyy kenttään puheen tahdissa.</string>
     <string-array name="sanelu_moottori_nimet">
         <item>Laitteen puheentunnistus (oletus)</item>
         <item>OpenAI-puheentunnistus – tarkin (vaatii OpenAI-avaimen)</item>

@@ -143,7 +143,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         ClipboardManager.OnPrimaryClipChangedListener { handleClipChanged() }
 
     // Jaettu kuuntelija: sama tulosten käsittely laitteen tunnistimelle
-    // ja omalle Whisper-moottorille.
+    // ja OpenAI-suoratoistomoottorille.
     private val dictationListener = object : DictationController.Listener {
                 override fun onPartialText(text: String) {
                     lastEditTime = SystemClock.uptimeMillis()

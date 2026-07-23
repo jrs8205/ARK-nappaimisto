@@ -282,10 +282,10 @@ object TextImprover {
     }
 
     /**
-     * Sanelun mallilista: /v1/models-vastauksesta vain eräpohjaiset
-     * puheentunnistusmallit (transcribe-perhe ja whisper-1), uusin ensin.
-     * Suoratoistomallit eivät toimi transkriptiorajapinnassa ja jäävät
-     * pois, samoin chat- ja puhesynteesimallit.
+     * Sanelun mallilista: /v1/models-vastauksesta vain puheentunnistus-
+     * mallit (transcribe- ja whisper-perheet), uusin ensin. Kaikki
+     * kelpaavat realtime-transkriptioistuntoon; chat-, puhesynteesi- ja
+     * puhekeskustelumallit (gpt-realtime-2.1 tms.) jäävät pois.
      */
     fun parseTranscribeModels(body: String): List<Pair<String, String>> = try {
         val data = JSONObject(body).optJSONArray("data")
@@ -294,10 +294,7 @@ object TextImprover {
             for (i in 0 until data.length()) {
                 val item = data.getJSONObject(i)
                 val id = item.optString("id")
-                val transcribeModel =
-                    ("transcribe" in id || id.startsWith("whisper")) &&
-                        "realtime" !in id
-                if (id.isNotEmpty() && transcribeModel) {
+                if (id.isNotEmpty() && ("transcribe" in id || "whisper" in id)) {
                     models.add(id to item.optLong("created"))
                 }
             }

@@ -21,8 +21,13 @@ object RealtimeEvents {
         /** Valmis transkriptio committoidulle äänelle. */
         data class Completed(val itemId: String, val text: String) : Incoming
 
-        /** Istunnon tai yksittäisen pätkän virhe syineen. */
-        data class Failure(val message: String) : Incoming
+        /**
+         * Virhe syineen. [fatal] erottaa istunnon kaatavan virheen (esim.
+         * hylätty session.update, jolloin tuloksia ei tule enää koskaan)
+         * yksittäisen lausuman epäonnistumisesta, jonka jälkeen istunto
+         * voi vielä jatkua.
+         */
+        data class Failure(val message: String, val fatal: Boolean) : Incoming
     }
 
     /**
@@ -87,9 +92,13 @@ object RealtimeEvents {
                 Incoming.Delta(json.optString("item_id"), json.optString("delta"))
             "conversation.item.input_audio_transcription.completed" ->
                 Incoming.Completed(json.optString("item_id"), json.optString("transcript"))
-            "conversation.item.input_audio_transcription.failed",
+            "conversation.item.input_audio_transcription.failed" -> Incoming.Failure(
+                json.optJSONObject("error")?.optString("message").orEmpty(),
+                fatal = false,
+            )
             "error" -> Incoming.Failure(
-                json.optJSONObject("error")?.optString("message").orEmpty()
+                json.optJSONObject("error")?.optString("message").orEmpty(),
+                fatal = true,
             )
             else -> null
         }

@@ -53,6 +53,10 @@ class OpenAiDictation(
 
     @Volatile
     private var stopRequested = false
+
+    // Luetaan myös äänisäikeestä ja WebSocket-callbackeista, joissa vanhan
+    // istunnon tapahtumat pitää tunnistaa heti tuoreesta arvosta.
+    @Volatile
     private var session = 0
     private var finishing = false
     private var streamingModel = true
@@ -132,12 +136,23 @@ class OpenAiDictation(
             request,
             object : WebSocketListener() {
                 override fun onOpen(ws: WebSocket, response: Response) {
-                    ws.send(RealtimeEvents.sessionUpdate(model, "fi"))
                     synchronized(backlog) {
+                        // Peruttu istunto ei saa avata jaettua tilaa eikä
+                        // valuttaa uuden istunnon puskuria vanhaan yhteyteen.
+                        if (mySession != session) {
+                            ws.close(CLOSE_NORMAL, null)
+                            return
+                        }
+                        ws.send(RealtimeEvents.sessionUpdate(model, "fi"))
                         socketOpen = true
                         while (backlog.isNotEmpty()) {
                             ws.send(RealtimeEvents.appendAudio(backlog.removeFirst()))
                         }
+                    }
+                    // Jos lopetus ehti tulla kättelyn aikana, puskuroitu puhe
+                    // on nyt lähetetty ja tunnistus viimeistellään vasta tässä.
+                    mainHandler.post {
+                        if (mySession == session && finishing) sendFinishSignal(ws)
                     }
                 }
 
@@ -165,12 +180,16 @@ class OpenAiDictation(
         if (mySession != session) return
         when (event) {
             is RealtimeEvents.Incoming.Delta -> {
-                val shown = transcript.onDelta(event.text)
+                val shown = transcript.onDelta(event.itemId, event.text)
                 if (shown.isNotEmpty() && isActive) listener.onPartialText(shown)
             }
             is RealtimeEvents.Incoming.Completed -> {
-                val text = transcript.onCompleted(event.text)
+                val text = transcript.onCompleted(event.itemId, event.text)
                 if (text.isNotEmpty()) listener.onFinalText(text)
+                // Kesken jäänyt rinnakkainen lausuma palaa composing-tekstiksi,
+                // ettei se katoa näkyvistä toimituksen yhteydessä.
+                val remaining = transcript.partial
+                if (remaining.isNotEmpty() && isActive) listener.onPartialText(remaining)
                 if (finishing) {
                     // Lopetus odottaa vain hetken lisää mahdollisia
                     // jälkitulevia lausumia, sitten istunto suljetaan.
@@ -178,8 +197,16 @@ class OpenAiDictation(
                     mainHandler.postDelayed(finishRunnable, FINISH_EXTRA_MS)
                 }
             }
-            is RealtimeEvents.Incoming.Failure ->
+            is RealtimeEvents.Incoming.Failure -> {
                 listener.onDictationErrorMessage(event.message)
+                if (event.fatal) {
+                    // Istunto ei enää tuota tuloksia: mikrofoni ja yhteys
+                    // eivät saa jäädä käymään aikakatkaisuun asti. Kertyneet
+                    // deltat pelastetaan kenttään finishNow'ssa.
+                    stopRequested = true
+                    finishNow(mySession)
+                }
+            }
         }
     }
 
@@ -216,7 +243,18 @@ class OpenAiDictation(
             val shorts = ShortArray(SAMPLE_RATE / 10)
             while (!stopRequested && mySession == session) {
                 val read = record.read(shorts, 0, shorts.size)
-                if (read <= 0) continue
+                if (read < 0) {
+                    // Mikrofoni kuoli kesken (esim. toinen sovellus vei sen):
+                    // ilman katkoa silmukka pyörisi tyhjää loputtomiin, koska
+                    // hiljaisuusvahti ei saa dataa eikä koskaan laukea.
+                    mainHandler.post {
+                        if (mySession == session) {
+                            listener.onDictationError(R.string.sanelu_virhe)
+                        }
+                    }
+                    break
+                }
+                if (read == 0) continue
                 sendAudio(RealtimeEvents.pcmBytes(shorts, read))
                 sentSamples += read
                 val floats = FloatArray(read) { shorts[it] / 32768f }
@@ -230,7 +268,10 @@ class OpenAiDictation(
                 }
                 if (event is SpeechSegmenter.Event.SessionTimeout) break
             }
-        } catch (e: SecurityException) {
+        } catch (e: Exception) {
+            // Kattaa luvan menetyksen lisäksi laitekohtaiset startRecording-
+            // heitot: käsittelemätön poikkeus kaataisi koko sovelluksen ja
+            // ohittaisi lopun beginFinish-kutsun.
             mainHandler.post {
                 if (mySession == session) listener.onDictationError(R.string.sanelu_virhe)
             }
@@ -265,17 +306,24 @@ class OpenAiDictation(
         if (mySession != session || finishing) return
         finishing = true
         val ws = webSocket
-        if (ws == null || !socketOpen || sentSamples < MIN_COMMIT_SAMPLES) {
+        if (ws == null || sentSamples < MIN_COMMIT_SAMPLES) {
             finishNow(mySession)
             return
         }
+        // Kättelyä odottava puhe on tallessa puskurissa: lopetussignaali
+        // lähtee vasta onOpenista, kun puskuri on ensin virrannut palvelulle.
+        if (socketOpen) sendFinishSignal(ws)
+        mainHandler.postDelayed(finishRunnable, FINISH_WAIT_MS)
+    }
+
+    /** Suoratoistomalli saa commitin; palvelimen VAD:lle syötetään hiljaisuutta. */
+    private fun sendFinishSignal(ws: WebSocket) {
         if (streamingModel) {
             ws.send(RealtimeEvents.commit())
         } else {
             val silence = ByteArray(SAMPLE_RATE / 5 * 2)
             repeat(5) { ws.send(RealtimeEvents.appendAudio(silence)) }
         }
-        mainHandler.postDelayed(finishRunnable, FINISH_WAIT_MS)
     }
 
     /** Sulkee istunnon; toimittamatta jääneet deltat pelastetaan kenttään. */
@@ -283,9 +331,9 @@ class OpenAiDictation(
         if (mySession != session) return
         mainHandler.removeCallbacks(finishRunnable)
         if (transcript.hasPartial) {
-            listener.onFinalText(transcript.onCompleted(transcript.partial))
+            listener.onFinalText(transcript.flush())
         }
-        webSocket?.close(1000, null)
+        webSocket?.close(CLOSE_NORMAL, null)
         webSocket = null
         socketOpen = false
         session++
@@ -320,5 +368,8 @@ class OpenAiDictation(
 
         /** Puskuri yhteyden avausta odottaville palasille (~30 s). */
         private const val BACKLOG_MAX_CHUNKS = 300
+
+        /** WebSocketin siisti sulkukoodi. */
+        private const val CLOSE_NORMAL = 1000
     }
 }

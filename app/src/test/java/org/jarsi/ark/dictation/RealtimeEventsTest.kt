@@ -96,20 +96,26 @@ class RealtimeEventsTest {
     }
 
     @Test
-    fun `epaonnistunut transkriptio kertoo syyn`() {
+    fun `epaonnistunut transkriptio kertoo syyn eika kaada istuntoa`() {
         val event = RealtimeEvents.parse(
             """{"type":"conversation.item.input_audio_transcription.failed",
                 "item_id":"item_1","error":{"message":"kiintiö täynnä"}}"""
         )
-        assertEquals(RealtimeEvents.Incoming.Failure("kiintiö täynnä"), event)
+        assertEquals(
+            RealtimeEvents.Incoming.Failure("kiintiö täynnä", fatal = false),
+            event,
+        )
     }
 
     @Test
-    fun `virhetapahtuma kertoo syyn`() {
+    fun `istuntovirhe kertoo syyn ja paattaa istunnon`() {
         val event = RealtimeEvents.parse(
             """{"type":"error","error":{"message":"väärä avain"}}"""
         )
-        assertEquals(RealtimeEvents.Incoming.Failure("väärä avain"), event)
+        assertEquals(
+            RealtimeEvents.Incoming.Failure("väärä avain", fatal = true),
+            event,
+        )
     }
 
     @Test

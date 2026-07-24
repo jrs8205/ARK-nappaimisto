@@ -394,6 +394,12 @@ class SettingsActivity : AppCompatActivity() {
                         trigrams = dao.allTrigrams(),
                         // Kuvaleikkeet jäävät pois: ne ovat tiedostoja, eivät dataa.
                         clips = dao.allClips().filter { it.pinned && it.text != null },
+                        // Asetukset mukaan, jotta näppäimistö toimii uudella
+                        // laitteella samoin; API-avaimet suodattuvat pois.
+                        settings = BackupCodec.exportableSettings(
+                            androidx.preference.PreferenceManager
+                                .getDefaultSharedPreferences(context).all
+                        ),
                     )
                     context.contentResolver.openOutputStream(uri, "wt")?.use {
                         it.write(BackupCodec.encode(backup).toByteArray(Charsets.UTF_8))
@@ -425,12 +431,29 @@ class SettingsActivity : AppCompatActivity() {
                     )
                     BackupCodec.newClips(dao.allClips(), backup.clips, System.currentTimeMillis())
                         .forEach { dao.upsertClip(it) }
+                    if (backup.settings.isNotEmpty()) {
+                        val editor = androidx.preference.PreferenceManager
+                            .getDefaultSharedPreferences(context).edit()
+                        backup.settings.forEach { (key, value) ->
+                            when (value) {
+                                is Boolean -> editor.putBoolean(key, value)
+                                is Int -> editor.putInt(key, value)
+                                is Long -> editor.putLong(key, value)
+                                is String -> editor.putString(key, value)
+                            }
+                        }
+                        editor.apply()
+                    }
                     LearnedDataStamp.bump()
                     toast(
                         context.getString(
                             R.string.varmuuskopio_tuotu, backup.words.size, backup.clips.size
                         )
                     )
+                    if (backup.settings.isNotEmpty()) {
+                        // Asetusrivit näyttäisivät muuten vanhat arvot.
+                        activity?.runOnUiThread { activity?.recreate() }
+                    }
                 } catch (e: Exception) {
                     toast(context.getString(R.string.varmuuskopio_virhe))
                 }

@@ -4,12 +4,13 @@ import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
-/** Varmuuskopion sisältö: oppimisdata ja kiinnitetyt tekstileikkeet. */
+/** Varmuuskopion sisältö: oppimisdata, kiinnitetyt tekstileikkeet ja asetukset. */
 data class Backup(
     val words: List<WordEntity>,
     val bigrams: List<BigramEntity>,
     val trigrams: List<TrigramEntity>,
     val clips: List<ClipEntity>,
+    val settings: Map<String, Any> = emptyMap(),
 )
 
 /**
@@ -19,7 +20,21 @@ data class Backup(
  */
 object BackupCodec {
 
-    const val FORMAT = 1
+    const val FORMAT = 2
+
+    /**
+     * Nämä eivät kuulu varmuuskopioon: API-avaimet ovat Android Keystorella
+     * laitekohtaisesti salattuja eivätkä toimisi toisella laitteella, ja
+     * esittelyn kuittaus pidetään laitekohtaisena, jotta uusi puhelin
+     * opastaa näppäimistön käyttöönoton.
+     */
+    private val EXCLUDED_SETTINGS = buildSet {
+        ApiKeyStore.Slot.entries.forEach {
+            add(it.plainPref)
+            add(it.encryptedPref)
+        }
+        add("esittely_nahty")
+    }
 
     fun encode(backup: Backup): String {
         val root = JSONObject()
@@ -80,13 +95,37 @@ object BackupCodec {
                 }
             },
         )
+        root.put(
+            "settings",
+            JSONArray().apply {
+                backup.settings.forEach { (key, value) ->
+                    // Tyyppi kirjataan talteen, jotta tuonti palauttaa arvon
+                    // samana prefs-tyyppinä (JSON ei erota Int/Long).
+                    val type = when (value) {
+                        is Boolean -> "b"
+                        is Int -> "i"
+                        is Long -> "l"
+                        is String -> "s"
+                        else -> return@forEach
+                    }
+                    put(JSONObject().put("k", key).put("t", type).put("v", value))
+                }
+            },
+        )
         return root.toString()
     }
+
+    /** Varmuuskopioon kelpaavat asetukset laitteen kaikista asetuksista. */
+    fun exportableSettings(all: Map<String, *>): Map<String, Any> =
+        all.filterKeys { it !in EXCLUDED_SETTINGS }
+            .filterValues { it is Boolean || it is Int || it is Long || it is String }
+            .mapValues { it.value as Any }
 
     /** @throws IllegalArgumentException jos tiedosto ei ole tuettu varmuuskopio. */
     fun decode(json: String): Backup = try {
         val root = JSONObject(json)
-        require(root.optInt("format") == FORMAT) { "Tuntematon varmuuskopion muoto" }
+        // Muoto 1 kelpaa yhä: siitä puuttuvat vain asetukset.
+        require(root.optInt("format") in 1..FORMAT) { "Tuntematon varmuuskopion muoto" }
         Backup(
             words = root.optJSONArray("words").mapObjects { w ->
                 WordEntity(
@@ -126,6 +165,20 @@ object BackupCodec {
                     created = c.getLong("created"),
                     pinned = true,
                 )
+            },
+            settings = buildMap {
+                root.optJSONArray("settings").mapObjects { s ->
+                    val key = s.getString("k")
+                    // Kiellettyjä avaimia ei tuoda käsin muokatustakaan
+                    // tiedostosta.
+                    if (key in EXCLUDED_SETTINGS) return@mapObjects
+                    when (s.getString("t")) {
+                        "b" -> put(key, s.getBoolean("v"))
+                        "i" -> put(key, s.getInt("v"))
+                        "l" -> put(key, s.getLong("v"))
+                        "s" -> put(key, s.getString("v"))
+                    }
+                }
             },
         )
     } catch (e: JSONException) {

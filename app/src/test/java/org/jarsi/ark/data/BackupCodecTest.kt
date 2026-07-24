@@ -89,4 +89,57 @@ class BackupCodecTest {
         assertTrue(result.single().id > 5000L)
         assertTrue(result.single().pinned)
     }
+
+    @Test
+    fun `asetukset sailyvat koodauksessa tyyppeineen`() {
+        val settings = mapOf<String, Any>(
+            "ehdotukset" to true,
+            "sanelu_hiljaisuus" to 7,
+            "aikaleima" to 4_000_000_000L,
+            "ai_palvelu" to "chatgpt",
+        )
+        val backup = Backup(emptyList(), emptyList(), emptyList(), emptyList(), settings)
+        val decoded = BackupCodec.decode(BackupCodec.encode(backup))
+        assertEquals(settings, decoded.settings)
+    }
+
+    @Test
+    fun `exportableSettings suodattaa avaimet ja vieraat tyypit`() {
+        val all = mapOf(
+            "ehdotukset" to true,
+            "claude_api_avain" to "sk-salaisuus",
+            "claude_api_avain_salattu" to "blob",
+            "openai_api_avain" to "sk-salaisuus",
+            "openai_api_avain_salattu" to "blob",
+            "esittely_nahty" to true,
+            "joukko" to setOf("a", "b"),
+            "tyokalurivi" to """{"jarjestys":[]}""",
+        )
+        val exportable = BackupCodec.exportableSettings(all)
+        assertEquals(
+            mapOf<String, Any>("ehdotukset" to true, "tyokalurivi" to """{"jarjestys":[]}"""),
+            exportable,
+        )
+    }
+
+    @Test
+    fun `tuonti suodattaa kielletyt asetukset myos tiedostosta`() {
+        val decoded = BackupCodec.decode(
+            """{"format":2,"settings":[
+                {"k":"claude_api_avain","t":"s","v":"sk-x"},
+                {"k":"esittely_nahty","t":"b","v":true},
+                {"k":"ehdotukset","t":"b","v":false}
+            ]}"""
+        )
+        assertEquals(mapOf<String, Any>("ehdotukset" to false), decoded.settings)
+    }
+
+    @Test
+    fun `vanha muoto kelpaa ja tuo tyhjat asetukset`() {
+        val decoded = BackupCodec.decode(
+            """{"format":1,"words":[],"bigrams":[],"trigrams":[],"clips":[]}"""
+        )
+        assertTrue(decoded.settings.isEmpty())
+        assertTrue(decoded.words.isEmpty())
+    }
 }

@@ -120,6 +120,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private val translateBuffer = TranslateBuffer()
     private var translateRunnable: Runnable? = null
 
+    // Käännöstilan viimeisin käyttöhetki muistiajan vertailuun; puskuri
+    // elää vain prosessin muistissa, joten elapsedRealtime riittää.
+    private var translateLastUsed = 0L
+
     // Näkyvä käännös ja sen tuoreus: tuore käännös vastaa rivin nykyistä
     // sisältöä ja kelpaa vietäväksi kenttään sellaisenaan.
     private var currentTranslation = ""
@@ -609,6 +613,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val bar = translateBar ?: return
         // Salasanakenttiä ei käännetä.
         if (passwordField) return
+        // Vanha käännösteksti unohtuu muistiajan kuluttua: tuntien takainen
+        // teksti avautuisi muuten yllättäen uuden käännöstyön pohjaksi.
+        val memoryMs = prefs.getInt(PREF_TRANSLATE_MEMORY, 30) * 60_000L
+        if (translateBuffer.text.isNotEmpty() && translateLastUsed > 0 &&
+            SystemClock.elapsedRealtime() - translateLastUsed > memoryMs
+        ) {
+            translateBuffer.clear()
+            lastInsertedTranslation = ""
+        }
         // Sanelu ja käännös eivät voi olla yhtä aikaa päällä.
         stopDictation()
         hideAllPanels()
@@ -631,6 +644,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
      */
     private fun hideTranslateBar() {
         if (!translateMode) return
+        translateLastUsed = SystemClock.elapsedRealtime()
         translateMode = false
         translateRunnable?.let { mainHandler.removeCallbacks(it) }
         translationGeneration++
@@ -2545,6 +2559,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_AI_SERVICE = "ai_palvelu"
         const val PREF_NUMBER_ROW = "numerorivi"
         const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"
+        const val PREF_TRANSLATE_MEMORY = "kaannos_muisti"
         const val PREF_DICTATION_ENGINE = "sanelu_moottori"
         const val PREF_DOUBLE_SPACE = "kaksoisvali_piste"
         const val DOUBLE_SPACE_PERIOD_MS = 1100L

@@ -172,6 +172,8 @@
     <string name="sanelu_verkkovirhe">Sanelun tunnistus epäonnistui: %1$s</string>
     <string name="kaannoskielet">Käännöskielet</string>
     <string name="kaannoskielet_kuvaus">Lataa ja poista käännösmalleja (noin 30 Mt kieltä kohden)</string>
+    <string name="asetus_kaannos_muisti">Käännöksen muistiaika (minuuttia)</string>
+    <string name="asetus_kaannos_muisti_kuvaus">Käännösnäkymän teksti säilyy näin kauan viimeisestä käytöstä. Sen jälkeen näkymä avautuu tyhjänä.</string>
     <string name="kieli_ladattu">Ladattu</string>
     <string name="kieli_ladataan">Ladataan…</string>
     <string name="kieli_oletus">Oletus</string>

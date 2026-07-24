@@ -123,6 +123,16 @@
             android:title="@string/kaannoskielet"
             android:summary="@string/kaannoskielet_kuvaus"
             app:singleLineTitle="false" />
+        <SeekBarPreference
+            android:key="kaannos_muisti"
+            android:icon="@drawable/ic_history"
+            android:title="@string/asetus_kaannos_muisti"
+            android:summary="@string/asetus_kaannos_muisti_kuvaus"
+            android:defaultValue="30"
+            android:max="120"
+            app:min="5"
+            app:singleLineTitle="false"
+            app:showSeekBarValue="true" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/asetukset_sanelu">

@@ -59,10 +59,12 @@ import org.jarsi.ark.keyboard.SymbolOrder
 import org.jarsi.ark.keyboard.TextUndo
 import org.jarsi.ark.keyboard.ToolbarOrder
 import org.jarsi.ark.keyboard.TranslateBuffer
+import org.jarsi.ark.keyboard.TranslateLines
 import org.jarsi.ark.keyboard.TranslatePrep
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
+import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
 import com.google.mlkit.nl.translate.TranslateLanguage
@@ -792,20 +794,51 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         val client = translator ?: return
         val generation = translationGeneration
-        val prepared = TranslatePrep.prepare(text)
-        val english = translationTarget() == TranslateLanguage.ENGLISH
-        client.translate(prepared.text).addOnSuccessListener { result ->
-            // Tulos kelpaa vain, jos rivi ei ehtinyt muuttua välissä.
-            if (translateMode && generation == translationGeneration &&
-                text == translateBuffer.toString()
-            ) {
-                currentTranslation = TranslatePrep.clean(result, prepared, english)
-                translationFresh = true
-                translateBar?.setTranslation(
-                    currentTranslation, getString(R.string.kaannos_tyhja)
-                )
-            }
+        translateKeepingLines(
+            client,
+            text,
+            onResult = { result ->
+                // Tulos kelpaa vain, jos rivi ei ehtinyt muuttua välissä.
+                if (translateMode && generation == translationGeneration &&
+                    text == translateBuffer.toString()
+                ) {
+                    currentTranslation = result
+                    translationFresh = true
+                    translateBar?.setTranslation(
+                        currentTranslation, getString(R.string.kaannos_tyhja)
+                    )
+                }
+            },
+        )
+    }
+
+    /**
+     * Kääntää tekstin rivi kerrallaan, jotta rivinvaihdot säilyvät —
+     * esikäsittely ja konekäännös litistäisivät ne muuten yhdeksi riviksi.
+     * [onResult] kutsutaan päälangalla vain onnistuneella käännöksellä;
+     * [onFailure] virheellä.
+     */
+    private fun translateKeepingLines(
+        client: Translator,
+        text: String,
+        onResult: (String) -> Unit,
+        onFailure: () -> Unit = {},
+    ) {
+        val lines = TranslateLines.split(text)
+        val jobs = TranslateLines.translatable(lines).map { TranslatePrep.prepare(it) }
+        if (jobs.isEmpty()) {
+            onResult("")
+            return
         }
+        val english = translationTarget() == TranslateLanguage.ENGLISH
+        Tasks.whenAllSuccess<String>(jobs.map { client.translate(it.text) })
+            .addOnSuccessListener { results ->
+                val cleaned = results.mapIndexed { index, result ->
+                    TranslatePrep.clean(result, jobs[index], english)
+                }
+                onResult(TranslateLines.merge(lines, cleaned))
+            }
+            .addOnFailureListener { onFailure() }
     }
 
     /**
@@ -832,27 +865,28 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         val generation = ++translationGeneration
         val session = editorSessionId
-        val prepared = TranslatePrep.prepare(text)
-        val english = translationTarget() == TranslateLanguage.ENGLISH
-        client.translate(prepared.text)
-            .addOnSuccessListener { result ->
+        translateKeepingLines(
+            client,
+            text,
+            onResult = { result ->
                 // Vanhentunut tulos hylätään: käyttäjä ehti jatkaa, sulkea
                 // tilan, vaihtaa kenttää tai syötenäkymä ehti sulkeutua.
                 if (!translateMode || generation != translationGeneration ||
                     session != editorSessionId || translateBuffer.toString() != text
                 ) {
-                    return@addOnSuccessListener
+                    return@translateKeepingLines
                 }
-                commitTranslation(TranslatePrep.clean(result, prepared, english))
+                commitTranslation(result)
                 onDone()
-            }
-            .addOnFailureListener {
+            },
+            onFailure = {
                 if (translateMode && generation == translationGeneration &&
                     session == editorSessionId
                 ) {
                     Toast.makeText(this, R.string.kaannos_virhe, Toast.LENGTH_SHORT).show()
                 }
-            }
+            },
+        )
     }
 
     // Viimeisin kenttään viety käännös: uusi vienti korvaa sen, ettei

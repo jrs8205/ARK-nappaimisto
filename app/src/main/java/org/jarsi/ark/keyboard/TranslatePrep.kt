@@ -72,3 +72,26 @@ object TranslatePrep {
         return out.toString()
     }
 }
+
+/**
+ * Monirivisen tekstin käännös rivi kerrallaan: esikäsittely ja konekäännös
+ * litistäisivät rivinvaihdot, joten jokainen rivi käännetään erikseen ja
+ * tulos kootaan alkuperäisin rivinvaihdoin. Tyhjät rivit säilyvät
+ * paikoillaan sellaisinaan.
+ */
+object TranslateLines {
+
+    fun split(text: String): List<String> = text.split("\n")
+
+    /** Käännettävät eli sisällölliset rivit järjestyksessä. */
+    fun translatable(lines: List<String>): List<String> =
+        lines.filter { it.isNotBlank() }
+
+    /** Kokoaa käännetyt rivit alkuperäisten tyhjien rivien lomaan. */
+    fun merge(lines: List<String>, translated: List<String>): String {
+        var next = 0
+        return lines.joinToString("\n") { line ->
+            if (line.isBlank()) line else translated.getOrElse(next++) { line }
+        }
+    }
+}

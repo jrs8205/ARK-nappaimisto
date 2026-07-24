@@ -331,7 +331,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         // sisällön mukana CappedScrollView'n ylärajaan asti. Oikeaan
         // reunaan jää tilaa kulman tyhjennysnapille.
         gravity = Gravity.TOP
-        minimumHeight = dp(56)
+        minimumHeight = areaHeight()
         setPadding(dp(16), dp(10), dp(44), dp(10))
         setOnTouchListener { view, event ->
             val textView = view as TextView
@@ -398,12 +398,15 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }
 
-    // Alueet kasvavat viidennekseen näytöstä, jotta pitkätkin tekstit
-    // näkyvät kerralla; suhteellinen raja skaalautuu kaikille laitteille.
-    private fun areaMaxHeight(): Int =
-        maxOf(dp(120), (resources.displayMetrics.heightPixels * 0.20f).roundToInt())
+    // Kiinteä aluekorkeus: näkymä täyttää tilan tilariviin asti eikä
+    // taustasovelluksesta jää kaistaa näkyviin. Korkeus ei elä tekstin
+    // mukana — kasvu työntäisi näppäimistön navigointipalkin alle, joten
+    // pitkä teksti vierii alueen sisällä. Suhteellinen mitta skaalautuu
+    // kaikille laitteille.
+    private fun areaHeight(): Int =
+        maxOf(dp(120), (resources.displayMetrics.heightPixels * 0.17f).roundToInt())
 
-    private val sourceScroll = CappedScrollView(areaMaxHeight()).apply {
+    private val sourceScroll = CappedScrollView(areaHeight()).apply {
         isVerticalScrollBarEnabled = false
         addView(
             bufferView,
@@ -433,11 +436,11 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private val translationView = TextView(context).apply {
         textSize = LARGE_TEXT_SP
         gravity = Gravity.TOP
-        minimumHeight = dp(52)
+        minimumHeight = areaHeight()
         setPadding(dp(16), dp(10), dp(16), dp(10))
     }
 
-    private val translationScroll = CappedScrollView(areaMaxHeight()).apply {
+    private val translationScroll = CappedScrollView(areaHeight()).apply {
         isVerticalScrollBarEnabled = false
         addView(
             translationView,

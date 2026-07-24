@@ -67,6 +67,9 @@ import org.jarsi.ark.theme.KeyboardTheme
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
+import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mlkit.nl.languageid.LanguageIdentificationOptions
+import com.google.mlkit.nl.languageid.LanguageIdentifier
 import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
@@ -134,6 +137,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var aiTranslateGeneration = 0
     private var translator: Translator? = null
     private var translatorReady = false
+
+    // Lähdekielen päättely kirjoitetusta tekstistä; käsin valittu lähde
+    // lukitsee päättelyn, kunnes rivi tyhjennetään.
+    private var languageIdentifier: LanguageIdentifier? = null
+    private var translateSourceLocked = false
 
     // Kieliparilta puuttuu ladattu malli; lataus odottaa käyttäjän lupaa.
     private var translationModelsMissing = false
@@ -372,6 +380,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         dictation.stop()
         openAiDictation?.destroy()
         translator?.close()
+        languageIdentifier?.close()
         clipboardManager?.removePrimaryClipChangedListener(clipChangedListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefListener)
         flushLearned()
@@ -624,6 +633,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             translateBuffer.clear()
             lastInsertedTranslation = ""
         }
+        if (translateBuffer.text.isEmpty()) translateSourceLocked = false
         // Sanelu ja käännös eivät voi olla yhtä aikaa päällä.
         stopDictation()
         hideAllPanels()
@@ -792,6 +802,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             translateBar?.setTranslation("", getString(R.string.kaannos_tyhja))
             return
         }
+        detectSourceLanguage(text)
         val client = translator ?: return
         val generation = translationGeneration
         translateKeepingLines(
@@ -810,6 +821,34 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
             },
         )
+    }
+
+    /**
+     * Päättelee lähdekielen kirjoitetusta tekstistä käyttäjän omien
+     * (ladattujen) kielten joukosta, ettei päättely koskaan vaadi uuden
+     * mallin latausta. Kohdekielellä kirjoitettu teksti kääntää suunnan.
+     * Rinnakkainen käännös nykyparilla saa jatkua: kielenvaihto käynnistää
+     * uuden käännöksen ja korvaa tuloksen.
+     */
+    private fun detectSourceLanguage(text: String) {
+        if (translateSourceLocked || text.length < AUTODETECT_MIN_CHARS) return
+        val identifier = languageIdentifier ?: LanguageIdentification.getClient(
+            LanguageIdentificationOptions.Builder()
+                .setConfidenceThreshold(AUTODETECT_CONFIDENCE)
+                .build()
+        ).also { languageIdentifier = it }
+        identifier.identifyLanguage(text)
+            .addOnSuccessListener { tag ->
+                if (!translateMode || text != translateBuffer.toString()) {
+                    return@addOnSuccessListener
+                }
+                val code = TranslateLanguage.fromLanguageTag(tag)
+                    ?: return@addOnSuccessListener
+                if (code !in translationLangs || code == translationSource()) {
+                    return@addOnSuccessListener
+                }
+                pickTranslationLanguage(sourceSide = true, code = code)
+            }
     }
 
     /**
@@ -1800,11 +1839,15 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             it.listener = object : TranslateBarView.Listener {
                 override fun onPickSource(code: String) {
                     feedback()
+                    // Käsivalinta ohittaa kielen päättelyn tältä tekstiltä.
+                    translateSourceLocked = true
                     pickTranslationLanguage(sourceSide = true, code = code)
                 }
 
                 override fun onSwap() {
                     feedback()
+                    // Käsin käännettyä suuntaa ei saa päätellä heti takaisin.
+                    translateSourceLocked = true
                     val source = translationSource()
                     prefs.edit()
                         .putString(PREF_TRANSLATE_SOURCE, translationTarget())
@@ -1823,6 +1866,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     translateBuffer.clear()
                     currentTranslation = ""
                     translationFresh = false
+                    // Uusi teksti saa taas päätellä kielensä.
+                    translateSourceLocked = false
                     // Vietyä käännöstä EI unohdeta: tyhjennyksen jälkeen
                     // kirjoitettu uusi teksti korvaa Lisää-napilla vanhan
                     // kentästä, joten viestin voi kirjoittaa kokonaan
@@ -2607,6 +2652,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_NUMBER_ROW = "numerorivi"
         const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"
         const val PREF_TRANSLATE_MEMORY = "kaannos_muisti"
+
+        /** Kielen päättely vaatii vähintään tämän verran tekstiä. */
+        private const val AUTODETECT_MIN_CHARS = 6
+
+        /** Oletuskynnystä (0,5) tiukempi raja lähikielten sekaannuksia vastaan. */
+        private const val AUTODETECT_CONFIDENCE = 0.7f
         const val PREF_DICTATION_ENGINE = "sanelu_moottori"
         const val PREF_DOUBLE_SPACE = "kaksoisvali_piste"
         const val DOUBLE_SPACE_PERIOD_MS = 1100L

@@ -91,6 +91,7 @@ dependencies {
     implementation(libs.androidx.viewpager2)
     // Paikallinen käännös: mallit ladataan kerran, käännös tapahtuu laitteella.
     implementation(libs.mlkit.translate)
+    implementation(libs.mlkit.language.id)
     // Sanelun suoratoisto: WebSocket OpenAI:n realtime-transkriptioon.
     implementation(libs.okhttp)
     implementation(libs.androidx.room.runtime)

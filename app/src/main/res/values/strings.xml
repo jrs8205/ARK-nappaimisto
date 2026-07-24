@@ -127,7 +127,7 @@
     <string name="kaannos_lataa_mallit">Lataa mallit</string>
     <string name="kaannos_lataus_virhe">Käännösmallin lataus epäonnistui – tarkista verkkoyhteys</string>
     <string name="kaannos_virhe">Käännös epäonnistui – yritä uudelleen</string>
-    <string name="kaannos_lisaa">Lisää</string>
+    <string name="kaannos_vie">Vie käännös</string>
     <string name="kaannos_tyhja">Käännös ilmestyy tähän</string>
     <string name="kaannos_ai_kaannetaan">Käännetään…</string>
     <string name="kaannos_ai_virhe_syy">AI-käännös epäonnistui: %1$s</string>

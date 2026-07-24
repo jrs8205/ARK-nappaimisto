@@ -558,6 +558,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         hideCorrectionPanel()
         hideEmojiPanel()
         hideTranslateBar()
+        stopDictation()
+        resetSidePage()
         if (kb.height > 0) {
             panel.layoutParams = panel.layoutParams.apply { height = kb.height }
         }
@@ -582,10 +584,23 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         hideEmojiPanel()
     }
 
+    /**
+     * Sivutila palaa kirjaimiin paneelin tai sanelun alta, ettei nuoli-
+     * tai www-korostus jää aktiiviseksi toisen tilan rinnalle.
+     */
+    private fun resetSidePage() {
+        if (page == Page.ARROWS || page == Page.SYMBOLS3) {
+            page = Page.LETTERS
+            updateLayout()
+        }
+    }
+
     private fun showEmojiPanel() {
         val panel = emojiPanel ?: return
         val kb = keyboardView ?: return
         hideAllPanels()
+        stopDictation()
+        resetSidePage()
         panel.refreshRecentsIfNeeded()
         if (kb.height > 0) {
             panel.layoutParams = panel.layoutParams.apply { height = kb.height }
@@ -641,6 +656,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Sanelu ja käännös eivät voi olla yhtä aikaa päällä.
         stopDictation()
         hideAllPanels()
+        resetSidePage()
         translateMode = true
         currentTranslation = ""
         translationFresh = false
@@ -1086,6 +1102,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         hideClipboardPanel()
         hideEmojiPanel()
         hideTranslateBar()
+        stopDictation()
+        resetSidePage()
         if (kb.height > 0) {
             panel.layoutParams = panel.layoutParams.apply { height = kb.height }
         }
@@ -1740,9 +1758,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         toolbar = ToolbarView(this).also {
             it.listener = object : ToolbarView.Listener {
                 override fun onToggleArrows() {
-                    // Korjausnäkymä peittää näppäimistön: sivunvaihto ei
-                    // näkyisi, joten näkymä suljetaan ja siirrytään suoraan.
-                    hideCorrectionPanel()
+                    // Paneelit peittävät näppäimistön: sivunvaihto ei
+                    // näkyisi, joten ne suljetaan ja siirrytään suoraan.
+                    hideAllPanels()
                     page = if (page == Page.ARROWS) Page.LETTERS else Page.ARROWS
                     updateLayout()
                     updateSuggestions()
@@ -1750,7 +1768,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
 
                 override fun onToggleWeb() {
-                    hideCorrectionPanel()
+                    hideAllPanels()
                     page = if (page == Page.SYMBOLS3) Page.LETTERS else Page.SYMBOLS3
                     updateLayout()
                     updateSuggestions()
@@ -1759,8 +1777,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onToggleDictation() {
                     feedback()
-                    // Sanelu ei saa kirjoittaa kenttään kesken korjauksen.
-                    hideCorrectionPanel()
+                    // Sanelu ei saa kirjoittaa kenttään kesken korjauksen,
+                    // ja sivutila palaa kirjaimiin ettei kahta korostusta
+                    // jää päälle yhtä aikaa.
+                    hideAllPanels()
+                    resetSidePage()
                     if (translateMode) {
                         // Käännöstila suljetaan ensin; sanelu käynnistetään
                         // uudella painalluksella, ettei viimeistely ja sanelu
@@ -1854,11 +1875,22 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     feedback()
                     // Käsin käännettyä suuntaa ei saa päätellä heti takaisin.
                     translateSourceLocked = true
+                    // Tuore käännös siirtyy suunnanvaihdossa lähdetekstiksi
+                    // kuten Google Kääntäjässä — muuten rivillä olisi
+                    // vaihdon jälkeen kahdesti samankielinen teksti.
+                    val moved = currentTranslation
+                        .takeIf { translationFresh && it.isNotBlank() }
                     val source = translationSource()
                     prefs.edit()
                         .putString(PREF_TRANSLATE_SOURCE, translationTarget())
                         .putString(PREF_TRANSLATE_TARGET, source)
                         .apply()
+                    if (moved != null) {
+                        translateBuffer.clear()
+                        translateBuffer.insert(moved)
+                        currentTranslation = ""
+                        translationFresh = false
+                    }
                     onTranslatePairChanged()
                 }
 
@@ -1891,15 +1923,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     clipboardManager?.setPrimaryClip(
                         ClipData.newPlainText("", translation)
                     )
-                    // Kopio päätyy myös omaan leikepöytäpaneeliin, josta sen
-                    // voi liittää mihin tahansa kenttään.
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(
-                            this@KeyboardService,
-                            R.string.kaannos_kopioitu,
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
+                    // Järjestelmä ei näytä omaa kopiointikuplaansa
+                    // näppäimistön kopioinneista, joten kuittaus on omamme.
+                    Toast.makeText(
+                        this@KeyboardService,
+                        R.string.kaannos_kopioitu,
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
 
                 override fun onInsert() {
@@ -1923,15 +1953,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 override fun onCopy(text: String) {
                     feedback()
                     clipboardManager?.setPrimaryClip(ClipData.newPlainText("", text))
-                    // Android 13:sta alkaen järjestelmä näyttää oman
-                    // kopiointi-ilmoituksensa; vanhemmilla kuitataan itse.
-                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                        Toast.makeText(
-                            this@KeyboardService,
-                            R.string.kaannos_kopioitu,
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
+                    // Järjestelmä ei näytä omaa kopiointikuplaansa
+                    // näppäimistön kopioinneista, joten kuittaus on omamme.
+                    Toast.makeText(
+                        this@KeyboardService,
+                        R.string.kaannos_kopioitu,
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
 
                 override fun onPaste() {
@@ -2088,6 +2116,25 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     // Koko näytön muokkaustila vaakasuunnassa peittäisi sovelluksen — pidetään pois.
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    /**
+     * Käännösnäkymä piirtyy sovelluksen päälle Gboardin laajenevien
+     * paneelien tapaan: sovellukselle kerrotaan vain näppäimistöosan
+     * viemä tila. Ilman tätä koko ruudun korkuinen näkymä kutistaisi
+     * sovelluksen olemattomiin, jolloin kenttä menettää fokuksen ja
+     * käynnistää syötteen uudelleen — vienti kenttään katkesi ja näkymä
+     * saattoi sulkeutua heti avauksen perään.
+     */
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        if (!translateMode) return
+        val bar = translateBar ?: return
+        if (bar.visibility != View.VISIBLE || bar.height == 0) return
+        outInsets.contentTopInsets += bar.height
+        outInsets.visibleTopInsets += bar.height
+        // Koko näkymä ottaa silti kosketukset vastaan.
+        outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_FRAME
+    }
+
     override fun onStartInputView(info: EditorInfo, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         soundEnabled = prefs.getBoolean("aanet", false)
@@ -2131,14 +2178,20 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             info.inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS != 0
         learning.resetContext()
         reloadLearnedIfChanged()
-        // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee sanelun.
-        stopDictation()
-        hideAllPanels()
-        // Kenttä vaihtui: näkymä sulkeutuu, mutta käännöstyö säilyy
-        // puskurissa, koska mikään ei kirjoitu kenttiin itsestään.
-        hideTranslateBar()
-        // Uudessa kentässä ei ole vietyä käännöstä korvattavaksi.
-        lastInsertedTranslation = ""
+        if (!restarting) {
+            // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee
+            // sanelun ja sulkee näkymät. Saman kentän syötteen uudelleen-
+            // käynnistys (restartInput, esim. sovelluksen reaktio näkymän
+            // koon muutokseen) ei saa sulkea mitään — käännösnäkymä
+            // välähtäisi muuten auki ja heti kiinni.
+            stopDictation()
+            hideAllPanels()
+            // Kenttä vaihtui: näkymä sulkeutuu, mutta käännöstyö säilyy
+            // puskurissa, koska mikään ei kirjoitu kenttiin itsestään.
+            hideTranslateBar()
+            // Uudessa kentässä ei ole vietyä käännöstä korvattavaksi.
+            lastInsertedTranslation = ""
+        }
         if (pendingDictation) {
             pendingDictation = false
             if (!passwordField &&

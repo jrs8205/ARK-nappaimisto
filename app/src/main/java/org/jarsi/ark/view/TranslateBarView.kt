@@ -466,7 +466,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     }
 
     private val insertLabel = TextView(context).apply {
-        text = context.getString(R.string.kaannos_lisaa)
+        text = context.getString(R.string.kaannos_vie)
         textSize = 15f
         setTypeface(typeface, Typeface.BOLD)
         setPadding(dp(12), dp(10), dp(14), dp(10))
@@ -615,11 +615,20 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private fun render() {
         bufferView.textSize = textSizeFor(shownText)
         if (shownText.isEmpty()) {
-            shownCursor = -1
-            removeCallbacks(blinkRunnable)
-            bufferView.text = shownHint
+            // Kursori vilkkuu vihjeen edessä heti avattaessa, jotta alue
+            // näyttää aktiiviselta ja kirjoittamaan voi ryhtyä suoraan.
+            shownCursor = 0
+            bufferView.text = SpannableStringBuilder(CURSOR_PLACEHOLDER + shownHint).apply {
+                setSpan(
+                    cursorSpan,
+                    0,
+                    CURSOR_PLACEHOLDER.length,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
             bufferView.setTextColor(theme.hint)
             clearLabel.visibility = GONE
+            restartBlink()
         } else {
             val position = shownCursorTarget.coerceIn(0, shownText.length)
             shownCursor = position
@@ -693,7 +702,8 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     }
 
     private fun onBufferTapped(view: TextView, x: Float, y: Float) {
-        // Vihjetekstiä ei voi kohdistaa.
+        // Tyhjällä rivillä kursori on jo alussa; napautus ei siirrä mitään.
+        if (shownText.isEmpty()) return
         if (shownCursor < 0) return
         val offset = view.getOffsetForPosition(x, y)
         if (offset < 0) return

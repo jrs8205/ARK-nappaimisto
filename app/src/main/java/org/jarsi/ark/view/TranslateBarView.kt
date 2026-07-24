@@ -388,7 +388,12 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }
 
-    private val sourceScroll = CappedScrollView(dp(120)).apply {
+    // Alueet kasvavat viidennekseen näytöstä, jotta pitkätkin tekstit
+    // näkyvät kerralla; suhteellinen raja skaalautuu kaikille laitteille.
+    private fun areaMaxHeight(): Int =
+        maxOf(dp(120), (resources.displayMetrics.heightPixels * 0.20f).roundToInt())
+
+    private val sourceScroll = CappedScrollView(areaMaxHeight()).apply {
         isVerticalScrollBarEnabled = false
         addView(
             bufferView,
@@ -416,7 +421,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setPadding(dp(12), dp(10), dp(12), dp(10))
     }
 
-    private val translationScroll = CappedScrollView(dp(120)).apply {
+    private val translationScroll = CappedScrollView(areaMaxHeight()).apply {
         isVerticalScrollBarEnabled = false
         addView(
             translationView,

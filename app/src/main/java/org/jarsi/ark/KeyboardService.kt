@@ -1634,6 +1634,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         toolbar = ToolbarView(this).also {
             it.listener = object : ToolbarView.Listener {
                 override fun onToggleArrows() {
+                    // Korjausnäkymä peittää näppäimistön: sivunvaihto ei
+                    // näkyisi, joten näkymä suljetaan ja siirrytään suoraan.
+                    hideCorrectionPanel()
                     page = if (page == Page.ARROWS) Page.LETTERS else Page.ARROWS
                     updateLayout()
                     updateSuggestions()
@@ -1641,6 +1644,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
 
                 override fun onToggleWeb() {
+                    hideCorrectionPanel()
                     page = if (page == Page.SYMBOLS3) Page.LETTERS else Page.SYMBOLS3
                     updateLayout()
                     updateSuggestions()
@@ -1649,6 +1653,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
                 override fun onToggleDictation() {
                     feedback()
+                    // Sanelu ei saa kirjoittaa kenttään kesken korjauksen.
+                    hideCorrectionPanel()
                     if (translateMode) {
                         // Käännöstila suljetaan ensin; sanelu käynnistetään
                         // uudella painalluksella, ettei viimeistely ja sanelu
@@ -1711,6 +1717,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
 
                 override fun onUndo() {
+                    // Peruutus muuttaa kenttää; auki jäänyt korjausnäkymä
+                    // näyttäisi vanhentunutta tekstiä.
+                    hideCorrectionPanel()
                     performUndo()
                 }
 

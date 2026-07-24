@@ -16,6 +16,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
@@ -170,10 +171,13 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }
 
+    // Kielipillerit Google Kääntäjän tapaan: koko kielinimet leveissä
+    // pilleritaustoissa suunnanvaihdon molemmin puolin.
     private val sourceLabel = TextView(context).apply {
-        textSize = 14f
-        setTypeface(typeface, Typeface.BOLD)
-        setPadding(dp(12), dp(8), dp(8), dp(8))
+        textSize = 15f
+        gravity = Gravity.CENTER
+        maxLines = 1
+        setPadding(dp(16), dp(10), dp(16), dp(10))
         setOnClickListener { showLanguageMenu(it, sourceSide = true) }
     }
 
@@ -187,11 +191,16 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     }
 
     private val targetLabel = TextView(context).apply {
-        textSize = 14f
-        setTypeface(typeface, Typeface.BOLD)
-        setPadding(dp(8), dp(8), dp(12), dp(8))
+        textSize = 15f
+        gravity = Gravity.CENTER
+        maxLines = 1
+        setPadding(dp(16), dp(10), dp(16), dp(10))
         setOnClickListener { showLanguageMenu(it, sourceSide = false) }
     }
+
+    // Valitut kielikoodit; pillerit näyttävät nimet mutta lista vertaa koodiin.
+    private var sourceCode = ""
+    private var targetCode = ""
 
     // Valittavat kielet listavalikkoon; palvelu päivittää ladatut tiedot.
     private var languageChoices: List<LanguageChoice> = emptyList()
@@ -209,7 +218,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         dismissLanguagePopup()
         val choices = languageChoices
         if (choices.isEmpty()) return
-        val selected = (if (sourceSide) sourceLabel else targetLabel).text.toString()
+        val selected = if (sourceSide) sourceCode else targetCode
         val list = LinearLayout(context).apply {
             orientation = VERTICAL
             background = GradientDrawable().apply {
@@ -317,12 +326,13 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             drawSelectionHandles(canvas, this)
         }
     }.apply {
-        textSize = 16f
+        textSize = LARGE_TEXT_SP
         // Teksti rivittyy vapaasti kuten Google Kääntäjässä; alue kasvaa
-        // sisällön mukana CappedScrollView'n ylärajaan asti.
+        // sisällön mukana CappedScrollView'n ylärajaan asti. Oikeaan
+        // reunaan jää tilaa kulman tyhjennysnapille.
         gravity = Gravity.TOP
-        minimumHeight = dp(48)
-        setPadding(dp(12), dp(10), dp(12), dp(10))
+        minimumHeight = dp(56)
+        setPadding(dp(16), dp(10), dp(44), dp(10))
         setOnTouchListener { view, event ->
             val textView = view as TextView
             when (event.actionMasked) {
@@ -406,19 +416,25 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     private val clearLabel = ImageView(context).apply {
         setImageResource(R.drawable.ic_close)
-        setPadding(dp(10), dp(10), dp(10), dp(10))
+        setPadding(dp(12), dp(12), dp(12), dp(12))
         visibility = GONE
         contentDescription = context.getString(R.string.cd_tyhjenna_rivi)
         setOnClickListener { listener?.onClear() }
     }
 
+    // Tyhjennys kelluu lähdetekstin oikeassa yläkulmassa kuten Googlessa.
+    private val sourceFrame = FrameLayout(context)
+
+    // Ohut viiva erottaa lähdetekstin ja käännöksen ilman taustalaatikkoa.
+    private val divider = View(context)
+
     // Käännösalue: monirivinen kuten kirjoitusaluekin. Kenttä ei muutu
     // ennen kuin käännös kopioidaan tai viedään pikanapilla.
     private val translationView = TextView(context).apply {
-        textSize = 16f
+        textSize = LARGE_TEXT_SP
         gravity = Gravity.TOP
-        minimumHeight = dp(44)
-        setPadding(dp(12), dp(10), dp(12), dp(10))
+        minimumHeight = dp(52)
+        setPadding(dp(16), dp(10), dp(16), dp(10))
     }
 
     private val translationScroll = CappedScrollView(areaMaxHeight()).apply {
@@ -463,18 +479,6 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setOnClickListener { listener?.onDownloadModels() }
     }
 
-    // Otsikkorivi: kielivalinnat vasemmalla, tyhjennys oikealla.
-    private val headerRow = LinearLayout(context).apply {
-        orientation = HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        minimumHeight = dp(40)
-        addView(sourceLabel)
-        addView(swapLabel)
-        addView(targetLabel)
-        addView(View(context), LayoutParams(0, 1, 1f))
-        addView(clearLabel)
-    }
-
     // Toimintorivi käännöksen alla: ✨, kopiointi ja vienti kenttään.
     private val actionRow = LinearLayout(context).apply {
         orientation = HORIZONTAL
@@ -487,52 +491,110 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         addView(downloadLabel)
     }
 
+    // Kielirivi alimpana näppäimistön yläpuolella kuten Google Kääntäjässä.
+    private val languageRow = LinearLayout(context).apply {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(12), dp(4), dp(12), dp(4))
+        addView(sourceLabel, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(
+            swapLabel,
+            LayoutParams(dp(44), dp(44)).apply {
+                marginStart = dp(6)
+                marginEnd = dp(6)
+            },
+        )
+        addView(targetLabel, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+    }
+
     init {
         orientation = VERTICAL
-        // Rako alareunaan erottaa toimintonapit alla olevasta
-        // työkalurivistä, etteivät painallukset osu väärään riviin.
-        setPadding(0, 0, 0, dp(10))
+        // Rako alareunaan erottaa kielirivin alla olevasta työkalurivistä,
+        // etteivät painallukset osu väärään riviin.
+        setPadding(0, dp(6), 0, dp(10))
         val rowParams =
             LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        addView(headerRow, rowParams)
-        addView(sourceScroll, rowParams)
+        sourceFrame.addView(
+            sourceScroll,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        sourceFrame.addView(
+            clearLabel,
+            FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP or Gravity.END),
+        )
+        addView(sourceFrame, rowParams)
+        addView(
+            divider,
+            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                marginStart = dp(16)
+                marginEnd = dp(16)
+            },
+        )
         addView(translationScroll, rowParams)
         addView(actionRow, rowParams)
+        addView(languageRow, rowParams)
     }
 
     fun applySettings(newTheme: KeyboardTheme) {
         theme = newTheme
         setBackgroundColor(theme.background)
-        sourceLabel.setTextColor(theme.accent)
-        targetLabel.setTextColor(theme.accent)
+        // Kielipillerit saavat korttitaustan; itse tekstialueet ovat
+        // paljaita ja käännös erottuu vain värillä ja erotinviivalla.
+        fun pill() = GradientDrawable().apply {
+            cornerRadius = dp(24).toFloat()
+            setColor(theme.specialKey)
+        }
+        sourceLabel.background = pill()
+        targetLabel.background = pill()
+        sourceLabel.setTextColor(theme.text)
+        targetLabel.setTextColor(theme.text)
         swapLabel.setColorFilter(theme.text)
         clearLabel.setColorFilter(theme.hint)
         aiLabel.setColorFilter(theme.text)
         insertLabel.setTextColor(theme.accent)
         downloadLabel.setTextColor(theme.accent)
         copyIcon.setColorFilter(theme.text)
-        // Käännös erottuu omaksi alueekseen korttitaustalla.
-        translationScroll.setBackgroundColor(theme.specialKey)
-        actionRow.setBackgroundColor(theme.specialKey)
+        divider.setBackgroundColor(
+            (theme.hint and 0x00FFFFFF) or (DIVIDER_ALPHA shl 24)
+        )
+    }
+
+    /** Iso teksti lyhyille, pienempi pitkille — kuten Google Kääntäjässä. */
+    private fun textSizeFor(text: String): Float = when {
+        text.length <= 60 -> LARGE_TEXT_SP
+        text.length <= 160 -> 21f
+        else -> 17f
     }
 
     /** Näyttää käännöksen tai [hint]-vihjeen sen puuttuessa. */
     fun setTranslation(text: String, hint: String) {
+        translationView.textSize = textSizeFor(text)
         if (text.isEmpty()) {
             translationView.text = hint
             translationView.setTextColor(theme.hint)
         } else {
             translationView.text = text
-            translationView.setTextColor(theme.text)
+            // Käännös erottuu lähdetekstistä korostevärillä kuten Googlessa.
+            translationView.setTextColor(theme.accent)
         }
         val alpha = if (text.isEmpty()) 0.4f else 1f
         insertLabel.alpha = alpha
         copyIcon.alpha = alpha
     }
 
-    fun setLanguages(source: String, target: String) {
-        sourceLabel.text = source
-        targetLabel.text = target
+    fun setLanguages(
+        sourceCode: String,
+        sourceName: String,
+        targetCode: String,
+        targetName: String,
+    ) {
+        this.sourceCode = sourceCode
+        this.targetCode = targetCode
+        sourceLabel.text = sourceName
+        targetLabel.text = targetName
     }
 
     /**
@@ -548,6 +610,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     }
 
     private fun render() {
+        bufferView.textSize = textSizeFor(shownText)
         if (shownText.isEmpty()) {
             shownCursor = -1
             removeCallbacks(blinkRunnable)
@@ -821,5 +884,11 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
         // Valinnan korostustaustan läpinäkyvyys korostusväristä.
         const val SELECTION_ALPHA = 0x55
+
+        // Tekstialueiden peruskoko lyhyille teksteille.
+        const val LARGE_TEXT_SP = 26f
+
+        // Erotinviivan läpinäkyvyys vihjeväristä.
+        const val DIVIDER_ALPHA = 0x66
     }
 }

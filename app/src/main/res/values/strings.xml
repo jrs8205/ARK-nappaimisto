@@ -101,9 +101,9 @@
 
     <string name="asetukset_varmuuskopio">Varmuuskopio</string>
     <string name="varmuuskopio_vie">Vie varmuuskopio</string>
-    <string name="varmuuskopio_vie_kuvaus">Tallentaa opitut sanat, sanaketjut ja kiinnitetyt tekstileikkeet tiedostoon</string>
+    <string name="varmuuskopio_vie_kuvaus">Tallentaa opitut sanat, sanaketjut, kiinnitetyt tekstileikkeet ja asetukset tiedostoon</string>
     <string name="varmuuskopio_tuo">Tuo varmuuskopio</string>
-    <string name="varmuuskopio_tuo_kuvaus">Yhdistää tiedoston sisällön tämän laitteen oppimisdataan</string>
+    <string name="varmuuskopio_tuo_kuvaus">Yhdistää tiedoston sisällön tämän laitteen oppimisdataan ja palauttaa asetukset</string>
     <string name="varmuuskopio_viety">Varmuuskopio tallennettu: %1$d sanaa, %2$d leikettä</string>
     <string name="varmuuskopio_tuotu">Varmuuskopio tuotu: %1$d sanaa, %2$d leikettä</string>
     <string name="varmuuskopio_virhe">Varmuuskopion käsittely epäonnistui</string>

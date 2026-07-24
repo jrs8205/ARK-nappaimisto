@@ -614,6 +614,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun languageName(code: String): String =
         Locale(code).getDisplayLanguage(fiLocale).replaceFirstChar { it.titlecase(fiLocale) }
 
+    /** Kielen nimi pienellä alkukirjaimella kielipillereitä varten. */
+    private fun languageNameLower(code: String): String =
+        Locale(code).getDisplayLanguage(fiLocale)
+
     /**
      * Käännösnäkymä: näppäily kertyy ylärivin lähdetekstiin ja käännös
      * näkyy alarivillä livenä. Kenttään ei kirjoitu mitään itsestään —
@@ -676,8 +680,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun updateTranslateBar() {
         val bar = translateBar ?: return
         bar.setLanguages(
-            translationSource().uppercase(fiLocale),
-            translationTarget().uppercase(fiLocale),
+            translationSource(),
+            languageNameLower(translationSource()),
+            translationTarget(),
+            languageNameLower(translationTarget()),
         )
         // Kirjoittaa saa heti myös malleja odottaessa; vain valmistelu
         // näyttää oman vihjeensä.

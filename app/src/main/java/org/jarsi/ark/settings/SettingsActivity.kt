@@ -228,7 +228,7 @@ class SettingsActivity : AppCompatActivity() {
             )
         }
 
-        /** Näyttää vain valitun AI-palvelun avaimen ja mallin rivit. */
+        /** Näyttää valitun AI-palvelun mallirivin ja päivittää tilarivin. */
         private fun setupAiServiceVisibility() {
             val service = findPreference<ListPreference>("ai_palvelu") ?: return
             refreshAiServiceRows(service.value)
@@ -260,9 +260,10 @@ class SettingsActivity : AppCompatActivity() {
                 },
                 name,
             )
-            findPreference<Preference>("claude_api_avain")?.isVisible = !chatgpt
+            // Avainrivit näkyvät aina: OpenAI-avainta tarvitaan saneluun
+            // silloinkin, kun Paranna teksti käyttää Claudea — palvelut
+            // toimivat rinnakkain eikä valinta piilota toisen avainta.
             findPreference<Preference>("claude_malli")?.isVisible = !chatgpt
-            findPreference<Preference>("openai_api_avain")?.isVisible = chatgpt
             findPreference<Preference>("openai_malli")?.isVisible = chatgpt
         }
 

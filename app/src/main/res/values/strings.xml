@@ -67,13 +67,13 @@
     <string name="asetukset_tekoaly">Tekoäly</string>
     <string name="asetus_ai_palvelu">AI-palvelu (Claude / ChatGPT)</string>
     <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s. Napauta vaihtaaksesi palvelua.</string>
-    <string name="asetus_ai_palvelu_ei_avainta">Ei käytössä: lisää %1$s-avain alle, niin AI-toiminnot tulevat näkyviin.</string>
+    <string name="asetus_ai_palvelu_ei_avainta">Ei käytössä: lisää %1$s-avain alle, niin AI-toiminnot tulevat käyttöön.</string>
     <string name="asetus_api_avain">Claude API -avain</string>
     <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään Anthropicin palveluun vain kun painat nappia; avain säilyy vain tällä laitteella salattuna.</string>
     <string name="asetus_malli">Korjausten Claude-malli</string>
     <string name="asetus_malli_nykyinen">Käytössä: %1$s. Lista haetaan Anthropicilta omalla avaimellasi.</string>
     <string name="asetus_openai_avain">ChatGPT API -avain</string>
-    <string name="asetus_openai_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä. Teksti lähetetään OpenAI:n palveluun vain kun painat nappia; avain säilyy vain tällä laitteella salattuna.</string>
+    <string name="asetus_openai_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon korjausnäkymässä ja OpenAI-sanelun. Teksti tai puhe lähetetään OpenAI:n palveluun vain kun käytät toimintoa itse; avain säilyy vain tällä laitteella salattuna.</string>
     <string name="asetus_openai_malli">Korjausten ChatGPT-malli</string>
     <string name="asetus_malli_nykyinen_openai">Käytössä: %1$s. Lista haetaan OpenAI:lta omalla avaimellasi.</string>
     <string name="malli_aseta_avain">Aseta ensin API-avain</string>

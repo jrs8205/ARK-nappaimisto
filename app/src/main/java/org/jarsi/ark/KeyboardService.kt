@@ -994,29 +994,42 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     )
                     .distinct()
                     .sortedBy { languageName(it) }
+                // Kielivalikossa ovat kaikki tuetut kielet: omat (ladatut)
+                // ensin ja loput latausmerkinnällä aakkosjärjestyksessä.
+                val downloaded = translationLangs.toSet()
+                translateBar?.setLanguageChoices(
+                    TranslateLanguage.getAllLanguages()
+                        .map {
+                            TranslateBarView.LanguageChoice(
+                                it, languageName(it), it in downloaded
+                            )
+                        }
+                        .sortedWith(
+                            compareByDescending<TranslateBarView.LanguageChoice> {
+                                it.downloaded
+                            }.thenBy { it.name }
+                        )
+                )
             }
     }
 
-    private fun cycleTranslationLanguage(sourceSide: Boolean) {
-        val langs = translationLangs
-        if (langs.size < 2) return
-        val current = if (sourceSide) translationSource() else translationTarget()
+    /** Asettaa käännösparin kielen; sama kieli molemmin puolin vaihtaa suunnan. */
+    private fun pickTranslationLanguage(sourceSide: Boolean, code: String) {
         val other = if (sourceSide) translationTarget() else translationSource()
-        var index = langs.indexOf(current)
-        repeat(langs.size) {
-            index = (index + 1) % langs.size
-            val candidate = langs[index]
-            if (candidate != other) {
-                prefs.edit()
-                    .putString(
-                        if (sourceSide) PREF_TRANSLATE_SOURCE else PREF_TRANSLATE_TARGET,
-                        candidate,
-                    )
-                    .apply()
-                onTranslatePairChanged()
-                return
-            }
+        if (code == other) {
+            prefs.edit()
+                .putString(PREF_TRANSLATE_SOURCE, translationTarget())
+                .putString(PREF_TRANSLATE_TARGET, translationSource())
+                .apply()
+        } else {
+            prefs.edit()
+                .putString(
+                    if (sourceSide) PREF_TRANSLATE_SOURCE else PREF_TRANSLATE_TARGET,
+                    code,
+                )
+                .apply()
         }
+        onTranslatePairChanged()
     }
 
     private fun showCorrectionPanel() {
@@ -1785,9 +1798,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         translateBar = TranslateBarView(this).also {
             it.listener = object : TranslateBarView.Listener {
-                override fun onCycleSource() {
+                override fun onPickSource(code: String) {
                     feedback()
-                    cycleTranslationLanguage(sourceSide = true)
+                    pickTranslationLanguage(sourceSide = true, code = code)
                 }
 
                 override fun onSwap() {
@@ -1800,9 +1813,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     onTranslatePairChanged()
                 }
 
-                override fun onCycleTarget() {
+                override fun onPickTarget(code: String) {
                     feedback()
-                    cycleTranslationLanguage(sourceSide = false)
+                    pickTranslationLanguage(sourceSide = false, code = code)
                 }
 
                 override fun onClear() {

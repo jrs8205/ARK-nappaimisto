@@ -39,10 +39,18 @@ import kotlin.math.roundToInt
  */
 class TranslateBarView(context: Context) : LinearLayout(context) {
 
+    /** Kielivalinnan rivi: koodi, suomenkielinen nimi ja onko malli laitteella. */
+    data class LanguageChoice(val code: String, val name: String, val downloaded: Boolean)
+
     interface Listener {
-        fun onCycleSource()
+        /** Käyttäjä valitsi lähdekielen listasta. */
+        fun onPickSource(code: String)
+
         fun onSwap()
-        fun onCycleTarget()
+
+        /** Käyttäjä valitsi kohdekielen listasta. */
+        fun onPickTarget(code: String)
+
         fun onClear()
 
         /** Käyttäjä napautti lähdetekstiä: kursori kohtaan [position]. */
@@ -166,7 +174,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         textSize = 14f
         setTypeface(typeface, Typeface.BOLD)
         setPadding(dp(12), dp(8), dp(8), dp(8))
-        setOnClickListener { listener?.onCycleSource() }
+        setOnClickListener { showLanguageMenu(it, sourceSide = true) }
     }
 
     // Ikonit ovat vektoreita eivätkä tekstimerkkejä, jotta ne piirtyvät
@@ -182,7 +190,105 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         textSize = 14f
         setTypeface(typeface, Typeface.BOLD)
         setPadding(dp(8), dp(8), dp(12), dp(8))
-        setOnClickListener { listener?.onCycleTarget() }
+        setOnClickListener { showLanguageMenu(it, sourceSide = false) }
+    }
+
+    // Valittavat kielet listavalikkoon; palvelu päivittää ladatut tiedot.
+    private var languageChoices: List<LanguageChoice> = emptyList()
+    private var languagePopup: PopupWindow? = null
+
+    fun setLanguageChoices(choices: List<LanguageChoice>) {
+        languageChoices = choices
+    }
+
+    /**
+     * Kielilista avautuu napautetun kielen ylle: ladatut kielet ensin ja
+     * lataamattomat latausikonilla — valinta kysyy latausluvan erikseen.
+     */
+    private fun showLanguageMenu(anchor: View, sourceSide: Boolean) {
+        dismissLanguagePopup()
+        val choices = languageChoices
+        if (choices.isEmpty()) return
+        val selected = (if (sourceSide) sourceLabel else targetLabel).text.toString()
+        val list = LinearLayout(context).apply {
+            orientation = VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(8).toFloat()
+                setColor(theme.specialKey)
+            }
+        }
+        choices.forEach { choice ->
+            val row = LinearLayout(context).apply {
+                orientation = HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(16), dp(9), dp(16), dp(9))
+                setOnClickListener {
+                    dismissLanguagePopup()
+                    if (sourceSide) {
+                        listener?.onPickSource(choice.code)
+                    } else {
+                        listener?.onPickTarget(choice.code)
+                    }
+                }
+            }
+            val current = choice.code.equals(selected, ignoreCase = true)
+            row.addView(
+                TextView(context).apply {
+                    text = choice.name
+                    textSize = 15f
+                    if (current) setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(if (current) theme.accent else theme.text)
+                },
+                LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+            )
+            if (!choice.downloaded) {
+                row.addView(
+                    ImageView(context).apply {
+                        setImageResource(R.drawable.ic_download)
+                        setColorFilter(theme.hint)
+                    },
+                    LayoutParams(dp(18), dp(18)).apply { marginStart = dp(12) },
+                )
+            }
+            list.addView(
+                row,
+                LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        val scroll = ScrollView(context).apply { addView(list) }
+        scroll.measure(
+            View.MeasureSpec.makeMeasureSpec(dp(240), View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.makeMeasureSpec(dp(320), View.MeasureSpec.AT_MOST),
+        )
+        val popupWidth = scroll.measuredWidth
+        val popupHeight = scroll.measuredHeight
+        val anchorLocation = IntArray(2)
+        anchor.getLocationInWindow(anchorLocation)
+        val x = anchorLocation[0].coerceIn(
+            dp(4),
+            (resources.displayMetrics.widthPixels - popupWidth - dp(4)).coerceAtLeast(dp(4)),
+        )
+        languagePopup = PopupWindow(scroll, popupWidth, popupHeight).apply {
+            isClippingEnabled = false
+            // Sulkeutuu myös listan ulkopuolisesta napautuksesta.
+            isOutsideTouchable = true
+            isFocusable = false
+            setBackgroundDrawable(GradientDrawable())
+            showAtLocation(
+                this@TranslateBarView,
+                Gravity.NO_GRAVITY,
+                x,
+                anchorLocation[1] - popupHeight - dp(6),
+            )
+        }
+    }
+
+    private fun dismissLanguagePopup() {
+        languagePopup?.dismiss()
+        languagePopup = null
     }
 
     // Näytetty lähdeteksti ja valittu väli (lähdetekstin indeksejä)
@@ -492,6 +598,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     override fun onDetachedFromWindow() {
         removeCallbacks(blinkRunnable)
         dismissSelectionPopup()
+        dismissLanguagePopup()
         super.onDetachedFromWindow()
     }
 

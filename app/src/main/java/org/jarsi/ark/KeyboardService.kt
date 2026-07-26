@@ -25,8 +25,6 @@ import android.webkit.MimeTypeMap
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
@@ -680,7 +678,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         stopTranslationEditing()
         bar.visibility = View.VISIBLE
         toolbar?.translationActive = true
-        updateTranslateAreaHeight()
         refreshTranslationLanguages()
         updateTranslateBar()
         checkTranslationModels()
@@ -755,41 +752,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         bar.setModelsMissing(translationModelsMissing)
         // Shift-nuoli seuraa käännösrivin tekstiä kuten kenttää.
         if (translateMode) updateAutoCaps()
-    }
-
-    /**
-     * Kertoo käännösnäkymälle, paljonko pystytilaa sille jää näppäimistön
-     * ja rivien jälkeen. Näppäimistön korkeus vaihtuu sivuittain (?123-
-     * sivulla on rivi enemmän) ja asetuksesta, joten mitoitus lasketaan
-     * uudelleen aina kun jompikumpi muuttuu — muuten alin näppäinrivi
-     * jäisi navigointipalkin alle.
-     */
-    private fun updateTranslateAreaHeight() {
-        val bar = translateBar ?: return
-        val keyboard = keyboardView?.desiredHeight() ?: return
-        val rows = rowHeight(toolbar) + rowHeight(suggestionBar)
-        val top = maxOf(statusBarHeight(), (24 * resources.displayMetrics.density).toInt())
-        bar.setAvailableHeight(resources.displayMetrics.heightPixels - keyboard - rows - top)
-    }
-
-    /** Näkyvän rivin korkeus; mitataan, jos näkymää ei ole vielä asemoitu. */
-    private fun rowHeight(view: View?): Int {
-        if (view == null || view.visibility == View.GONE) return 0
-        if (view.height > 0) return view.height
-        view.measure(
-            View.MeasureSpec.makeMeasureSpec(
-                resources.displayMetrics.widthPixels,
-                View.MeasureSpec.EXACTLY,
-            ),
-            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-        )
-        return view.measuredHeight
-    }
-
-    private fun statusBarHeight(): Int {
-        val view = translateBar ?: return 0
-        val insets = ViewCompat.getRootWindowInsets(view) ?: return 0
-        return insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
     }
 
     private fun onTranslatePairChanged() {
@@ -1820,8 +1782,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         correctionPanel?.applySettings(theme)
         emojiPanel?.applySettings(theme)
         translateBar?.applySettings(theme)
-        // Näppäimistön korkeusasetus muuttaa käännösalueille jäävää tilaa.
-        if (translateMode) updateTranslateAreaHeight()
     }
 
     override fun onCreateInputView(): View {
@@ -2081,8 +2041,19 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             it.visibility = View.GONE
             // Käännösalueet kaiken ylle: työkalurivi, ehdotukset ja
-            // näppäimet pysyvät yhtenäisenä pakettina kuten aina.
-            container.addView(it, 0, LinearLayout.LayoutParams(params))
+            // näppäimet pysyvät yhtenäisenä pakettina kuten aina. Paino
+            // tekee näkymästä joustavan: se saa tilan, joka muilta jää,
+            // eikä esimerkiksi ?123-sivun ylimääräinen näppäinrivi työnnä
+            // alinta riviä navigointipalkin alle.
+            container.addView(
+                it,
+                0,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f,
+                ),
+            )
         }
         suggestionBar = SuggestionBarView(this).also {
             it.listener = ::onSuggestionPicked
@@ -2492,9 +2463,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         keyboardView?.setKeyboardLayout(layout)
         keyboardView?.shiftState = shiftState
-        // Sivun rivimäärä vaihtelee (?123-sivulla on numerorivi), joten
-        // käännösalueiden tila lasketaan uudelleen.
-        if (translateMode) updateTranslateAreaHeight()
         // Työkalurivin korostukset seuraavat aina nykyistä sivua.
         toolbar?.arrowsActive = page == Page.ARROWS
         toolbar?.webActive = page == Page.SYMBOLS3

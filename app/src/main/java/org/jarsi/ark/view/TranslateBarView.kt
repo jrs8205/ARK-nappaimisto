@@ -332,9 +332,8 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private var downY = 0f
     private var longPressFired = false
 
-    // Tekstialueen korkeus: ihanne on viidennes näytöstä, mutta ahtaassa
-    // tilassa palvelu kutistaa sitä setAvailableHeightillä.
-    private var areaHeight = idealAreaHeight()
+    // Tekstialueen ihannekorkeus; ahtaassa tilassa emo antaa vähemmän.
+    private val areaHeight = idealAreaHeight()
 
     // Käännösalueen napautus: vieritykseksi tunnistettu liike ei siirrä kursoria.
     private var translationDownX = 0f
@@ -417,14 +416,36 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }
 
-    // Alue vierii sisältönsä yli; korkeus tulee aina areaHeightista.
+    /**
+     * Tekstialue vierii sisältönsä yli. Korkeus on enintään ihanne,
+     * mutta ahtaassa tilassa emo antaa vähemmän — silloin alue kutistuu
+     * eikä työnnä alempia rivejä ulos näytöltä.
+     */
     private inner class CappedScrollView : ScrollView(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val limit = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+                areaHeight
+            } else {
+                minOf(areaHeight, MeasureSpec.getSize(heightMeasureSpec))
+            }
             super.onMeasure(
                 widthMeasureSpec,
-                MeasureSpec.makeMeasureSpec(areaHeight, MeasureSpec.AT_MOST),
+                MeasureSpec.makeMeasureSpec(limit, MeasureSpec.AT_MOST),
             )
         }
+    }
+
+    /**
+     * Näkymä ei veny sisältöään korkeammaksi, vaikka emo tarjoaisi
+     * enemmän: ylimääräinen tila kuuluu näppäimistölle.
+     */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val spec = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.EXACTLY) {
+            MeasureSpec.makeMeasureSpec(MeasureSpec.getSize(heightMeasureSpec), MeasureSpec.AT_MOST)
+        } else {
+            heightMeasureSpec
+        }
+        super.onMeasure(widthMeasureSpec, spec)
     }
 
     // Aluekorkeuden ihanne: näkymä täyttää tilan tilariviin asti eikä
@@ -434,38 +455,6 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     // kaikille laitteille.
     private fun idealAreaHeight(): Int =
         maxOf(dp(120), (resources.displayMetrics.heightPixels * 0.17f).roundToInt())
-
-    /**
-     * Kertoo, paljonko pystytilaa näkymälle jää näppäimistön ja rivien
-     * jälkeen. Alueet jakavat sen tasan mutteivät kasva ihannettaan
-     * suuremmiksi. Tila loppuu esimerkiksi ?123-sivulla, jossa on rivi
-     * enemmän kuin kirjainsivulla, ja matalilla näytöillä — ilman
-     * kutistusta alin näppäinrivi jäisi navigointipalkin alle.
-     */
-    fun setAvailableHeight(available: Int) {
-        val height = ((available - chromeHeight()) / 2).coerceIn(dp(56), idealAreaHeight())
-        if (height == areaHeight) return
-        areaHeight = height
-        bufferView.minimumHeight = height
-        translationView.minimumHeight = height
-        requestLayout()
-    }
-
-    /** Tekstialueiden ulkopuolelle jäävien osien korkeus. */
-    private fun chromeHeight(): Int {
-        fun measured(view: View): Int {
-            if (view.height > 0) return view.height
-            view.measure(
-                MeasureSpec.makeMeasureSpec(
-                    resources.displayMetrics.widthPixels,
-                    MeasureSpec.EXACTLY,
-                ),
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-            )
-            return view.measuredHeight
-        }
-        return measured(actionRow) + measured(languageRow) + paddingTop + paddingBottom + dp(1)
-    }
 
     private val sourceScroll = CappedScrollView().apply {
         isVerticalScrollBarEnabled = false
@@ -607,6 +596,13 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         setPadding(0, dp(6), 0, dp(10))
         val rowParams =
             LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        // Tekstialueet ovat näkymän joustava osa: ne kasvavat ihanteeseensa
+        // ja kutistuvat tasan, kun näppäimistö vie enemmän tilaa.
+        fun areaParams() = LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            1f,
+        )
         sourceFrame.addView(
             sourceScroll,
             FrameLayout.LayoutParams(
@@ -618,7 +614,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             clearLabel,
             FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP or Gravity.END),
         )
-        addView(sourceFrame, rowParams)
+        addView(sourceFrame, areaParams())
         addView(
             divider,
             LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
@@ -626,7 +622,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
                 marginEnd = dp(16)
             },
         )
-        addView(translationScroll, rowParams)
+        addView(translationScroll, areaParams())
         addView(actionRow, rowParams)
         addView(languageRow, rowParams)
     }

@@ -3,6 +3,7 @@ package org.jarsi.ark.settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -32,11 +33,25 @@ object SettingsUi {
             toolbar.setNavigationOnClickListener { activity.finish() }
         }
         val container = root.findViewById<ViewGroup>(R.id.asetus_sisalto)
-        content?.let { container.addView(it) }
-        ViewCompat.setOnApplyWindowInsetsListener(container) { view, insets ->
+        // Sisältö täyttää kehyksen: muuten se venyy listan mittaiseksi ja
+        // alareunan painike (esim. Tyhjennä kaikki) valuu ruudun alle.
+        content?.let {
+            container.addView(
+                it,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
+        // Upotukset luetaan juuresta: sovelluspalkki ehtii kuluttaa ne
+        // ennen sisältökehystä, jolloin alareunan painike jäisi
+        // navigointipalkin alle. Juuren oma käsittely jatkuu normaalisti,
+        // jotta yläreunan upotus menee yhä sovelluspalkille.
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(bars.left, 0, bars.right, bars.bottom)
-            insets
+            container.setPadding(bars.left, 0, bars.right, bars.bottom)
+            ViewCompat.onApplyWindowInsets(view, insets)
         }
         activity.setContentView(root)
         return container

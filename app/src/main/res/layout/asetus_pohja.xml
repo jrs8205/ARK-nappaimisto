@@ -31,6 +31,9 @@
         </com.google.android.material.appbar.CollapsingToolbarLayout>
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- Alareunan upotus varataan SettingsUi:n kuuntelijassa, jotta
+         sisällön alin rivi (esim. Tyhjennä kaikki) pysyy navigointipalkin
+         yläpuolella. -->
     <FrameLayout
         android:id="@+id/asetus_sisalto"
         android:layout_width="match_parent"

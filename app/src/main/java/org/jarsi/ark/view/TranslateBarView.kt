@@ -22,6 +22,8 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import org.jarsi.ark.R
 import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.CursorIndex
@@ -304,7 +306,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
                 this@TranslateBarView,
                 Gravity.NO_GRAVITY,
                 x,
-                anchorLocation[1] - popupHeight - dp(6),
+                popupTop(anchorLocation[1], popupHeight),
             )
         }
     }
@@ -1019,10 +1021,28 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
                 this@TranslateBarView,
                 Gravity.NO_GRAVITY,
                 x,
-                barLocation[1] - popupHeight - dp(6),
+                popupTop(barLocation[1], popupHeight),
             )
         }
     }
+
+    /**
+     * Valikon yläreuna: ensisijaisesti ankkurin yläpuolelle, mutta ei
+     * koskaan tilarivin alle. Käännösnäkymä ulottuu lähelle näytön
+     * yläreunaa, joten yläpuolella ei aina ole tilaa — silloin valikko
+     * avautuu ankkurin alapuolelle.
+     */
+    private fun popupTop(anchorTop: Int, popupHeight: Int): Int {
+        val minTop = statusBarTop() + dp(4)
+        val above = anchorTop - popupHeight - dp(6)
+        return if (above >= minTop) above else (anchorTop + dp(6)).coerceAtLeast(minTop)
+    }
+
+    private fun statusBarTop(): Int =
+        ViewCompat.getRootWindowInsets(this)
+            ?.getInsets(WindowInsetsCompat.Type.statusBars())
+            ?.top
+            ?: 0
 
     private fun clearSelection() {
         selection = null

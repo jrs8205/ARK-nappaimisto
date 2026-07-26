@@ -170,13 +170,20 @@ class KeyboardView(context: Context) : View(context) {
         return super.onApplyWindowInsets(insets)
     }
 
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val width = MeasureSpec.getSize(widthMeasureSpec)
+    /**
+     * Näppäimistön korkeus nykyisellä asettelulla. Rivimäärä vaihtelee
+     * sivuittain (?123-sivulla on numerorivi), joten käännösnäkymän
+     * mitoitus tarvitsee tämän jo ennen mittausta.
+     */
+    fun desiredHeight(): Int {
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val baseRowHeight = dp(if (landscape) 44f else 56f)
         val rows = layout.rows.size.coerceAtLeast(1)
-        val height = (baseRowHeight * rows * heightScale + dp(4f)).roundToInt() + bottomInset
-        setMeasuredDimension(width, height)
+        return (baseRowHeight * rows * heightScale + dp(4f)).roundToInt() + bottomInset
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), desiredHeight())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

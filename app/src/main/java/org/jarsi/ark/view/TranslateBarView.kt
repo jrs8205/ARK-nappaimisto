@@ -332,6 +332,10 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private var downY = 0f
     private var longPressFired = false
 
+    // Tekstialueen korkeus: ihanne on viidennes näytöstä, mutta ahtaassa
+    // tilassa palvelu kutistaa sitä setAvailableHeightillä.
+    private var areaHeight = idealAreaHeight()
+
     // Käännösalueen napautus: vieritykseksi tunnistettu liike ei siirrä kursoria.
     private var translationDownX = 0f
     private var translationDownY = 0f
@@ -356,7 +360,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         // sisällön mukana CappedScrollView'n ylärajaan asti. Oikeaan
         // reunaan jää tilaa kulman tyhjennysnapille.
         gravity = Gravity.TOP
-        minimumHeight = areaHeight()
+        minimumHeight = areaHeight
         setPadding(dp(16), dp(10), dp(44), dp(10))
         setOnTouchListener { view, event ->
             val textView = view as TextView
@@ -413,25 +417,57 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }
 
-    // Kasvaa sisällön mukana ylärajaan asti, sitten vierii pystysuunnassa.
-    private inner class CappedScrollView(private val maxHeightPx: Int) : ScrollView(context) {
+    // Alue vierii sisältönsä yli; korkeus tulee aina areaHeightista.
+    private inner class CappedScrollView : ScrollView(context) {
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             super.onMeasure(
                 widthMeasureSpec,
-                MeasureSpec.makeMeasureSpec(maxHeightPx, MeasureSpec.AT_MOST),
+                MeasureSpec.makeMeasureSpec(areaHeight, MeasureSpec.AT_MOST),
             )
         }
     }
 
-    // Kiinteä aluekorkeus: näkymä täyttää tilan tilariviin asti eikä
+    // Aluekorkeuden ihanne: näkymä täyttää tilan tilariviin asti eikä
     // taustasovelluksesta jää kaistaa näkyviin. Korkeus ei elä tekstin
     // mukana — kasvu työntäisi näppäimistön navigointipalkin alle, joten
     // pitkä teksti vierii alueen sisällä. Suhteellinen mitta skaalautuu
     // kaikille laitteille.
-    private fun areaHeight(): Int =
+    private fun idealAreaHeight(): Int =
         maxOf(dp(120), (resources.displayMetrics.heightPixels * 0.17f).roundToInt())
 
-    private val sourceScroll = CappedScrollView(areaHeight()).apply {
+    /**
+     * Kertoo, paljonko pystytilaa näkymälle jää näppäimistön ja rivien
+     * jälkeen. Alueet jakavat sen tasan mutteivät kasva ihannettaan
+     * suuremmiksi. Tila loppuu esimerkiksi ?123-sivulla, jossa on rivi
+     * enemmän kuin kirjainsivulla, ja matalilla näytöillä — ilman
+     * kutistusta alin näppäinrivi jäisi navigointipalkin alle.
+     */
+    fun setAvailableHeight(available: Int) {
+        val height = ((available - chromeHeight()) / 2).coerceIn(dp(56), idealAreaHeight())
+        if (height == areaHeight) return
+        areaHeight = height
+        bufferView.minimumHeight = height
+        translationView.minimumHeight = height
+        requestLayout()
+    }
+
+    /** Tekstialueiden ulkopuolelle jäävien osien korkeus. */
+    private fun chromeHeight(): Int {
+        fun measured(view: View): Int {
+            if (view.height > 0) return view.height
+            view.measure(
+                MeasureSpec.makeMeasureSpec(
+                    resources.displayMetrics.widthPixels,
+                    MeasureSpec.EXACTLY,
+                ),
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+            )
+            return view.measuredHeight
+        }
+        return measured(actionRow) + measured(languageRow) + paddingTop + paddingBottom + dp(1)
+    }
+
+    private val sourceScroll = CappedScrollView().apply {
         isVerticalScrollBarEnabled = false
         addView(
             bufferView,
@@ -463,7 +499,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private val translationView = TextView(context).apply {
         textSize = LARGE_TEXT_SP
         gravity = Gravity.TOP
-        minimumHeight = areaHeight()
+        minimumHeight = areaHeight
         setPadding(dp(16), dp(10), dp(16), dp(10))
         setOnTouchListener { view, event ->
             when (event.actionMasked) {
@@ -494,7 +530,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }
 
-    private val translationScroll = CappedScrollView(areaHeight()).apply {
+    private val translationScroll = CappedScrollView().apply {
         isVerticalScrollBarEnabled = false
         addView(
             translationView,

@@ -125,6 +125,21 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private val translateBuffer = TranslateBuffer()
     private var translateRunnable: Runnable? = null
 
+    // Käännöstä voi korjata paikallaan ennen vientiä: näppäily kohdistuu
+    // omaan puskuriinsa, kunnes lähdetekstiä napautetaan.
+    private val translationBuffer = TranslateBuffer()
+    private var translationEditing = false
+
+    /** Puskuri, johon näppäily käännöstilassa kohdistuu. */
+    private fun activeTranslateBuffer(): TranslateBuffer =
+        if (translationEditing) translationBuffer else translateBuffer
+
+    /** Kohdistus takaisin lähdetekstiin; keskeneräinen korjaus jää käännökseen. */
+    private fun stopTranslationEditing() {
+        translationEditing = false
+        translationBuffer.clear()
+    }
+
     // Käännöstilan viimeisin käyttöhetki muistiajan vertailuun; puskuri
     // elää vain prosessin muistissa, joten elapsedRealtime riittää.
     private var translateLastUsed = 0L
@@ -660,6 +675,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         translateMode = true
         currentTranslation = ""
         translationFresh = false
+        stopTranslationEditing()
         bar.visibility = View.VISIBLE
         toolbar?.translationActive = true
         refreshTranslationLanguages()
@@ -687,6 +703,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         translationModelsMissing = false
         currentTranslation = ""
         translationFresh = false
+        stopTranslationEditing()
         translateBar?.visibility = View.GONE
         suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
         toolbar?.translationActive = false
@@ -715,7 +732,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             prefs,
             if (openAiSelected()) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
         )
-        bar.setBuffer(translateBuffer.text, translateBuffer.cursor, hint)
+        // Kursori näkyy vain siinä alueessa, johon näppäily kohdistuu.
+        bar.setBuffer(
+            translateBuffer.text,
+            if (translationEditing) -1 else translateBuffer.cursor,
+            hint,
+        )
         bar.setTranslation(
             currentTranslation,
             getString(
@@ -725,6 +747,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     R.string.kaannos_tyhja
                 }
             ),
+            if (translationEditing) translationBuffer.cursor else -1,
         )
         bar.setModelsMissing(translationModelsMissing)
         // Shift-nuoli seuraa käännösrivin tekstiä kuten kenttää.
@@ -732,6 +755,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun onTranslatePairChanged() {
+        // Uusi kielipari tuo uuden käännöksen, joten korjaus päättyy.
+        stopTranslationEditing()
         updateTranslateBar()
         checkTranslationModels()
         scheduleLiveTranslate()
@@ -800,7 +825,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun onTranslateBufferChanged() {
-        // Rivin muutos vanhentaa näkyvän käännöksen, kunnes uusi valmistuu.
+        if (translationEditing) {
+            // Käsin korjattu käännös on se, joka viedään ja kopioidaan;
+            // uutta konekäännöstä ei haeta ennen kuin lähdeteksti muuttuu.
+            currentTranslation = translationBuffer.toString()
+            translationFresh = currentTranslation.isNotBlank()
+            updateTranslateBar()
+            updateSuggestions()
+            return
+        }
+        // Lähdetekstin muutos vanhentaa näkyvän käännöksen, kunnes uusi valmistuu.
         translationFresh = false
         updateTranslateBar()
         scheduleLiveTranslate()
@@ -816,7 +850,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun runLiveTranslate() {
-        if (!translateMode || !translatorReady) return
+        // Käsin korjattua käännöstä ei ylikirjoiteta kesken muokkauksen.
+        if (!translateMode || !translatorReady || translationEditing) return
         val text = translateBuffer.toString()
         if (text.isBlank()) {
             currentTranslation = ""
@@ -997,6 +1032,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             Toast.makeText(this, R.string.malli_aseta_avain, Toast.LENGTH_SHORT).show()
             return
         }
+        // AI-käännös korvaa alueen sisällön, joten käsin korjaus päättyy.
+        stopTranslationEditing()
         translateBar?.setTranslation("", getString(R.string.kaannos_ai_kaannetaan))
         val sourceName = languageName(translationSource())
         val targetName = languageName(translationTarget())
@@ -1379,9 +1416,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         markOwnEdit()
         if (clip.text != null) {
             if (translateMode) {
-                // Liitetty teksti menee käännösriville, jolloin sen
-                // käännös näkyy kentässä heti.
-                translateBuffer.insert(clip.text)
+                // Liitetty teksti menee käännösnäkymään sille alueelle,
+                // jota käyttäjä parhaillaan kirjoittaa.
+                activeTranslateBuffer().insert(clip.text)
                 onTranslateBufferChanged()
             } else {
                 ic.commitText(clip.text, 1)
@@ -1503,10 +1540,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     private fun handleBackspaceKey() {
-        if (translateMode && translateBuffer.isNotEmpty()) {
-            // Poisto kohdistuu käännösriviin, ei kenttään; rivin alussa
+        if (translateMode && activeTranslateBuffer().isNotEmpty()) {
+            // Poisto kohdistuu käännösnäkymään, ei kenttään; alueen alussa
             // poisto ei valu kenttään vaan jää tekemättä.
-            if (translateBuffer.backspace()) {
+            if (activeTranslateBuffer().backspace()) {
                 onTranslateBufferChanged()
             }
         } else if (!revertSmartSpace() && !revertAutoCorrect()) {
@@ -1550,8 +1587,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         punctSpaceAdded = false
         pendingRevert = null
         pendingSpaceRevert = null
-        if (translateMode && translateBuffer.isNotEmpty()) {
-            if (translateBuffer.backspaceWord()) {
+        if (translateMode && activeTranslateBuffer().isNotEmpty()) {
+            if (activeTranslateBuffer().backspaceWord()) {
                 onTranslateBufferChanged()
             }
         } else {
@@ -1891,6 +1928,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         currentTranslation = ""
                         translationFresh = false
                     }
+                    stopTranslationEditing()
                     onTranslatePairChanged()
                 }
 
@@ -1904,6 +1942,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     translateBuffer.clear()
                     currentTranslation = ""
                     translationFresh = false
+                    stopTranslationEditing()
                     // Uusi teksti saa taas päätellä kielensä.
                     translateSourceLocked = false
                     // Vietyä käännöstä EI unohdeta: tyhjennyksen jälkeen
@@ -1945,8 +1984,34 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
 
                 override fun onCursorTap(position: Int) {
+                    // Paluu lähdetekstiin päättää käännöksen muokkauksen;
+                    // korjattu käännös jää näkyviin ja vietäväksi, kunnes
+                    // lähdetekstin muutos tuo tilalle uuden käännöksen.
+                    stopTranslationEditing()
                     translateBuffer.setCursor(position)
                     updateTranslateBar()
+                    updateSuggestions()
+                    feedback()
+                }
+
+                override fun onTranslationTap(position: Int) {
+                    // Käännöstä korjataan paikallaan: teksti siirtyy omaan
+                    // puskuriinsa ja näppäily kohdistuu siihen.
+                    if (currentTranslation.isEmpty()) return
+                    if (!translationEditing) {
+                        translationBuffer.clear()
+                        translationBuffer.insert(currentTranslation)
+                        translationEditing = true
+                        // Kesken oleva käännös ei saa pyyhkiä korjausta.
+                        translateRunnable?.let { mainHandler.removeCallbacks(it) }
+                        translationGeneration++
+                        aiTranslateGeneration++
+                    }
+                    translationBuffer.setCursor(position)
+                    // Korjattu käännös on se, joka viedään ja kopioidaan.
+                    translationFresh = true
+                    updateTranslateBar()
+                    updateSuggestions()
                     feedback()
                 }
 
@@ -1970,7 +2035,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         ?.toString()
                     if (clipText.isNullOrEmpty()) return
                     markOwnEdit()
-                    translateBuffer.insert(clipText)
+                    activeTranslateBuffer().insert(clipText)
                     onTranslateBufferChanged()
                 }
             }
@@ -2090,8 +2155,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 override fun onEmojiPicked(emoji: String) {
                     markOwnEdit()
                     if (translateMode) {
-                        // Emojit kulkevat käännösrivin kautta muun tekstin mukana.
-                        translateBuffer.insert(emoji)
+                        // Emojit kulkevat käännösnäkymän kautta muun tekstin mukana.
+                        activeTranslateBuffer().insert(emoji)
                         onTranslateBufferChanged()
                     } else {
                         currentInputConnection?.commitText(emoji, 1)
@@ -2248,12 +2313,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         if (translateMode) {
-            // Valinta korvaa käännösrivin keskeneräisen sanan; oppiminen
+            // Valinta korvaa käännösnäkymän keskeneräisen sanan; oppiminen
             // toimii kuten kentässä.
-            val beforeCursor = translateBuffer.text.substring(0, translateBuffer.cursor)
+            val buffer = activeTranslateBuffer()
+            val beforeCursor = buffer.text.substring(0, buffer.cursor)
             val current = WordTools.currentWord(beforeCursor)
-            translateBuffer.deleteBeforeCursor(current.length)
-            translateBuffer.insert(if (spaceAfterSuggestion) "$word " else word)
+            buffer.deleteBeforeCursor(current.length)
+            buffer.insert(if (spaceAfterSuggestion) "$word " else word)
             if (learningEnabled) {
                 learning.onSuggestionsIgnored(shownCompletions, word)
                 shownCompletions = emptyList()
@@ -2318,9 +2384,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             bar.setSuggestions(emptyList())
             return
         }
-        // Käännöstilassa ehdotukset lasketaan käännösrivin tekstistä.
+        // Käännöstilassa ehdotukset lasketaan siitä alueesta, jota kirjoitetaan.
         val before: CharSequence = if (translateMode) {
-            translateBuffer.text.substring(0, translateBuffer.cursor)
+            val buffer = activeTranslateBuffer()
+            buffer.text.substring(0, buffer.cursor)
         } else {
             currentInputConnection?.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
         }
@@ -2396,14 +2463,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         pendingRevert = null
         textUndo.clear()
         if (translateMode) {
-            // Käännöstilassa näppäily kertyy käännösriville; kenttään
-            // kirjoittuu vain käännös.
+            // Käännöstilassa näppäily kertyy käännösnäkymään; kenttään
+            // kirjoittuu vain valmis käännös.
             val output = if (shiftState != ShiftState.OFF && text.length == 1) {
                 text.uppercase(fiLocale)
             } else {
                 text
             }
-            translateBuffer.smartType(output)
+            activeTranslateBuffer().smartType(output)
             if (shiftState == ShiftState.SHIFT) {
                 shiftState = ShiftState.OFF
                 manualShift = false
@@ -2497,7 +2564,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 if (translateMode) {
                     // Käännösnäkymä on oma työkalunsa: enter tekee
                     // rivinvaihdon omaan tekstiin kuten Google Kääntäjässä.
-                    translateBuffer.insert("\n")
+                    activeTranslateBuffer().insert("\n")
                     onTranslateBufferChanged()
                     feedback()
                     return
@@ -2521,11 +2588,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     SystemClock.uptimeMillis() - lastSpaceTime < DOUBLE_SPACE_PERIOD_MS
                 lastSpaceTime = SystemClock.uptimeMillis()
                 if (translateMode) {
-                    if (doubleTap && translateBuffer.doubleSpacePeriod()) {
-                        // Kaksoisvälilyönti pisteeksi myös käännösrivillä.
+                    val buffer = activeTranslateBuffer()
+                    if (doubleTap && buffer.doubleSpacePeriod()) {
+                        // Kaksoisvälilyönti pisteeksi myös käännösnäkymässä.
                         lastSpaceTime = 0
                     } else {
-                        translateBuffer.smartSpace()
+                        buffer.smartSpace()
                     }
                     onTranslateBufferChanged()
                 } else if (doubleTap && smartSpaceField && performDoubleSpacePeriod()) {
@@ -2559,13 +2627,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             is KeyAction.Arrow -> {
                 if (translateMode) {
-                    // Nuolet liikuttavat käännösrivin kursoria: vasen/oikea
-                    // grafeemin, ylös alkuun ja alas loppuun.
+                    // Nuolet liikuttavat kirjoitettavan alueen kursoria:
+                    // vasen/oikea grafeemin, ylös alkuun ja alas loppuun.
+                    val buffer = activeTranslateBuffer()
                     when (action.keyCode) {
-                        KeyEvent.KEYCODE_DPAD_LEFT -> translateBuffer.moveLeft()
-                        KeyEvent.KEYCODE_DPAD_RIGHT -> translateBuffer.moveRight()
-                        KeyEvent.KEYCODE_DPAD_UP -> translateBuffer.moveToStart()
-                        KeyEvent.KEYCODE_DPAD_DOWN -> translateBuffer.moveToEnd()
+                        KeyEvent.KEYCODE_DPAD_LEFT -> buffer.moveLeft()
+                        KeyEvent.KEYCODE_DPAD_RIGHT -> buffer.moveRight()
+                        KeyEvent.KEYCODE_DPAD_UP -> buffer.moveToStart()
+                        KeyEvent.KEYCODE_DPAD_DOWN -> buffer.moveToEnd()
                         else -> Unit
                     }
                     updateTranslateBar()
@@ -2583,8 +2652,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onSpaceSwipe(steps: Int) {
         if (translateMode) {
-            // Liu'utus liikuttaa käännösrivin kursoria kentän sijaan.
-            translateBuffer.move(steps)
+            // Liu'utus liikuttaa käännösnäkymän kursoria kentän sijaan.
+            activeTranslateBuffer().move(steps)
             updateTranslateBar()
         } else {
             sendDownUpKeyEvents(
@@ -2643,11 +2712,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     /**
-     * Käännösrivin iso alkukirjain kuten kentissä: rivin alussa ja
+     * Käännösnäkymän iso alkukirjain kuten kentissä: alueen alussa ja
      * lauseen päättävän välimerkin ja välin jälkeen.
      */
     private fun translateAutoCaps(): Boolean {
-        val before = translateBuffer.text.substring(0, translateBuffer.cursor)
+        val buffer = activeTranslateBuffer()
+        val before = buffer.text.substring(0, buffer.cursor)
         if (before.isBlank()) return true
         if (!before.endsWith(" ")) return false
         val trimmed = before.trimEnd(' ')

@@ -24,6 +24,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import org.jarsi.ark.R
 import org.jarsi.ark.engine.WordTools
+import org.jarsi.ark.keyboard.CursorIndex
 import org.jarsi.ark.theme.KeyboardTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -56,6 +57,9 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
         /** Käyttäjä napautti lähdetekstiä: kursori kohtaan [position]. */
         fun onCursorTap(position: Int)
+
+        /** Käyttäjä napautti käännöstä: sitä muokataan kohdasta [position]. */
+        fun onTranslationTap(position: Int)
 
         /** Käyttäjä kopioi valitun lähdetekstin. */
         fun onCopy(text: String)
@@ -109,20 +113,26 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private fun dp(value: Int) = (value * density).roundToInt()
 
     // Näytetyn tekstin kursorikohta napautuksen takaisinmappausta varten;
-    // -1 kun rivillä näkyy vihjeteksti.
+    // -1 kun alueella ei ole kohdistusta (vihje näkyvissä tai kirjoitus
+    // kohdistuu toiseen alueeseen).
     private var shownCursor = -1
+    private var shownTranslationCursor = -1
 
     // Kursori vilkkuu kuten tekstikentässä: puoli sekuntia näkyvissä ja
-    // puoli piilossa; siirto tuo sen aina heti näkyviin.
+    // puoli piilossa; siirto tuo sen aina heti näkyviin. Kohdistus on
+    // kerrallaan vain toisessa alueessa, joten sama tahti riittää molemmille.
     private var cursorVisible = true
     private val blinkRunnable = object : Runnable {
         override fun run() {
-            if (shownCursor < 0 || !isShown) return
+            if (!hasCursor() || !isShown) return
             cursorVisible = !cursorVisible
             bufferView.invalidate()
+            translationView.invalidate()
             postDelayed(this, CURSOR_BLINK_MS)
         }
     }
+
+    private fun hasCursor(): Boolean = shownCursor >= 0 || shownTranslationCursor >= 0
 
     private fun restartBlink() {
         cursorVisible = true
@@ -132,7 +142,8 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     // Kursori piirretään kapeana pystyviivana, joka vie vain parin pisteen
     // raon — kokonainen merkki työntäisi kirjaimet erilleen kuin välilyönti.
-    private val cursorSpan = object : ReplacementSpan() {
+    // [accent] erottaa käännösalueen kursorin, joka seuraa käännöksen väriä.
+    private inner class CursorSpan(private val accent: Boolean) : ReplacementSpan() {
         override fun getSize(
             paint: Paint,
             text: CharSequence?,
@@ -165,11 +176,14 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             val oldColor = paint.color
             // Tekstin väri: tummassa teemassa valkoinen kuten kentän kursori,
             // vaaleassa tumma, jotta viiva näkyy aina.
-            paint.color = theme.text
+            paint.color = if (accent) theme.accent else theme.text
             canvas.drawRect(x, y + paint.ascent(), x + dp(2), y + paint.descent(), paint)
             paint.color = oldColor
         }
     }
+
+    private val cursorSpan = CursorSpan(accent = false)
+    private val translationCursorSpan = CursorSpan(accent = true)
 
     // Kielipillerit Google Kääntäjän tapaan: koko kielinimet leveissä
     // pilleritaustoissa suunnanvaihdon molemmin puolin.
@@ -305,6 +319,11 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private var shownText = ""
     private var shownHint = ""
     private var shownCursorTarget = 0
+
+    // Näytetty käännös vihjeineen ja kursorikohtineen; -1 = ei kohdistusta.
+    private var shownTranslation = ""
+    private var shownTranslationHint = ""
+    private var translationCursorTarget = -1
     private var selection: IntRange? = null
     private var selectionPopup: PopupWindow? = null
     private var popupAnchorX = 0
@@ -312,6 +331,12 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private var downX = 0f
     private var downY = 0f
     private var longPressFired = false
+
+    // Käännösalueen napautus: vieritykseksi tunnistettu liike ei siirrä kursoria.
+    private var translationDownX = 0f
+    private var translationDownY = 0f
+    private var translationScrolled = false
+
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val longPressRunnable = Runnable { onBufferLongPressed() }
 
@@ -432,12 +457,41 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private val divider = View(context)
 
     // Käännösalue: monirivinen kuten kirjoitusaluekin. Kenttä ei muutu
-    // ennen kuin käännös kopioidaan tai viedään pikanapilla.
+    // ennen kuin käännös kopioidaan tai viedään pikanapilla. Käännöstä
+    // napauttamalla sitä voi korjata paikallaan ennen vientiä.
+    @SuppressLint("ClickableViewAccessibility")
     private val translationView = TextView(context).apply {
         textSize = LARGE_TEXT_SP
         gravity = Gravity.TOP
         minimumHeight = areaHeight()
         setPadding(dp(16), dp(10), dp(16), dp(10))
+        setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    translationDownX = event.x
+                    translationDownY = event.y
+                    translationScrolled = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (abs(event.x - translationDownX) > touchSlop ||
+                        abs(event.y - translationDownY) > touchSlop
+                    ) {
+                        // Vieritys ei saa siirtää kursoria sormen noustessa.
+                        translationScrolled = true
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!translationScrolled) {
+                        onTranslationTapped(view as TextView, event.x, event.y)
+                        view.performClick()
+                    }
+                }
+            }
+            // Sama kulutusmalli kuin lähdealueessa: napautus jää tänne,
+            // liike jää vierityksen siepattavaksi.
+            event.actionMasked == MotionEvent.ACTION_UP ||
+                event.actionMasked == MotionEvent.ACTION_DOWN
+        }
     }
 
     private val translationScroll = CappedScrollView(areaHeight()).apply {
@@ -572,20 +626,75 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         else -> 17f
     }
 
-    /** Näyttää käännöksen tai [hint]-vihjeen sen puuttuessa. */
-    fun setTranslation(text: String, hint: String) {
+    /**
+     * Näyttää käännöksen tai [hint]-vihjeen sen puuttuessa. [cursor] on
+     * kohta käännöstekstissä, kun käyttäjä muokkaa käännöstä paikallaan;
+     * -1 piirtää käännöksen ilman kursoria.
+     */
+    fun setTranslation(text: String, hint: String, cursor: Int = -1) {
+        shownTranslation = text
+        shownTranslationHint = hint
+        translationCursorTarget = cursor
+        renderTranslation()
+    }
+
+    private fun renderTranslation() {
+        val text = shownTranslation
         translationView.textSize = textSizeFor(text)
         if (text.isEmpty()) {
-            translationView.text = hint
+            // Kursori jää näkyviin, jos käyttäjä pyyhki korjatun käännöksen
+            // tyhjäksi — kirjoitus jatkuu yhä tälle alueelle.
+            val focused = translationCursorTarget >= 0
+            shownTranslationCursor = if (focused) 0 else -1
+            translationView.text = if (focused) {
+                SpannableStringBuilder(CURSOR_PLACEHOLDER + shownTranslationHint).apply {
+                    setSpan(
+                        translationCursorSpan,
+                        0,
+                        CURSOR_PLACEHOLDER.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                }
+            } else {
+                SpannableStringBuilder(shownTranslationHint)
+            }
             translationView.setTextColor(theme.hint)
+            if (focused) restartBlink()
         } else {
-            translationView.text = text
+            val position = translationCursorTarget.takeIf { it >= 0 }?.coerceIn(0, text.length)
+            shownTranslationCursor = position ?: -1
+            translationView.text = if (position == null) {
+                SpannableStringBuilder(text)
+            } else {
+                SpannableStringBuilder(text).apply {
+                    insert(position, CURSOR_PLACEHOLDER)
+                    setSpan(
+                        translationCursorSpan,
+                        position,
+                        position + CURSOR_PLACEHOLDER.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                }
+            }
             // Käännös erottuu lähdetekstistä korostevärillä kuten Googlessa.
             translationView.setTextColor(theme.accent)
+            if (position != null) {
+                restartBlink()
+                scrollIntoView(translationView, translationScroll, position)
+            }
         }
         val alpha = if (text.isEmpty()) 0.4f else 1f
         insertLabel.alpha = alpha
         copyIcon.alpha = alpha
+    }
+
+    /** Napautus käännöksessä: kursori tekstin kohtaan, paikkamerkki huomioiden. */
+    private fun onTranslationTapped(view: TextView, x: Float, y: Float) {
+        if (shownTranslation.isEmpty()) return
+        val offset = view.getOffsetForPosition(x, y)
+        if (offset < 0) return
+        val position = CursorIndex.toText(offset, shownTranslationCursor)
+        listener?.onTranslationTap(position.coerceIn(0, shownTranslation.length))
     }
 
     fun setLanguages(
@@ -602,7 +711,8 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     /**
      * Näyttää keskeneräisen tekstin kursoreineen tai [hint]-vihjeen, kun
-     * rivi on tyhjä. [cursor] on kohta lähdetekstissä.
+     * rivi on tyhjä. [cursor] on kohta lähdetekstissä; -1 jättää kursorin
+     * pois, kun kirjoitus kohdistuu käännösalueeseen.
      */
     fun setBuffer(text: String, cursor: Int, hint: String) {
         if (text != shownText) clearSelection()
@@ -614,51 +724,61 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     private fun render() {
         bufferView.textSize = textSizeFor(shownText)
+        val focused = shownCursorTarget >= 0
         if (shownText.isEmpty()) {
             // Kursori vilkkuu vihjeen edessä heti avattaessa, jotta alue
             // näyttää aktiiviselta ja kirjoittamaan voi ryhtyä suoraan.
-            shownCursor = 0
-            bufferView.text = SpannableStringBuilder(CURSOR_PLACEHOLDER + shownHint).apply {
-                setSpan(
-                    cursorSpan,
-                    0,
-                    CURSOR_PLACEHOLDER.length,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-                )
+            shownCursor = if (focused) 0 else -1
+            bufferView.text = if (focused) {
+                SpannableStringBuilder(CURSOR_PLACEHOLDER + shownHint).apply {
+                    setSpan(
+                        cursorSpan,
+                        0,
+                        CURSOR_PLACEHOLDER.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                }
+            } else {
+                SpannableStringBuilder(shownHint)
             }
             bufferView.setTextColor(theme.hint)
             clearLabel.visibility = GONE
-            restartBlink()
+            if (focused) restartBlink()
         } else {
-            val position = shownCursorTarget.coerceIn(0, shownText.length)
+            val position = if (focused) shownCursorTarget.coerceIn(0, shownText.length) else -1
             shownCursor = position
             bufferView.text = SpannableStringBuilder(shownText).apply {
-                insert(position, CURSOR_PLACEHOLDER)
-                setSpan(
-                    cursorSpan,
-                    position,
-                    position + CURSOR_PLACEHOLDER.length,
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
-                )
+                if (position >= 0) {
+                    insert(position, CURSOR_PLACEHOLDER)
+                    setSpan(
+                        cursorSpan,
+                        position,
+                        position + CURSOR_PLACEHOLDER.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
+                    )
+                }
                 selection?.let { sel ->
                     // Paikkamerkki siirtää näyttöindeksejä kursorin kohdalla.
-                    val start = sel.first + if (sel.first >= position) 1 else 0
-                    val end = sel.last + 1 + if (sel.last + 1 > position) 1 else 0
                     setSpan(
                         BackgroundColorSpan(selectionColor()),
-                        start,
-                        end,
+                        displayIndex(sel.first, boundaryAfter = false),
+                        displayIndex(sel.last + 1, boundaryAfter = true),
                         Spannable.SPAN_EXCLUSIVE_EXCLUSIVE,
                     )
                 }
             }
             bufferView.setTextColor(theme.text)
             clearLabel.visibility = VISIBLE
-            restartBlink()
-            // Kahvaa raahatessa näkymä ei saa hyppiä kursorin perässä.
-            if (draggingHandle == 0) scrollCursorIntoView(position)
+            if (position >= 0) {
+                restartBlink()
+                // Kahvaa raahatessa näkymä ei saa hyppiä kursorin perässä.
+                if (draggingHandle == 0) scrollIntoView(bufferView, sourceScroll, position)
+            }
         }
     }
+
+    private fun displayIndex(sourceIndex: Int, boundaryAfter: Boolean): Int =
+        CursorIndex.toDisplay(sourceIndex, shownCursor, boundaryAfter)
 
     private fun selectionColor(): Int =
         (theme.accent and 0x00FFFFFF) or (SELECTION_ALPHA shl 24)
@@ -666,9 +786,10 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     override fun onVisibilityAggregated(isVisible: Boolean) {
         super.onVisibilityAggregated(isVisible)
         // Vilkutus pyörii vain rivin ollessa esillä.
-        if (isVisible && shownCursor >= 0) {
+        if (isVisible && hasCursor()) {
             restartBlink()
             bufferView.invalidate()
+            translationView.invalidate()
         } else if (!isVisible) {
             removeCallbacks(blinkRunnable)
             clearSelection()
@@ -683,20 +804,20 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     }
 
     /** Vierittää pystysuunnassa niin, että kursoririvi pysyy näkyvissä. */
-    private fun scrollCursorIntoView(position: Int) {
-        bufferView.post {
-            val layout = bufferView.layout ?: return@post
+    private fun scrollIntoView(view: TextView, scroll: ScrollView, position: Int) {
+        view.post {
+            val layout = view.layout ?: return@post
             val clamped = position.coerceIn(0, layout.text.length)
             val line = layout.getLineForOffset(clamped)
-            val top = layout.getLineTop(line) + bufferView.totalPaddingTop
-            val bottom = layout.getLineBottom(line) + bufferView.totalPaddingTop
-            val viewport = sourceScroll.height
+            val top = layout.getLineTop(line) + view.totalPaddingTop
+            val bottom = layout.getLineBottom(line) + view.totalPaddingTop
+            val viewport = scroll.height
             if (viewport <= 0) return@post
-            val scrollY = sourceScroll.scrollY
+            val scrollY = scroll.scrollY
             if (top < scrollY) {
-                sourceScroll.smoothScrollTo(0, top)
+                scroll.smoothScrollTo(0, top)
             } else if (bottom > scrollY + viewport) {
-                sourceScroll.smoothScrollTo(0, bottom - viewport)
+                scroll.smoothScrollTo(0, bottom - viewport)
             }
         }
     }
@@ -704,12 +825,11 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private fun onBufferTapped(view: TextView, x: Float, y: Float) {
         // Tyhjällä rivillä kursori on jo alussa; napautus ei siirrä mitään.
         if (shownText.isEmpty()) return
-        if (shownCursor < 0) return
         val offset = view.getOffsetForPosition(x, y)
         if (offset < 0) return
         // Näytetyssä tekstissä on kursorin paikkamerkki; poistetaan sen vaikutus.
-        val position = if (offset > shownCursor) offset - 1 else offset
-        listener?.onCursorTap(position)
+        val position = CursorIndex.toText(offset, shownCursor)
+        listener?.onCursorTap(position.coerceIn(0, shownText.length))
     }
 
     /** Näyttöindeksin piste (x, rivin alareuna) lähdetekstin kohdalle;
@@ -721,12 +841,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         boundaryAfter: Boolean,
     ): Pair<Float, Float>? {
         val layout = text.layout ?: return null
-        val display = if (boundaryAfter) {
-            sourceIndex + if (sourceIndex > shownCursor) 1 else 0
-        } else {
-            sourceIndex + if (sourceIndex >= shownCursor) 1 else 0
-        }
-        val clamped = display.coerceIn(0, layout.text.length)
+        val clamped = displayIndex(sourceIndex, boundaryAfter).coerceIn(0, layout.text.length)
         val line = layout.getLineForOffset(clamped)
         val x = layout.getPrimaryHorizontal(clamped) + text.totalPaddingLeft
         val y = layout.getLineBottom(line).toFloat() + text.totalPaddingTop
@@ -753,8 +868,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         val sel = selection ?: return
         val offset = text.getOffsetForPosition(x, y)
         if (offset < 0) return
-        val position = (if (offset > shownCursor) offset - 1 else offset)
-            .coerceIn(0, shownText.length)
+        val position = CursorIndex.toText(offset, shownCursor).coerceIn(0, shownText.length)
         val updated = if (draggingHandle == 1) {
             minOf(position, sel.last)..sel.last
         } else {
@@ -778,7 +892,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
 
     /** Pitkä painallus maalaa sanan ja avaa Kopioi-valikon sen ylle. */
     private fun onBufferLongPressed() {
-        if (shownCursor < 0) {
+        if (shownText.isEmpty()) {
             // Tyhjälläkin rivillä voi liittää leikepöydän tekstin.
             if (pasteAvailable) {
                 longPressFired = true
@@ -791,7 +905,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
         val offset = bufferView.getOffsetForPosition(downX, downY)
         if (offset < 0) return
-        val position = if (offset > shownCursor) offset - 1 else offset
+        val position = CursorIndex.toText(offset, shownCursor)
         val range = WordTools.wordRangeAt(shownText, position) ?: return
         longPressFired = true
         selection = range

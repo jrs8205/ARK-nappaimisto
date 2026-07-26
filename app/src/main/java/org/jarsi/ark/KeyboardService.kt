@@ -134,10 +134,31 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun activeTranslateBuffer(): TranslateBuffer =
         if (translationEditing) translationBuffer else translateBuffer
 
+    // Sanelun keskeneräisen jakson pituus käännösnäkymässä: seuraava tulos
+    // korvaa sen, kuten kentässä keskeneräinen composing-teksti.
+    private var dictationPending = 0
+
+    /**
+     * Kirjoittaa sanelun tuloksen käännösnäkymään sille alueelle, jota
+     * parhaillaan kirjoitetaan. Keskeneräinen jakso korvautuu seuraavalla,
+     * jottei sama puhe päädy tekstiin kahdesti.
+     */
+    private fun dictateIntoTranslation(text: String, final: Boolean) {
+        val buffer = activeTranslateBuffer()
+        if (dictationPending > 0) buffer.deleteBeforeCursor(dictationPending)
+        val inserted = if (final) "$text " else text
+        buffer.insert(inserted)
+        dictationPending = if (final) 0 else inserted.length
+        onTranslateBufferChanged()
+    }
+
     /** Kohdistus takaisin lähdetekstiin; keskeneräinen korjaus jää käännökseen. */
     private fun stopTranslationEditing() {
         translationEditing = false
         translationBuffer.clear()
+        // Kirjoitettava alue vaihtui: sanelun keskeneräinen jakso ei enää
+        // osoita mihinkään.
+        dictationPending = 0
     }
 
     // Käännöstilan viimeisin käyttöhetki muistiajan vertailuun; puskuri
@@ -177,21 +198,29 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 override fun onPartialText(text: String) {
                     lastEditTime = SystemClock.uptimeMillis()
                     val shown = if (dictationCapNext) DictationText.capitalize(text) else text
+                    if (translateMode) {
+                        dictateIntoTranslation(shown, final = false)
+                        return
+                    }
                     currentInputConnection?.setComposingText(shown, 1)
                 }
 
                 override fun onFinalText(text: String) {
-                    val ic = currentInputConnection ?: return
                     lastEditTime = SystemClock.uptimeMillis()
                     val committed =
                         if (dictationCapNext) DictationText.capitalize(text) else text
-                    // Lopullinen teksti korvaa keskeneräisen — ei sen perään,
-                    // ettei sama puhe päädy kenttään kahdesti.
-                    ic.beginBatchEdit()
-                    ic.setComposingText("$committed ", 1)
-                    ic.finishComposingText()
-                    ic.endBatchEdit()
-                    textUndo.record("$committed ")
+                    if (translateMode) {
+                        dictateIntoTranslation(committed, final = true)
+                    } else {
+                        val ic = currentInputConnection ?: return
+                        // Lopullinen teksti korvaa keskeneräisen — ei sen perään,
+                        // ettei sama puhe päädy kenttään kahdesti.
+                        ic.beginBatchEdit()
+                        ic.setComposingText("$committed ", 1)
+                        ic.finishComposingText()
+                        ic.endBatchEdit()
+                        textUndo.record("$committed ")
+                    }
                     // Lauseen loppu nostaa seuraavankin jakson isolle alkukirjaimelle.
                     dictationCapNext = DictationText.endsSentence(committed)
                     if (learningEnabled) {
@@ -204,6 +233,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 override fun onDictationStateChanged(active: Boolean) {
                     toolbar?.micActive = active
                     if (!active) {
+                        dictationPending = 0
                         currentInputConnection?.finishComposingText()
                     }
                 }
@@ -572,7 +602,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val kb = keyboardView ?: return
         hideCorrectionPanel()
         hideEmojiPanel()
-        hideTranslateBar()
+        // Käännösnäkymä jää auki kuten emojipaneelinkin alla: leike
+        // liitetään siihen alueeseen, jota parhaillaan kirjoitetaan.
         stopDictation()
         resetSidePage()
         if (kb.height > 0) {
@@ -1819,13 +1850,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     // jää päälle yhtä aikaa.
                     hideAllPanels()
                     resetSidePage()
-                    if (translateMode) {
-                        // Käännöstila suljetaan ensin; sanelu käynnistetään
-                        // uudella painalluksella, ettei viimeistely ja sanelu
-                        // kirjoita kenttään yhtä aikaa.
-                        hideTranslateBar()
-                        return
-                    }
+                    // Käännöstilassa sanelu kirjoittaa käännösnäkymään sille
+                    // alueelle, jota parhaillaan kirjoitetaan — kenttään ei
+                    // mene mitään ennen vientiä.
                     when {
                         passwordField -> Unit
                         dictationActive() -> {
@@ -2002,6 +2029,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                         translationBuffer.clear()
                         translationBuffer.insert(currentTranslation)
                         translationEditing = true
+                        dictationPending = 0
                         // Kesken oleva käännös ei saa pyyhkiä korjausta.
                         translateRunnable?.let { mainHandler.removeCallbacks(it) }
                         translationGeneration++

@@ -21,8 +21,8 @@ android {
         applicationId = "org.jarsi.ark.nappaimisto"
         minSdk = 26
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.12.0"
+        versionCode = 10
+        versionName = "0.13.0"
 
         ndk {
             // Vain puhelinten arkkitehtuurit: ML Kitin käännöskirjaston

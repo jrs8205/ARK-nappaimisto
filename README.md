@@ -174,6 +174,13 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   laitteen puheentunnistuspalvelussa — ensisijaisesti laitteella; jos
   suomen laitemallia ei ole, laitteen palvelu voi käyttää verkkoa.
   Sanellut sanat oppivat kuten kirjoitetut.
+* sanelun tunnistus valittavissa (asetukset → Sanelu): laitteen oma
+  tunnistus tai OpenAI-puheentunnistus. OpenAI tunnistaa suomea
+  selvästi tarkemmin eikä lopeta kuuntelua melussa: ääni virtaa
+  jatkuvana OpenAI:n Realtime-rajapintaan omalla API-avaimella, ja
+  teksti ilmestyy kenttään puheen tahdissa. Laitteella ei pätkitä
+  puhetta, joten sanoja ei katoa pätkien rajoilta. Tunnistusmallin voi
+  valita asetuksista, ja ilman avainta käytetään laitteen tunnistusta.
 * leikepöytä työkaluriviltä: tekstit ja kuvat kaksisarakkeisessa
   ruudukossa, kiinnitys neulasta, kolmen pisteen valikosta liittäminen,
   haku verkosta ja poisto, sekä oman kiinnitetyn leikkeen luonti
@@ -195,14 +202,20 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   itsestään. Käännöksen voi kopioida leikepöydälle tai viedä
   Lisää-napilla kenttään, jolloin uusi vienti korvaa edellisen.
   ✨-nappi hakee laadukkaamman käännöksen valitulta AI-palvelulta
-  (vaatii oman API-avaimen). Kielipari ja suunta ovat vaihdettavissa;
-  kielimallit ladataan vasta käyttäjän luvalla (~30 Mt/kieli, kertalataus)
-  ja niitä hallitaan asetuksista.
+  (vaatii oman API-avaimen). Myös käännöstä voi napauttaa: kursori
+  siirtyy siihen ja konekäännöksen voi viimeistellä paikallaan ennen
+  vientiä — korjattu teksti on se, joka viedään ja kopioidaan.
+  Lähdekieli tunnistetaan kirjoitetusta tekstistä laitteella omien
+  ladattujen kielten joukosta, ja kielet valitaan pillereitä
+  napauttamalla; kielimallit ladataan vasta käyttäjän luvalla
+  (~30 Mt/kieli, kertalataus) ja niitä hallitaan asetuksista.
   Kirjoitusalueella toimivat sanaehdotukset, kursorin siirto, valinta
   kahvoineen, Kopioi/Liitä sekä välimerkkisäännöt, ja teksti säilyy
-  kunnes sen itse tyhjentää — myös sovelluksesta toiseen vaihtaessa.
-  Käännettävä teksti esikäsitellään kokonaisiksi lauseiksi, mikä
-  parantaa käännösten laatua.
+  kunnes sen itse tyhjentää — myös sovelluksesta toiseen vaihtaessa
+  (säilytysaika säädettävissä asetuksista 5–120 minuuttia).
+  Rivinvaihdot säilyvät käännöksessä, ja käännettävä teksti
+  esikäsitellään kokonaisiksi lauseiksi, mikä parantaa käännösten
+  laatua.
 * Paranna teksti (valinnainen): korjausnäkymän nappi lähettää kentän
   tekstin valittuun AI-palveluun (Anthropicin Claude tai OpenAI:n
   ChatGPT) ja näyttää kolme parannusehdotusta, joista valittu korvaa
@@ -220,15 +233,24 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 ## Yksityisyys
 
 Oppiminen ja ehdotukset ovat kokonaan paikallisia, eikä sovelluksessa ole
-analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus kahta
-tarkoitusta varten: käännöskielten mallien kertalataus (Google ML Kit)
-sekä valinnaiset AI-toiminnot (Paranna teksti ja ✨-AI-käännös), jotka
-lähettävät tekstin valittuun AI-palveluun (Anthropic tai OpenAI) vain
-kun käyttäjä itse painaa nappia ja on ensin asettanut oman
-API-avaimensa. API-avaimet säilytetään laitteella Android Keystorella
-salattuina. Live-käännös tehdään laitteella, eikä kirjoitettua tekstiä
-lähetetä minnekään ilman käyttäjän omaa, tietoista toimintoa. Oppiminen
-kytkeytyy kokonaan pois salasana- ja muissa arkaluonteisissa kentissä.
+analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus kolmea
+tarkoitusta varten:
+
+* käännöskielten mallien kertalataus (Google ML Kit)
+* valinnaiset AI-toiminnot (Paranna teksti ja ✨-AI-käännös), jotka
+  lähettävät tekstin valittuun AI-palveluun (Anthropic tai OpenAI) vain
+  kun käyttäjä itse painaa nappia ja on ensin asettanut oman
+  API-avaimensa
+* valinnainen OpenAI-puheentunnistus: puhe virtaa OpenAI:lle vain kun
+  käyttäjä on itse valinnut sen sanelun tunnistukseksi asetuksista ja
+  asettanut oman API-avaimensa, ja vain sanelun ollessa käynnissä.
+  Oletuksena sanelu käyttää laitteen omaa puheentunnistusta.
+
+API-avaimet säilytetään laitteella Android Keystorella salattuina.
+Live-käännös ja lähdekielen tunnistus tehdään laitteella, eikä
+kirjoitettua tekstiä lähetetä minnekään ilman käyttäjän omaa,
+tietoista toimintoa. Oppiminen kytkeytyy kokonaan pois salasana- ja
+muissa arkaluonteisissa kentissä.
 
 ## Kääntäminen
 

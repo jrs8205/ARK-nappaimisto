@@ -1,11 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Käännösmallien kertalataus; itse käännös ja kaikki oppiminen
-         tapahtuvat laitteella, eikä kirjoitettua tekstiä lähetetä minnekään. -->
+    <!-- Verkkoyhteys kolmeen tarkoitukseen: käännösmallien kertalataus,
+         valinnaiset AI-toiminnot (Paranna teksti ja ✨-käännös lähettävät
+         käsiteltävän tekstin valitulle palvelulle käyttäjän omalla
+         API-avaimella) sekä valinnainen OpenAI-sanelu. Käännös ilman ✨:ää,
+         oikoluku ja kaikki oppiminen tapahtuvat laitteella. Mitään ei lähetetä
+         ilman käyttäjän omaa toimintoa: jokainen lähetys alkaa napin
+         painalluksesta, eikä sovellus tee taustakyselyitä. -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Sanelun mikrofoni; puhe käsitellään laitteen puheentunnistuspalvelussa. -->
+    <!-- Sanelun mikrofoni. Oletuksena puhe käsitellään laitteen
+         puheentunnistuspalvelussa; jos käyttäjä valitsee asetuksista
+         OpenAI-sanelun, puhe virtaa OpenAI:lle omalla avaimella yhdessä
+         käytetyimpien opittujen sanojen kanssa tunnistuksen tarkentamiseksi. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <!-- Automaattinen pilvivarmistus ja laitesiirto pois: oppimisdata ja

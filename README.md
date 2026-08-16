@@ -179,8 +179,10 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   selvästi tarkemmin eikä lopeta kuuntelua melussa: ääni virtaa
   jatkuvana OpenAI:n Realtime-rajapintaan omalla API-avaimella, ja
   teksti ilmestyy kenttään puheen tahdissa. Laitteella ei pätkitä
-  puhetta, joten sanoja ei katoa pätkien rajoilta. Tunnistusmallin voi
-  valita asetuksista, ja ilman avainta käytetään laitteen tunnistusta.
+  puhetta, joten sanoja ei katoa pätkien rajoilta. Käytetyimmät opitut
+  sanat lähtevät sanastovihjeinä, jolloin omat nimet ja termit
+  tunnistuvat oikein. Tunnistusmallin voi valita asetuksista, ja ilman
+  avainta käytetään laitteen tunnistusta.
 * leikepöytä työkaluriviltä: tekstit ja kuvat kaksisarakkeisessa
   ruudukossa, kiinnitys neulasta, kolmen pisteen valikosta liittäminen,
   haku verkosta ja poisto, sekä oman kiinnitetyn leikkeen luonti
@@ -244,6 +246,10 @@ tarkoitusta varten:
 * valinnainen OpenAI-puheentunnistus: puhe virtaa OpenAI:lle vain kun
   käyttäjä on itse valinnut sen sanelun tunnistukseksi asetuksista ja
   asettanut oman API-avaimensa, ja vain sanelun ollessa käynnissä.
+  Puheen mukana lähetetään käytetyimmät opitut sanat sanastovihjeinä,
+  jotta omat nimet ja termit tunnistuvat oikein; opittu sanasto itsessään
+  pysyy laitteella eikä siirry mihinkään muualle. Yksi sanelu kestää
+  enintään viisi minuuttia, jottei kuuntelu jatkuisi vahingossa.
   Oletuksena sanelu käyttää laitteen omaa puheentunnistusta.
 
 API-avaimet säilytetään laitteella Android Keystorella salattuina.

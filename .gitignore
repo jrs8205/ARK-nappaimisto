@@ -30,3 +30,8 @@ local.properties
 
 # Testauksen kuvakaappaukset projektikansiossa.
 Screenshot_*.png
+
+# Ulkopuoliset katselmointipyynnöt ja -raportit: työkaluja kehityksen
+# aikana, eivät osa julkaistavaa projektia.
+/BUG_HUNT_REQUEST.md
+*_REVIEW_*.md

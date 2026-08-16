@@ -270,6 +270,18 @@ class OpenAiDictation(
                 if (read == 0) continue
                 sendAudio(RealtimeEvents.pcmBytes(shorts, read))
                 sentSamples += read
+                // Kova yläraja: jatkuva taustamelu (auto, kahvila, televisio)
+                // pitää hiljaisuusvahdin ikuisesti nollassa, jolloin mikrofoni
+                // ja maksullinen äänivirta jatkuisivat rajatta. Katkaisu
+                // viimeistelee tunnistuksen normaalisti, ei hylkää tekstiä.
+                if (sentSamples >= MAX_SESSION_SAMPLES) {
+                    mainHandler.post {
+                        if (mySession == session) {
+                            listener.onDictationError(R.string.sanelu_aikaraja)
+                        }
+                    }
+                    break
+                }
                 val floats = FloatArray(read) { shorts[it] / 32768f }
                 // Segmentterin pätkintää ei käytetä — se toimii vain
                 // hiljaisuusvahtina ja mikrofonisykkeen mittarina.
@@ -378,6 +390,14 @@ class OpenAiDictation(
 
         /** Alle 0,2 s ääntä ei commitoida (palvelu hylkäisi tyhjän). */
         private const val MIN_COMMIT_SAMPLES = SAMPLE_RATE / 5L
+
+        /**
+         * Yhden sanelun enimmäispituus. Melussa hiljaisuusvahti ei laukea,
+         * joten tämä on ainoa raja joka pysäyttää maksullisen äänivirran
+         * ilman käyttäjän toimia. Viisi minuuttia riittää pisimpäänkin
+         * saneluun.
+         */
+        private const val MAX_SESSION_SAMPLES = SAMPLE_RATE * 300L
 
         /** Puskuri yhteyden avausta odottaville palasille (~30 s). */
         private const val BACKLOG_MAX_CHUNKS = 300

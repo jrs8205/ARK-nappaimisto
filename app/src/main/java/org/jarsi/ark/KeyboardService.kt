@@ -171,6 +171,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private var translationFresh = false
     private var translationGeneration = 0
     private var aiTranslateGeneration = 0
+
+    // AI-käännös on kesken: estää saman pyynnön laskuttamisen moneen kertaan.
+    private var aiTranslateRunning = false
     private var translator: Translator? = null
     private var translatorReady = false
 
@@ -1050,6 +1053,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     /** Hakee laadukkaamman käännöksen valitulta AI-palvelulta alariville. */
     private fun requestAiTranslation() {
         feedback()
+        // ✨ jää näkyviin pyynnön ajaksi, joten uudet napautukset jonottaisivat
+        // omat maksulliset pyyntönsä, joiden tulokset kaikki hylätään
+        // sukupolvivertailussa. Yksi pyyntö kerrallaan.
+        if (aiTranslateRunning) return
         val text = translateBuffer.toString()
         if (text.isBlank()) return
         if (text.length > TextImprover.MAX_INPUT_CHARS) {
@@ -1073,6 +1080,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val sourceName = languageName(translationSource())
         val targetName = languageName(translationTarget())
         val generation = ++aiTranslateGeneration
+        aiTranslateRunning = true
         improveExecutor.execute {
             val body = if (openAi) {
                 val model = prefs.getString(PREF_OPENAI_MODEL, null)
@@ -1092,6 +1100,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
             }
             mainHandler.post {
+                // Vapautetaan lukko ennen kaikkia paluureittejä, ettei nappi
+                // jää pysyvästi lukkoon keskeytyneen pyynnön jälkeen.
+                aiTranslateRunning = false
                 if (generation != aiTranslateGeneration || destroyed || !translateMode) {
                     return@post
                 }

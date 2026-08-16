@@ -58,6 +58,32 @@ class RealtimeEventsTest {
     }
 
     @Test
+    fun `avainsanoja ei laheteta mallille joka ei tue niita`() {
+        // Palvelin vastaa tukemattomalle mallille "The 'keywords' parameter
+        // is not supported for this model" ja se on fataali virhe, joka
+        // tappaisi sanelun heti (todennettu rajapintaa vasten 16.8.2026).
+        for (model in listOf(
+            "gpt-4o-transcribe", "gpt-4o-mini-transcribe",
+            "whisper-1", "gpt-realtime-whisper",
+        )) {
+            val transcription = JSONObject(
+                RealtimeEvents.sessionUpdate(model, "fi", keywords = listOf("prx4"))
+            ).getJSONObject("session").getJSONObject("audio")
+                .getJSONObject("input").getJSONObject("transcription")
+            assertTrue("$model ei saa saada avainsanoja", !transcription.has("keywords"))
+        }
+    }
+
+    @Test
+    fun `avainsanat tukevat mallit tunnistetaan`() {
+        assertTrue(RealtimeEvents.supportsKeywords("gpt-live-transcribe"))
+        assertTrue(RealtimeEvents.supportsKeywords("gpt-transcribe"))
+        assertTrue(!RealtimeEvents.supportsKeywords("gpt-4o-transcribe"))
+        assertTrue(!RealtimeEvents.supportsKeywords("gpt-realtime-whisper"))
+        assertTrue(!RealtimeEvents.supportsKeywords("whisper-1"))
+    }
+
+    @Test
     fun `avainsanat kulkevat transkription mukana`() {
         val json = JSONObject(
             RealtimeEvents.sessionUpdate(

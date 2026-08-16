@@ -170,6 +170,7 @@
     <string name="asetus_sanelu_malli">Sanelun malli</string>
     <string name="sanelu_openai_ei_avainta">OpenAI-avainta ei ole asetettu – sanelu käyttää laitteen tunnistusta</string>
     <string name="sanelu_verkkovirhe">Sanelun tunnistus epäonnistui: %1$s</string>
+    <string name="sanelu_aikaraja">Sanelu päättyi viiden minuutin ylärajaan</string>
     <string name="kaannoskielet">Käännöskielet</string>
     <string name="kaannoskielet_kuvaus">Lataa ja poista käännösmalleja (noin 30 Mt kieltä kohden)</string>
     <string name="asetus_kaannos_muisti">Käännöksen muistiaika (minuuttia)</string>

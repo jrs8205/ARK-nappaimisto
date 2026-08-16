@@ -41,6 +41,16 @@ object RealtimeEvents {
         model.startsWith("gpt-realtime") || model.startsWith("gpt-live-transcribe")
 
     /**
+     * Sanastovihjeet ovat uuden transcribe-sukupolven ominaisuus. Vanhemmat
+     * mallit vastaavat kenttään "The 'keywords' parameter is not supported
+     * for this model", ja se on fataali virhe joka päättäisi sanelun heti
+     * (todennettu rajapintaa vasten 16.8.2026). Siksi vihjeet lähetetään
+     * vain niille malleille jotka ne tuntevat.
+     */
+    fun supportsKeywords(model: String): Boolean =
+        model.startsWith("gpt-live-transcribe") || model.startsWith("gpt-transcribe")
+
+    /**
      * Istunnon asetusviesti. Suoratoistomalli hoitaa jaksotuksen itse,
      * joten se ei saa turn_detection-kenttää; eräpohjaiset mallit
      * tarvitsevat palvelimen VAD:n, joka jakaa jatkuvan äänivirran
@@ -58,8 +68,13 @@ object RealtimeEvents {
             .put("model", model)
             .put("language", language)
         if (delay != null) transcription.put("delay", delay)
-        val safeKeywords = keywords.filter { word ->
-            word.isNotBlank() && word.none { it == '<' || it == '>' || it == '\r' || it == '\n' }
+        val safeKeywords = if (supportsKeywords(model)) {
+            keywords.filter { word ->
+                word.isNotBlank() &&
+                    word.none { it == '<' || it == '>' || it == '\r' || it == '\n' }
+            }
+        } else {
+            emptyList()
         }
         if (safeKeywords.isNotEmpty()) {
             transcription.put("keywords", JSONArray(safeKeywords))

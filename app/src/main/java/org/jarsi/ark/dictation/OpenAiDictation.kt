@@ -40,6 +40,13 @@ class OpenAiDictation(
     /** Hiljaisuus, jonka jälkeen sanelu päättyy itsestään. */
     var silenceLimitMs = 5_000L
 
+    /**
+     * Sanastovihjeet tunnistimelle: käyttäjän omat sanat, joita yleinen
+     * kielimalli ei tunne. Luetaan jokaisen sanelun alussa ja lähetetään
+     * istunnon keywords-kenttänä.
+     */
+    var biasWords: () -> List<String> = { emptyList() }
+
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private val httpClient by lazy {
@@ -93,7 +100,7 @@ class OpenAiDictation(
         streamingModel = RealtimeEvents.isStreaming(model)
         listener.onDictationStateChanged(true)
         val mySession = ++session
-        openSocket(apiKey, model, mySession)
+        openSocket(apiKey, model, biasWords(), mySession)
         captureThread = Thread({ runCapture(mySession) }, "openai-sanelu")
             .also { it.start() }
     }
@@ -128,7 +135,12 @@ class OpenAiDictation(
         httpClient.dispatcher.executorService.shutdown()
     }
 
-    private fun openSocket(apiKey: String, model: String, mySession: Int) {
+    private fun openSocket(
+        apiKey: String,
+        model: String,
+        keywords: List<String>,
+        mySession: Int,
+    ) {
         val request = Request.Builder()
             .url(ENDPOINT)
             .header("Authorization", "Bearer $apiKey")
@@ -144,7 +156,7 @@ class OpenAiDictation(
                             ws.close(CLOSE_NORMAL, null)
                             return
                         }
-                        ws.send(RealtimeEvents.sessionUpdate(model, "fi"))
+                        ws.send(RealtimeEvents.sessionUpdate(model, "fi", keywords = keywords))
                         socketOpen = true
                         while (backlog.isNotEmpty()) {
                             ws.send(RealtimeEvents.appendAudio(backlog.removeFirst()))

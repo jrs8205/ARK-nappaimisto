@@ -58,6 +58,46 @@ class RealtimeEventsTest {
     }
 
     @Test
+    fun `avainsanat kulkevat transkription mukana`() {
+        val json = JSONObject(
+            RealtimeEvents.sessionUpdate(
+                "gpt-live-transcribe", "fi",
+                keywords = listOf("prx4", "jarsi.org"),
+            )
+        )
+        val keywords = json.getJSONObject("session").getJSONObject("audio")
+            .getJSONObject("input").getJSONObject("transcription")
+            .getJSONArray("keywords")
+        assertEquals(2, keywords.length())
+        assertEquals("prx4", keywords.getString(0))
+        assertEquals("jarsi.org", keywords.getString(1))
+    }
+
+    @Test
+    fun `kielletyt merkit suodattavat avainsanan pois`() {
+        // Palvelu hylkää avainsanat, joissa on <, > tai rivinvaihtoja.
+        val json = JSONObject(
+            RealtimeEvents.sessionUpdate(
+                "gpt-live-transcribe", "fi",
+                keywords = listOf("kelpo", "paha<sana", "iso>", "rivin\nvaihto", "palautus\r", " "),
+            )
+        )
+        val keywords = json.getJSONObject("session").getJSONObject("audio")
+            .getJSONObject("input").getJSONObject("transcription")
+            .getJSONArray("keywords")
+        assertEquals(1, keywords.length())
+        assertEquals("kelpo", keywords.getString(0))
+    }
+
+    @Test
+    fun `ilman avainsanoja kenttaa ei laheteta`() {
+        val json = JSONObject(RealtimeEvents.sessionUpdate("gpt-live-transcribe", "fi"))
+        val transcription = json.getJSONObject("session").getJSONObject("audio")
+            .getJSONObject("input").getJSONObject("transcription")
+        assertTrue(!transcription.has("keywords"))
+    }
+
+    @Test
     fun `viivevalinta kulkee transkription mukana`() {
         val json = JSONObject(
             RealtimeEvents.sessionUpdate("gpt-realtime-whisper", "fi", delay = "high")

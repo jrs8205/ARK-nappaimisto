@@ -1,5 +1,6 @@
 package org.jarsi.ark.dictation
 
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import java.util.Base64
@@ -43,13 +44,26 @@ object RealtimeEvents {
      * Istunnon asetusviesti. Suoratoistomalli hoitaa jaksotuksen itse,
      * joten se ei saa turn_detection-kenttää; eräpohjaiset mallit
      * tarvitsevat palvelimen VAD:n, joka jakaa jatkuvan äänivirran
-     * lausumiin ilman että ääntä putoaa väleistä.
+     * lausumiin ilman että ääntä putoaa väleistä. [keywords] on
+     * sanastovihjelista (käyttäjän omat sanat), jonka palvelu painottaa
+     * tunnistuksessa; sanat joissa on kiellettyjä merkkejä suodatetaan.
      */
-    fun sessionUpdate(model: String, language: String, delay: String? = null): String {
+    fun sessionUpdate(
+        model: String,
+        language: String,
+        delay: String? = null,
+        keywords: List<String> = emptyList(),
+    ): String {
         val transcription = JSONObject()
             .put("model", model)
             .put("language", language)
         if (delay != null) transcription.put("delay", delay)
+        val safeKeywords = keywords.filter { word ->
+            word.isNotBlank() && word.none { it == '<' || it == '>' || it == '\r' || it == '\n' }
+        }
+        if (safeKeywords.isNotEmpty()) {
+            transcription.put("keywords", JSONArray(safeKeywords))
+        }
         val input = JSONObject()
             .put(
                 "format",

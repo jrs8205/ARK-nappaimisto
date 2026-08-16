@@ -287,7 +287,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (prefs.getString(PREF_DICTATION_ENGINE, null) == "openai") {
             if (ApiKeyStore.exists(prefs, ApiKeyStore.Slot.OPENAI)) {
                 val engine = openAiDictation
-                    ?: OpenAiDictation(prefs, dictationListener).also { openAiDictation = it }
+                    ?: OpenAiDictation(prefs, dictationListener).also {
+                        // Omat opitut sanat vihjeiksi kuten järjestelmätunnistimelle.
+                        it.biasWords = { learning.biasWords(BIAS_WORD_MAX) }
+                        openAiDictation = it
+                    }
                 engine.silenceLimitMs = silence
                 engine.start()
                 return
@@ -2811,7 +2815,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val WORD_BACKSPACE_LOOKBACK = 48
         const val CORRECTION_LOOKBACK = 5000
         const val COMMON_WORD_POOL = 24
-        const val BIAS_WORD_MAX = 100
+        const val BIAS_WORD_MAX = 200
         const val PREF_TRANSLATE_SOURCE = "kaannos_lahde"
         const val PREF_TRANSLATE_TARGET = "kaannos_kohde"
         const val PREF_IMPROVE_MODEL = "claude_malli"

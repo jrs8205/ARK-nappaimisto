@@ -50,6 +50,26 @@ class TextImproverTest {
     }
 
     @Test
+    fun `paattelymallit saavat matalan paattelytason`() {
+        // Ilman rajausta päättelymalli voi polttaa koko tokenkaton
+        // näkymättömään päättelyyn ja palauttaa tyhjän — silti laskutettuna.
+        for (model in listOf("gpt-5-mini", "o3", "o4-mini")) {
+            val json = JSONObject(TextImprover.buildOpenAiRequest("moi", model))
+            assertEquals(
+                "$model tarvitsee päättelyrajauksen",
+                "low",
+                json.getJSONObject("reasoning").getString("effort"),
+            )
+        }
+    }
+
+    @Test
+    fun `tavallinen malli ei saa paattelykenttaa`() {
+        val json = JSONObject(TextImprover.buildOpenAiRequest("moi", "gpt-4o"))
+        assertTrue(!json.has("reasoning"))
+    }
+
+    @Test
     fun `versiot poimitaan json-vastauksesta`() {
         val body = """{"content":[{"type":"text","text":
             "{\"versiot\": [\"Eka versio.\", \"Toka versio.\", \"Kolmas.\"]}"}]}"""
@@ -131,18 +151,20 @@ class TextImproverTest {
     }
 
     @Test
-    fun `openai-paattelytaso vain gpt-5-malleille`() {
+    fun `openai-paattelytaso vain paattelymalleille`() {
         assertEquals(
             true,
             "\"reasoning\":{\"effort\":\"low\"}" in TextImprover.buildOpenAiRequest("x", "gpt-5.6-terra"),
         )
+        // o-sarja on myös päättelymalli: ilman rajausta se voi kuluttaa koko
+        // tokenkaton päättelyyn ja palauttaa tyhjän vastauksen laskutettuna.
         assertEquals(
-            false,
-            "reasoning" in TextImprover.buildOpenAiRequest("x", "gpt-4o"),
+            true,
+            "\"reasoning\":{\"effort\":\"low\"}" in TextImprover.buildOpenAiRequest("x", "o3"),
         )
         assertEquals(
             false,
-            "reasoning" in TextImprover.buildOpenAiRequest("x", "o3"),
+            "reasoning" in TextImprover.buildOpenAiRequest("x", "gpt-4o"),
         )
     }
 

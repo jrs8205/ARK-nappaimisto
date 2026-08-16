@@ -139,7 +139,7 @@ object TextImprover {
             .put("max_output_tokens", openAiMaxTokensFor(text))
             .put("instructions", SYSTEM_PROMPT)
             .put("input", text)
-        if (model.startsWith("gpt-5")) {
+        if (isReasoningModel(model)) {
             json.put("reasoning", JSONObject().put("effort", "low"))
         }
         return json.toString()
@@ -148,6 +148,15 @@ object TextImprover {
     /** OpenAI-katto: normaali vastausvara + kiinteä vara päättelylle. */
     fun openAiMaxTokensFor(text: String): Int =
         (maxTokensFor(text) + 6144).coerceAtMost(16384)
+
+    /**
+     * Päättelymallit (gpt-5-suku ja o-sarja) käyttävät osan tokenkatosta
+     * näkymättömään päättelyyn. Ilman matalaa tasoa oikoluvun kaltainen
+     * lyhyt tehtävä voi kuluttaa koko katon päättelyyn ja palauttaa tyhjän
+     * vastauksen — laskutettuna. Molemmat perheet näkyvät mallivalinnassa.
+     */
+    private fun isReasoningModel(model: String): Boolean =
+        model.startsWith("gpt-5") || Regex("^o\\d").containsMatchIn(model)
 
     // Käännös on yksi teksti kolmen version sijaan, joten katto on pienempi.
     private fun translateMaxTokensFor(text: String): Int =
@@ -189,7 +198,7 @@ object TextImprover {
             .put("max_output_tokens", (translateMaxTokensFor(text) + 6144).coerceAtMost(16384))
             .put("instructions", translatePrompt(sourceName, targetName))
             .put("input", text)
-        if (model.startsWith("gpt-5")) {
+        if (isReasoningModel(model)) {
             json.put("reasoning", JSONObject().put("effort", "low"))
         }
         return json.toString()

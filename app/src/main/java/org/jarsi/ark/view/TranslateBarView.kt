@@ -22,6 +22,7 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import org.jarsi.ark.R
@@ -350,7 +351,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     @SuppressLint("ClickableViewAccessibility")
-    private val bufferView = object : TextView(context) {
+    private val bufferView = object : AppCompatTextView(context) {
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
             drawSelectionHandles(canvas, this)

@@ -2796,6 +2796,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             SystemClock.uptimeMillis() - lastEditTime > EXTERNAL_SELECTION_MS
         ) {
             learning.resetContext()
+            // Korjauksen peruutus ja undo tunnistavat kohteensa pelkästä
+            // kursoria edeltävästä tekstistä. Kursorihypyn jälkeen sama
+            // teksti voi olla muuallakin, jolloin askelpalautin muuttaisi
+            // väärää esiintymää — sidonta katkeaa kun kursori siirtyy.
+            pendingRevert = null
+            pendingSpaceRevert = null
+            textUndo.clear()
         }
         updateAutoCaps()
         if (autoSpaceState > 0) autoSpaceState--

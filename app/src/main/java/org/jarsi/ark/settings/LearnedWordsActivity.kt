@@ -216,12 +216,12 @@ class LearnedWordsActivity : AppCompatActivity() {
                     1 -> mutate(entity) { db ->
                         if (entity.blocked && entity.count == 0 && entity.acceptedCount == 0) {
                             // Pelkkä estorivi: eston purku siivoaa rivin kokonaan.
-                            db.dao().deleteWord(entity.key)
+                            deleteWordFully(db, entity.key)
                         } else {
                             db.dao().upsertWords(listOf(entity.copy(blocked = !entity.blocked)))
                         }
                     }
-                    2 -> mutate(entity) { db -> db.dao().deleteWord(entity.key) }
+                    2 -> mutate(entity) { db -> deleteWordFully(db, entity.key) }
                 }
             }
             .show()
@@ -252,6 +252,18 @@ class LearnedWordsActivity : AppCompatActivity() {
                 // Tyhjennysvirhe ei kaada näkymää; lista jää ennalleen.
             }
         }
+    }
+
+    /**
+     * Poistaa sanan myös sanaketjuista. Pelkkä sanarivin poisto jättäisi
+     * bigrammit ja trigrammit paikoilleen, ja koska ennustus ei vaadi
+     * sanariviä, poistettu sana palaisi heti seuraavan sanan ehdotukseksi.
+     * Näppäimistön oma poisto tekee saman siivouksen.
+     */
+    private fun deleteWordFully(db: LearnedDatabase, key: String) {
+        db.dao().deleteWord(key)
+        db.dao().deleteBigramsFor(key)
+        db.dao().deleteTrigramsFor(key)
     }
 
     private fun mutate(entity: WordEntity, change: (LearnedDatabase) -> Unit) {

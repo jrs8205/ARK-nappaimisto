@@ -63,6 +63,18 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     private fun isChainToken(word: String) =
         word.length in 1..32 && word.all { isWordChar(it) }
 
+    /**
+     * Uudelleenlataus alkaa: tästä hetkestä eteenpäin kirjoitetut sanat
+     * jonottavat kuten kylmäkäynnistyksessä. Ilman tätä lukuhetken jälkeen
+     * opittu sana katoaisi, kun [load] korvaa muistin sisällön tilannekuvalla
+     * jossa sitä ei vielä ole — ja koska sanaa ei enää ole muistissa, sitä ei
+     * myöskään kirjoitettaisi tietokantaan.
+     */
+    @Synchronized
+    fun beginReload() {
+        loaded = false
+    }
+
     @Synchronized
     fun load(
         loadedWords: List<LearnedWord>,

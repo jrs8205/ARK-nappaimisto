@@ -162,7 +162,17 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 setOnPreferenceChangeListener { _, newValue ->
                     preferenceManager.sharedPreferences?.let {
-                        ApiKeyStore.save(it, newValue as? String ?: "", slot)
+                        // Salaus voi epäonnistua laitteella jonka Keystore on
+                        // rikki. Avain tallennetaan silti, jotta ominaisuus
+                        // toimii — mutta käyttäjän pitää tietää se, koska
+                        // asetusteksti lupaa salauksen.
+                        if (!ApiKeyStore.save(it, newValue as? String ?: "", slot)) {
+                            Toast.makeText(
+                                requireContext(),
+                                R.string.asetus_avain_ei_salausta,
+                                Toast.LENGTH_LONG,
+                            ).show()
+                        }
                     }
                     // Palvelurivin "Käytössä / Ei käytössä" seuraa avainta heti.
                     refreshAiServiceRows(

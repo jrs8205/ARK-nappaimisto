@@ -477,6 +477,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         if (loadedStamp == LearnedDataStamp.stamp) return
         val stamp = LearnedDataStamp.stamp
         loadedStamp = stamp
+        // Lukuhetken jälkeen kirjoitetut sanat jonoon, ettei tilannekuva
+        // pyyhi niitä muistista päälle kirjoittaessaan.
+        learning.beginReload()
         Thread {
             try {
                 val (words, pairs, triples) = readLearnedData(db)
@@ -795,6 +798,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun onTranslatePairChanged() {
         // Uusi kielipari tuo uuden käännöksen, joten korjaus päättyy.
         stopTranslationEditing()
+        // Vanha käännös on tehty toiselle kieliparille: se ei saa jäädä
+        // näkyviin tuoreena eikä kelvata vietäväksi, muuten kenttään voisi
+        // päätyä englantia ruotsi valittuna. Sukupolven nosto hylkää myös
+        // kesken olevan AI-käännöksen vastauksen.
+        currentTranslation = ""
+        translationFresh = false
+        aiTranslateGeneration++
         updateTranslateBar()
         checkTranslationModels()
         scheduleLiveTranslate()

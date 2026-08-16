@@ -171,6 +171,7 @@
     <string name="sanelu_openai_ei_avainta">OpenAI-avainta ei ole asetettu – sanelu käyttää laitteen tunnistusta</string>
     <string name="sanelu_verkkovirhe">Sanelun tunnistus epäonnistui: %1$s</string>
     <string name="sanelu_aikaraja">Sanelu päättyi viiden minuutin ylärajaan</string>
+    <string name="asetus_avain_ei_salausta">Avain tallennettiin, mutta laitteen suojattu avainsäilö ei ollut käytettävissä, joten sitä ei voitu salata. Avain on silti vain tämän sovelluksen käytössä eikä päädy varmuuskopioihin.</string>
     <string name="kaannoskielet">Käännöskielet</string>
     <string name="kaannoskielet_kuvaus">Lataa ja poista käännösmalleja (noin 30 Mt kieltä kohden)</string>
     <string name="asetus_kaannos_muisti">Käännöksen muistiaika (minuuttia)</string>

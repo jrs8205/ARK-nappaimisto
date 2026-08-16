@@ -174,6 +174,26 @@ class OpenAiDictation(
                     mainHandler.post { handleEvent(event, mySession) }
                 }
 
+                /**
+                 * Palvelin voi sulkea istunnon siististi (esim. väärä avain
+                 * → sulkukoodi 3000). Se ei kulje onFailuren kautta, joten
+                 * ilman tätä mikrofoni jäisi käymään kuolleen yhteyden
+                 * kanssa hiljaisuusrajaan tai viiden minuutin kattoon asti.
+                 */
+                override fun onClosing(ws: WebSocket, code: Int, reason: String) {
+                    mainHandler.post {
+                        if (mySession != session || !isActive) return@post
+                        if (code != CLOSE_NORMAL) {
+                            listener.onDictationErrorMessage(
+                                reason.ifEmpty { "yhteys katkesi ($code)" }
+                            )
+                        }
+                        // Kertyneet deltat pelastetaan kenttään finishNow'ssa.
+                        stopRequested = true
+                        finishNow(mySession)
+                    }
+                }
+
                 override fun onFailure(ws: WebSocket, t: Throwable, response: Response?) {
                     mainHandler.post {
                         if (mySession != session) return@post

@@ -53,13 +53,19 @@ object ApiKeyStore {
         prefs.getString(slot.encryptedPref, null) != null ||
             prefs.getString(slot.plainPref, null)?.isNotBlank() == true
 
-    /** Tallentaa avaimen salattuna; tyhjä arvo poistaa avaimen kokonaan. */
-    fun save(prefs: SharedPreferences, plainKey: String, slot: Slot = Slot.CLAUDE) {
+    /**
+     * Tallentaa avaimen salattuna; tyhjä arvo poistaa avaimen kokonaan.
+     * Palauttaa false, jos laitteen Keystore ei toiminut ja avain jouduttiin
+     * tallentamaan salaamattomana. Varareitti on tarkoituksellinen, jotta
+     * ominaisuus toimii myös rikkinäisellä Keystorella — mutta kutsujan
+     * pitää kertoa siitä käyttäjälle, koska asetusteksti lupaa salauksen.
+     */
+    fun save(prefs: SharedPreferences, plainKey: String, slot: Slot = Slot.CLAUDE): Boolean {
         val trimmed = plainKey.trim()
         if (trimmed.isEmpty()) {
             prefs.edit().remove(slot.encryptedPref).remove(slot.plainPref).apply()
             cached.remove(slot)
-            return
+            return true
         }
         val encrypted = encrypt(trimmed)
         prefs.edit().apply {
@@ -73,6 +79,7 @@ object ApiKeyStore {
             }
         }.apply()
         cached[slot] = trimmed
+        return encrypted != null
     }
 
     private fun encrypt(plain: String): String? = try {

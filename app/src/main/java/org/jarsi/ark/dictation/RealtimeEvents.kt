@@ -134,10 +134,21 @@ object RealtimeEvents {
                 json.optJSONObject("error")?.optString("message").orEmpty(),
                 fatal = false,
             )
-            "error" -> Incoming.Failure(
-                json.optJSONObject("error")?.optString("message").orEmpty(),
-                fatal = true,
-            )
+            "error" -> {
+                val error = json.optJSONObject("error")
+                // Istunnon asetuksiin osoittava virhe tarkoittaa, ettei
+                // tuloksia tule koskaan: palvelin pitää soketin auki, joten
+                // lopetus on meidän vastuullamme. Muut virheet koskevat
+                // yksittäistä tapahtumaa ja istunto jatkuu — todennettu
+                // 16.8.2026: liian lyhyt commit palautti virheen ilman
+                // param-kenttää ja istunto vastasi normaalisti sen jälkeen.
+                // Aidosti kuolettavat viat (esim. väärä avain) sulkevat
+                // soketin palvelimen päästä, ja sen hoitaa onClosing.
+                Incoming.Failure(
+                    error?.optString("message").orEmpty(),
+                    fatal = error?.optString("param").orEmpty().startsWith("session"),
+                )
+            }
             else -> null
         }
     }

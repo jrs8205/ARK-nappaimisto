@@ -193,12 +193,42 @@ class RealtimeEventsTest {
     }
 
     @Test
-    fun `istuntovirhe kertoo syyn ja paattaa istunnon`() {
+    fun `istuntoasetusten hylkays paattaa istunnon`() {
+        // Hylätty session.update tarkoittaa ettei tuloksia tule koskaan.
         val event = RealtimeEvents.parse(
-            """{"type":"error","error":{"message":"väärä avain"}}"""
+            """{"type":"error","error":{"message":"not supported",
+                "param":"session.audio.input.turn_detection"}}"""
         )
         assertEquals(
-            RealtimeEvents.Incoming.Failure("väärä avain", fatal = true),
+            RealtimeEvents.Incoming.Failure("not supported", fatal = true),
+            event,
+        )
+    }
+
+    @Test
+    fun `avainvirhe ei paata istuntoa itse - palvelin sulkee soketin`() {
+        // Väärä avain tulee ilman param-kenttää, mutta palvelin sulkee
+        // soketin koodilla 3000; lopetuksen hoitaa sulkukäsittelijä.
+        val event = RealtimeEvents.parse(
+            """{"type":"error","error":{"message":"Incorrect API key provided",
+                "code":"invalid_api_key","param":null}}"""
+        )
+        assertEquals(
+            RealtimeEvents.Incoming.Failure("Incorrect API key provided", fatal = false),
+            event,
+        )
+    }
+
+    @Test
+    fun `ohimenevä virhe ei katkaise saneluä kesken lauseen`() {
+        // Yksittäinen tapahtumatason virhe ei tee istunnosta käyttökelvotonta:
+        // katkaisu keskellä lausetta veisi jo maksetun puheen hukkaan.
+        val event = RealtimeEvents.parse(
+            """{"type":"error","error":{"message":"buffer too small",
+                "param":"input_audio_buffer"}}"""
+        )
+        assertEquals(
+            RealtimeEvents.Incoming.Failure("buffer too small", fatal = false),
             event,
         )
     }

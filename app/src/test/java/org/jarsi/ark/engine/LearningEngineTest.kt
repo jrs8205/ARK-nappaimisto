@@ -13,6 +13,29 @@ class LearningEngineTest {
         LearningEngine { now }.apply { load(emptyList(), emptyList(), emptyList()) }
 
     @Test
+    fun `uudelleenlatauksen aikana kirjoitettu sana ei katoa`() {
+        // Asetuksista palattaessa data luetaan taustalla ja korvaa muistin
+        // sisällön. Lukuhetken jälkeen kirjoitettu sana ei ole tilannekuvassa,
+        // joten ilman jonoa se katoaisi pysyvästi.
+        val e = engine()
+        e.beginReload()
+        e.onWordCommitted("uusisana")
+        e.load(emptyList(), emptyList(), emptyList())
+        assertEquals(listOf("uusisana"), e.suggest("uusi"))
+        assertTrue(e.isOwnWord("uusisana"))
+    }
+
+    @Test
+    fun `uudelleenlataus ei herata asetuksista poistettua sanaa`() {
+        val e = engine()
+        e.onWordCommitted("vanha")
+        e.beginReload()
+        // Tilannekuva ilman sanaa = se poistettiin asetuksista.
+        e.load(emptyList(), emptyList(), emptyList())
+        assertFalse(e.isOwnWord("vanha"))
+    }
+
+    @Test
     fun `sana opitaan ja ehdotetaan heti`() {
         val e = engine()
         e.onWordCommitted("prx4")

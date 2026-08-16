@@ -327,16 +327,27 @@ class ClipboardPanelView(context: Context) : FrameLayout(context) {
         override fun getItemCount() = items.size
     }
 
+    /**
+     * Pikkukuva ruudukon soluun. Näytteistys ottaa huomioon molemmat mitat:
+     * pelkkään korkeuteen katsominen purki hyvin leveän mutta matalan kuvan
+     * täydellä leveydellä, jolloin muistia voi loppua kesken. Muistivirhe
+     * ei ole Exception, joten se otetaan erikseen kiinni — näppäimistön
+     * kaatuminen veisi näppäimistön pois käyttäjän alta.
+     */
     private fun decodeThumbnail(path: String) = try {
         if (File(path).exists()) {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(path, bounds)
-            val sample = (bounds.outHeight / dp(84)).coerceAtLeast(1)
+            val target = dp(84).coerceAtLeast(1)
+            val sample = maxOf(bounds.outHeight / target, bounds.outWidth / target)
+                .coerceAtLeast(1)
             BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
         } else {
             null
         }
     } catch (e: Exception) {
+        null
+    } catch (e: OutOfMemoryError) {
         null
     }
 }

@@ -22,7 +22,8 @@ import kotlin.math.max
  * API-avaimella. Kaikki mikrofonin ääni virtaa WebSocketilla palvelulle
  * jatkuvana — laitteella ei pätkitä mitään, joten puhetta ei katoa
  * pätkärajoille eikä kuuntelu katkea melussa. Suoratoistomallilla
- * (gpt-realtime-*) teksti ilmestyy deltoina puheen tahdissa ja lopullinen
+ * (gpt-live-transcribe, gpt-realtime-*) teksti ilmestyy deltoina puheen
+ * tahdissa ja lopullinen
  * transkriptio valmistuu lopetuksen commitista; eräpohjaisilla malleilla
  * palvelimen VAD jakaa virran lausumiin ja tekstit valmistuvat pitkin
  * matkaa. Istunto päättyy vain omaan hiljaisuusrajaan tai pysäytykseen.
@@ -89,7 +90,7 @@ class OpenAiDictation(
         synchronized(backlog) { backlog.clear() }
         val model = prefs.getString(PREF_MODEL, null)?.takeIf { it.isNotBlank() }
             ?: DEFAULT_MODEL
-        streamingModel = model.startsWith("gpt-realtime")
+        streamingModel = RealtimeEvents.isStreaming(model)
         listener.onDictationStateChanged(true)
         val mySession = ++session
         openSocket(apiKey, model, mySession)
@@ -350,7 +351,7 @@ class OpenAiDictation(
          * -mallivalintaa; lista haetaan livenä
          * [TextImprover.parseTranscribeModels].
          */
-        const val DEFAULT_MODEL = "gpt-realtime-whisper"
+        const val DEFAULT_MODEL = "gpt-live-transcribe"
         const val PREF_MODEL = "sanelu_malli"
 
         private const val SAMPLE_RATE = RealtimeEvents.SAMPLE_RATE

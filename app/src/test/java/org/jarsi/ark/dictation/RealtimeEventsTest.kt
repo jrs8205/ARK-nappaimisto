@@ -31,6 +31,25 @@ class RealtimeEventsTest {
     }
 
     @Test
+    fun `live-transkriptiomalli ei kayta palvelimen puheentunnistusta`() {
+        // gpt-live-transcribe hylkää turn_detectionin kokonaan: palvelin
+        // vastaa fataalilla virheellä, jos kenttä lähetetään.
+        val json = JSONObject(RealtimeEvents.sessionUpdate("gpt-live-transcribe", "fi"))
+        val input = json.getJSONObject("session").getJSONObject("audio")
+            .getJSONObject("input")
+        assertTrue(!input.has("turn_detection"))
+    }
+
+    @Test
+    fun `suoratoistomallit tunnistetaan tunnisteesta`() {
+        assertTrue(RealtimeEvents.isStreaming("gpt-realtime-whisper"))
+        assertTrue(RealtimeEvents.isStreaming("gpt-live-transcribe"))
+        assertTrue(!RealtimeEvents.isStreaming("gpt-4o-transcribe"))
+        assertTrue(!RealtimeEvents.isStreaming("gpt-transcribe"))
+        assertTrue(!RealtimeEvents.isStreaming("whisper-1"))
+    }
+
+    @Test
     fun `erapohjainen malli saa palvelimen puheentunnistuksen`() {
         val json = JSONObject(RealtimeEvents.sessionUpdate("gpt-4o-transcribe", "fi"))
         val input = json.getJSONObject("session").getJSONObject("audio")

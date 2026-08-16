@@ -31,10 +31,19 @@ object RealtimeEvents {
     }
 
     /**
-     * Istunnon asetusviesti. Suoratoistomalli (gpt-realtime-*) hoitaa
-     * jaksotuksen itse, joten se ei saa turn_detection-kenttää;
-     * eräpohjaiset mallit tarvitsevat palvelimen VAD:n, joka jakaa
-     * jatkuvan äänivirran lausumiin ilman että ääntä putoaa väleistä.
+     * Suoratoistomallit (gpt-realtime-* ja gpt-live-transcribe*) tuottavat
+     * deltoja puheen tahdissa eivätkä hyväksy turn_detection-kenttää —
+     * gpt-live-transcribe vastaa siihen fataalilla virheellä (todennettu
+     * 16.8.2026). Lopetus tehdään commitilla.
+     */
+    fun isStreaming(model: String): Boolean =
+        model.startsWith("gpt-realtime") || model.startsWith("gpt-live-transcribe")
+
+    /**
+     * Istunnon asetusviesti. Suoratoistomalli hoitaa jaksotuksen itse,
+     * joten se ei saa turn_detection-kenttää; eräpohjaiset mallit
+     * tarvitsevat palvelimen VAD:n, joka jakaa jatkuvan äänivirran
+     * lausumiin ilman että ääntä putoaa väleistä.
      */
     fun sessionUpdate(model: String, language: String, delay: String? = null): String {
         val transcription = JSONObject()
@@ -47,7 +56,7 @@ object RealtimeEvents {
                 JSONObject().put("type", "audio/pcm").put("rate", SAMPLE_RATE),
             )
             .put("transcription", transcription)
-        if (!model.startsWith("gpt-realtime")) {
+        if (!isStreaming(model)) {
             input.put("turn_detection", JSONObject().put("type", "server_vad"))
         }
         return JSONObject()

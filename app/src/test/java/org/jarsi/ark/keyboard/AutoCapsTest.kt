@@ -68,6 +68,14 @@ class AutoCapsTest {
     }
 
     @Test
+    fun `lyhennetarkistus koskee vain pistetta`() {
+        assertTrue(AutoCaps.wanted("jarsi.org? ", sentences))
+        assertTrue(AutoCaps.wanted("jarsi.org! ", sentences))
+        assertTrue(AutoCaps.wanted("jarsi.org… ", sentences))
+        assertTrue(AutoCaps.wanted("jarsi.org?\n", sentences))
+    }
+
+    @Test
     fun `avaavat merkit eivat katkaise lauseen alkua`() {
         assertTrue(AutoCaps.wanted("Hei. (", sentences))
         assertTrue(AutoCaps.wanted("Hei. \"", sentences))

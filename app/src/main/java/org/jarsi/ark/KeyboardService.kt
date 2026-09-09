@@ -1378,7 +1378,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
      */
     private fun performDoubleSpacePeriod(): Boolean {
         val ic = currentInputConnection ?: return false
-        val before = ic.getTextBeforeCursor(3, 0)?.toString().orEmpty()
+        // Ison alkukirjaimen ennuste tarvitsee koko sanan (lyhennesääntö),
+        // ei vain viimeisiä merkkejä.
+        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0)?.toString().orEmpty()
         if (before.length < 2 || !before.endsWith(" ")) return false
         if (!SmartSpace.canEndSentence(before[before.length - 2])) return false
         ic.beginBatchEdit()
@@ -1387,6 +1389,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         ic.endBatchEdit()
         // Heti perään painettu kolmas väli ohitetaan kuten automaattivälin.
         punctSpaceAdded = true
+        updateAutoCaps(before.dropLast(1) + ". ")
         return true
     }
 
@@ -1476,12 +1479,14 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
      */
     private fun commitSpaceWithAutoCorrect() {
         val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val known = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0)?.toString()
+        val before = known.orEmpty()
         val typed = WordTools.currentWord(before)
         val context = WordTools.previousWords(before)
         val shown = shownCompletions
         shownCompletions = emptyList()
         ic.commitText(" ", 1)
+        updateAutoCaps(known?.let { "$it " })
         if (typed.isEmpty() || !learningEnabled) return
         if (!autoCorrectEnabled || noSuggestionsField) {
             learning.onSuggestionsIgnored(shown, typed)
@@ -2118,7 +2123,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0) ?: ""
+        val known = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0)?.toString()
+        val before = known.orEmpty()
         val current = WordTools.currentWord(before)
         // Välimerkin perään valittu ennustus saa välin eteensä samoin kuin
         // kirjoitettu kirjain, ja lauseen alku isonnetaan.
@@ -2154,7 +2160,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             maybeFlush()
         }
         feedback()
-        updateAutoCaps(committed)
+        updateAutoCaps(known?.let { it.dropLast(current.length) + committed })
         updateSuggestions()
     }
 
@@ -2270,10 +2276,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // eikä se saa estää välimerkkisääntöjä.
         val afterCursor = ic.getTextAfterCursor(1, 0)?.toString()
         val atLineEnd = afterCursor.isNullOrEmpty() || afterCursor == "\n"
+        // Edeltävä teksti luetaan ennen muokkausta: välimerkkisäännöt
+        // katsovat viimeistä merkkiä, ja ison alkukirjaimen ennusteeseen
+        // muokkaus sovelletaan siihen kerran.
+        val before = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0)?.toString()
+        val prev = before?.lastOrNull()
         if ((autoSpaceState > 0 || smartSpaceField) && text.length == 1 &&
-            SmartSpace.isPunctuation(text[0]) &&
-            ic.getTextBeforeCursor(1, 0)?.toString() == " " &&
-            atLineEnd
+            SmartSpace.isPunctuation(text[0]) && prev == ' ' && atLineEnd
         ) {
             // Välilyönti siirtyy välimerkin taakse: "sana ." -> "sana. "
             ic.beginBatchEdit()
@@ -2283,7 +2292,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (autoSpaceState > 0) autoSpaceState = 2
             smartSpaceState = 0
             punctSpaceAdded = true
-            updateAutoCaps(text + " ")
+            updateAutoCaps(before.orEmpty().dropLast(1) + text + " ")
             feedback()
             return
         }
@@ -2300,11 +2309,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // ei laukea (3,14) eikä keskellä tekstiä; osoitteen (jarsi.org)
         // välin saa pois yhdellä askelpalauttimella.
         if (smartSpaceField && text.length == 1 && SmartSpace.isPunctuation(text[0])) {
-            val prev = ic.getTextBeforeCursor(1, 0)?.lastOrNull()
             if (prev != null && prev != ' ' && !prev.isDigit() && atLineEnd) {
                 ic.commitText(text + " ", 1)
                 punctSpaceAdded = true
-                updateAutoCaps(text + " ")
+                updateAutoCaps(before.orEmpty() + text + " ")
                 feedback()
                 return
             }
@@ -2381,7 +2389,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     onTranslateBufferChanged()
                 } else if (doubleTap && smartSpaceField && performDoubleSpacePeriod()) {
                     lastSpaceTime = 0
-                    updateAutoCaps(". ")
                 } else if (swallowPunctSpace &&
                     currentInputConnection?.getTextBeforeCursor(1, 0)?.toString() == " "
                 ) {
@@ -2389,7 +2396,6 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     // ettei "sana, " saa tuplaväliä totutusta näppäilystä.
                 } else {
                     commitSpaceWithAutoCorrect()
-                    updateAutoCaps(" ")
                 }
                 feedback(AudioManager.FX_KEYPRESS_SPACEBAR)
             }
@@ -2475,6 +2481,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             ic.performEditorAction(action)
         } else {
             ic.commitText("\n", 1)
+            // Rivinvaihdon jälkeen edeltävällä tekstillä ei ole väliä.
             updateAutoCaps("\n")
         }
         feedback(AudioManager.FX_KEYPRESS_RETURN)
@@ -2484,13 +2491,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
      * Iso alkukirjain päätellään kursorin edeltävästä tekstistä itse, ei
      * kentän getCursorCapsMode-vastauksesta: moni sovellus ei toteuta sitä
      * tai vastaa vanhentuneesta tekstistä, ja vastaus voi jäädä kokonaan
-     * tulematta sovelluksen ollessa kiireinen. [pending] on juuri lähetetty
-     * teksti, jota kenttä ei välttämättä ole vielä ehtinyt käsitellä — sen
-     * kanssa vuoro vaihtuu heti näkyvästi kuten Gboardissa eikä odota
-     * sovelluksen valintapäivitystä, joka jää joissain sovelluksissa
-     * kokonaan tulematta.
+     * tulematta sovelluksen ollessa kiireinen. [predicted] on kursorin
+     * edeltävä teksti oman muokkauksen jälkeen: ennen muokkausta luettu
+     * teksti, johon muokkaus on sovellettu täsmälleen kerran (kentältä
+     * luettu teksti voi jo sisältää sen, ja kahdesti sovellettuna
+     * lyhennesääntö pettäisi). Sen kanssa vuoro vaihtuu heti näkyvästi
+     * kuten Gboardissa eikä odota sovelluksen valintapäivitystä, joka jää
+     * joissain sovelluksissa kokonaan tulematta. Ilman ennustetta teksti
+     * luetaan kentältä.
      */
-    private fun updateAutoCaps(pending: String = "") {
+    private fun updateAutoCaps(predicted: CharSequence? = null) {
         if (page != Page.LETTERS || manualShift || shiftState == ShiftState.CAPS) return
         val caps = if (translateMode) {
             val buffer = activeTranslateBuffer()
@@ -2501,13 +2511,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 false
             } else {
                 val ic = currentInputConnection ?: return
-                val known = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0)?.toString()
-                val before = when {
-                    known != null -> known + pending
-                    // Rivinvaihdon jälkeen tulos ei riipu edeltävästä tekstistä.
-                    pending.endsWith("\n") -> pending
-                    else -> return
-                }
+                val before = predicted
+                    ?: ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0)
+                    ?: return
                 AutoCaps.wanted(before, info.inputType)
             }
         }

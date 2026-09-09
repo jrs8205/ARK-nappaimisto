@@ -47,6 +47,9 @@ object AutoCaps {
         while (j > 0 && isClosing(before[j - 1])) j--
         if (j == 0 || !SmartSpace.isSentenceEnder(before[j - 1])) return false
         // Piste sanan sisällä (jarsi.org., e.g.) on lyhenne, ei lauseen loppu.
+        // Muut päättävät merkit eivät ole lyhenteitä: jarsi.org? aloittaa
+        // uuden lauseen.
+        if (before[j - 1] != '.') return true
         var k = j - 2
         while (k >= 0) {
             val c = before[k]

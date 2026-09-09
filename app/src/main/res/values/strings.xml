@@ -34,7 +34,6 @@
     <string name="tyokalu_mikrofoni">Sanelu</string>
     <string name="tyokalu_emojit">Emojit</string>
     <string name="tyokalu_leikepoyta">Leikepöytä</string>
-    <string name="tyokalu_oikoluku">Korjausnäkymä</string>
     <string name="tyokalu_kaannos">Käännös</string>
     <string name="tyokalu_peruutus">Peruutus</string>
     <string name="tyokalu_asetukset">Asetukset</string>
@@ -66,15 +65,15 @@
 
     <string name="asetukset_tekoaly">Tekoäly</string>
     <string name="asetus_ai_palvelu">AI-palvelu (Claude / ChatGPT)</string>
-    <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s (Paranna teksti ja AI-käännös). Napauta vaihtaaksesi palvelua.</string>
+    <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s (käännösnäkymän AI-käännös). Napauta vaihtaaksesi palvelua.</string>
     <string name="asetus_ai_palvelu_ei_avainta">Ei käytössä: lisää %1$s-avain alle, niin AI-toiminnot tulevat käyttöön.</string>
     <string name="asetus_api_avain">Claude API -avain</string>
-    <string name="asetus_api_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon ja käännösnäkymän AI-käännöksen. Teksti lähetetään Anthropicin palveluun vain kun käytät toimintoa itse; avain säilyy vain tällä laitteella salattuna.</string>
-    <string name="asetus_malli">Korjausten ja käännösten Claude-malli</string>
+    <string name="asetus_api_avain_kuvaus">Ottaa käyttöön käännösnäkymän AI-käännöksen. Teksti lähetetään Anthropicin palveluun vain kun käytät toimintoa itse; avain säilyy vain tällä laitteella salattuna.</string>
+    <string name="asetus_malli">AI-käännöksen Claude-malli</string>
     <string name="asetus_malli_nykyinen">Käytössä: %1$s. Lista haetaan Anthropicilta omalla avaimellasi.</string>
     <string name="asetus_openai_avain">ChatGPT API -avain</string>
-    <string name="asetus_openai_avain_kuvaus">Ottaa käyttöön Paranna teksti -toiminnon, käännösnäkymän AI-käännöksen ja OpenAI-sanelun. Teksti tai puhe lähetetään OpenAI:n palveluun vain kun käytät toimintoa itse; avain säilyy vain tällä laitteella salattuna.</string>
-    <string name="asetus_openai_malli">Korjausten ja käännösten ChatGPT-malli</string>
+    <string name="asetus_openai_avain_kuvaus">Ottaa käyttöön käännösnäkymän AI-käännöksen ja OpenAI-sanelun. Teksti tai puhe lähetetään OpenAI:n palveluun vain kun käytät toimintoa itse; avain säilyy vain tällä laitteella salattuna.</string>
+    <string name="asetus_openai_malli">AI-käännöksen ChatGPT-malli</string>
     <string name="asetus_malli_nykyinen_openai">Käytössä: %1$s. Lista haetaan OpenAI:lta omalla avaimellasi.</string>
     <string name="malli_aseta_avain">Aseta ensin API-avain</string>
 
@@ -88,16 +87,8 @@
     </string-array>
     <string name="malli_haku_virhe">Mallilistan haku epäonnistui – tarkista API-avain ja verkkoyhteys</string>
     <string name="malli_haku_virhe_syy">Mallilistan haku epäonnistui: %1$s</string>
-    <string name="korjaus_paranna">Paranna teksti</string>
-    <string name="korjaus_parannus_otsikko">Valitse parannus napauttamalla</string>
-    <string name="korjaus_parannetaan">Lähetetään teksti Anthropicille…</string>
-    <string name="korjaus_parannetaan_openai">Lähetetään teksti OpenAI:lle…</string>
-    <string name="korjaus_paranna_liian_pitka">Teksti on liian pitkä parannettavaksi (enintään 5 000 merkkiä)</string>
-    <string name="korjaus_hylkaa">Hylkää</string>
-    <string name="korjaus_paranna_virhe">Parannus epäonnistui – tarkista verkkoyhteys ja API-avain</string>
-    <string name="korjaus_paranna_virhe_syy">Parannus epäonnistui: %1$s</string>
-    <string name="korjaus_tyhja_vastaus">palvelu palautti tyhjän vastauksen</string>
-    <string name="korjaus_ei_korjattavaa">Teksti on jo kunnossa – ei korjattavaa</string>
+    <string name="kaannos_ai_liian_pitka">Teksti on liian pitkä AI-käännettäväksi (enintään 5 000 merkkiä)</string>
+    <string name="kaannos_ai_tyhja_vastaus">palvelu palautti tyhjän vastauksen</string>
 
     <string name="asetukset_varmuuskopio">Varmuuskopio</string>
     <string name="varmuuskopio_vie">Vie varmuuskopio</string>
@@ -110,8 +101,6 @@
 
     <string name="sanelu_virhe">Sanelu ei onnistunut</string>
     <string name="sanelu_ei_saatavilla">Sanelu ei ole käytettävissä tällä laitteella</string>
-
-    <string name="korjaus_tyhja">Kentässä ei ole tekstiä.\n\nOikoluku alleviivaa kentän tuntemattomat sanat, ja sanaa napauttamalla näet korjausvaihtoehdot ehdotusrivillä. Paranna teksti -AI-nappi tulee näkyviin, kun API-avain on asetettu asetuksissa.</string>
 
     <!-- Saavutettavuuskuvaukset kuvakenapeille -->
     <string name="cd_poista_merkki">Poista merkki</string>
@@ -149,7 +138,7 @@
     <string name="esittely_ehdotukset_otsikko">Ehdotukset oppivat sinulta</string>
     <string name="esittely_ehdotukset_teksti">Ehdotusrivi täydentää ja ennustaa sanoja, ja omat sanasi nousevat kärkeen heti ensimmäisestä kerrasta. Pitkä painallus ehdotukseen poistaa tai estää sanan, ja kaikkea opittua voi hallita asetuksista.</string>
     <string name="esittely_tyokalut_otsikko">Työkalurivi</string>
-    <string name="esittely_tyokalut_teksti">Ylärivillä ovat sanelu, leikepöytä, kääntäjä, korjausnäkymä ja emojit. Nappien järjestystä ja näkyvyyttä voi muokata asetuksista.</string>
+    <string name="esittely_tyokalut_teksti">Ylärivillä ovat sanelu, leikepöytä, kääntäjä ja emojit. Nappien järjestystä ja näkyvyyttä voi muokata asetuksista.</string>
     <string name="esittely_valmis_otsikko">Valmis!</string>
     <string name="esittely_valmis_teksti">Hyviä kirjoitushetkiä! Kaikki asetukset, opittujen sanojen hallinta ja varmuuskopiointi löytyvät tästä sovelluksesta.</string>
 

@@ -88,7 +88,7 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   (nykyisin 170 100 sanamuotoa taajuuksineen, ks.
   [docs/sanalista.md](docs/sanalista.md))
 * työkalurivi: kursorinsiirtotila, verkko-osoitesivu, sanelu, emojit,
-  leikepöytä, korjausnäkymä, käännös, peruutus ja asetukset; nappien
+  leikepöytä, käännös, peruutus ja asetukset; nappien
   järjestyksen ja näkyvyyden voi muokata asetuksista
 * välimerkki siirtyy ehdotuksen lisäämän välilyönnin eteen
 * älykäs jälkiväli: välimerkin perään kirjoitettu kirjain saa välin
@@ -140,11 +140,6 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   lähimpään tunnettuun; omat sanat, koodit ja estetyt jäävät aina rauhaan
 * askelpalautin heti korjauksen jälkeen peruu sen — peruttu sana opitaan,
   eikä sitä korjata enää uudestaan
-* korjausnäkymä työkaluriviltä: kentän koko teksti sanoina ja
-  tuntemattomat sanat alleviivattuna; sanaa napauttamalla ehdotusrivi
-  näyttää vaihtoehdot (kirjoitusvirheet ja paikkaan sopivat sanat) ja
-  valinta korvaa sanan paikallaan — kätevä myös sanellun tekstin
-  oikolukuun
 
 ## Muut ominaisuudet
 
@@ -204,7 +199,12 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   itsestään. Käännöksen voi kopioida leikepöydälle tai viedä
   Lisää-napilla kenttään, jolloin uusi vienti korvaa edellisen.
   ✨-nappi hakee laadukkaamman käännöksen valitulta AI-palvelulta
-  (vaatii oman API-avaimen). Myös käännöstä voi napauttaa: kursori
+  (Anthropicin Claude tai OpenAI:n ChatGPT; vaatii oman API-avaimen,
+  joka säilytetään laitteella Android Keystorella salattuna). Mallin
+  voi valita asetuksista — lista haetaan palvelusta, joten uudet mallit
+  näkyvät ilman sovelluspäivitystä. Lähetettävän tekstin pituus on
+  rajattu, ja mahdollisen virheen syy näytetään ilmoituksessa. Myös
+  käännöstä voi napauttaa: kursori
   siirtyy siihen ja konekäännöksen voi viimeistellä paikallaan ennen
   vientiä — korjattu teksti on se, joka viedään ja kopioidaan.
   Lähdekieli tunnistetaan kirjoitetusta tekstistä laitteella omien
@@ -218,16 +218,6 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
   Rivinvaihdot säilyvät käännöksessä, ja käännettävä teksti
   esikäsitellään kokonaisiksi lauseiksi, mikä parantaa käännösten
   laatua.
-* Paranna teksti (valinnainen): korjausnäkymän nappi lähettää kentän
-  tekstin valittuun AI-palveluun (Anthropicin Claude tai OpenAI:n
-  ChatGPT) ja näyttää kolme parannusehdotusta, joista valittu korvaa
-  tekstin; jos korjattavaa ei ole, siitä kerrotaan suoraan. Mallin voi
-  valita asetuksista — lista haetaan palvelusta, joten uudet mallit
-  näkyvät ilman sovelluspäivitystä, uusimmat ja kyvykkäimmät ensin.
-  Vaatii oman API-avaimen; avaimet säilytetään laitteella Android
-  Keystorella salattuina, ja ilman avainta nappia ei näytetä eikä
-  mitään lähetetä. Lähetettävän tekstin pituus on rajattu, ja
-  mahdollisen virheen syy näytetään ilmoituksessa.
 * asetussivujen Material 3 -ilme: iso kutistuva otsikko, korttirivit,
   kuvakkeet ja Material You -värit (Android 12+). Värit täyttävät
   WCAG AAA -kontrastivaatimukset molemmissa teemoissa.
@@ -239,10 +229,9 @@ analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus kolmea
 tarkoitusta varten:
 
 * käännöskielten mallien kertalataus (Google ML Kit)
-* valinnaiset AI-toiminnot (Paranna teksti ja ✨-AI-käännös), jotka
-  lähettävät tekstin valittuun AI-palveluun (Anthropic tai OpenAI) vain
-  kun käyttäjä itse painaa nappia ja on ensin asettanut oman
-  API-avaimensa
+* valinnainen ✨-AI-käännös, joka lähettää tekstin valittuun
+  AI-palveluun (Anthropic tai OpenAI) vain kun käyttäjä itse painaa
+  nappia ja on ensin asettanut oman API-avaimensa
 * valinnainen OpenAI-puheentunnistus: puhe virtaa OpenAI:lle vain kun
   käyttäjä on itse valinnut sen sanelun tunnistukseksi asetuksista ja
   asettanut oman API-avaimensa, ja vain sanelun ollessa käynnissä.

@@ -30,7 +30,7 @@ object ApiKeyStore {
     private const val ALIAS = "ark_api_avain"
     private const val GCM_TAG_BITS = 128
 
-    // Purku tapahtuu jokaisella korjausnäkymän avauksella; välimuisti
+    // Purku tapahtuu jokaisella AI-toiminnon käytöllä; välimuisti
     // säästää Keystore-kutsut yhteen per prosessi.
     private val cached = java.util.concurrent.ConcurrentHashMap<Slot, String>()
 

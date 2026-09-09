@@ -11,7 +11,6 @@ enum class ToolbarTool(val id: String) {
     MIC("mikrofoni"),
     EMOJI("emojit"),
     CLIPBOARD("leikepoyta"),
-    CORRECTION("oikoluku"),
     TRANSLATE("kaannos"),
     UNDO("peruutus"),
     SETTINGS("asetukset");

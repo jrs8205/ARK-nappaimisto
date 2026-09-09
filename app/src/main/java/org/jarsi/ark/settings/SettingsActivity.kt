@@ -21,7 +21,7 @@ import org.jarsi.ark.R
 import org.jarsi.ark.data.ApiKeyStore
 import org.jarsi.ark.dictation.OpenAiDictation
 import org.jarsi.ark.data.Backup
-import org.jarsi.ark.engine.TextImprover
+import org.jarsi.ark.engine.AiRequests
 import org.jarsi.ark.data.BackupCodec
 import org.jarsi.ark.data.LearnedDataStamp
 import org.jarsi.ark.data.LearnedDatabase
@@ -131,26 +131,26 @@ class SettingsActivity : AppCompatActivity() {
             }
             setupModelPreference(
                 key = "claude_malli",
-                defaultModel = TextImprover.MODEL,
+                defaultModel = AiRequests.MODEL,
                 slot = ApiKeyStore.Slot.CLAUDE,
-                modelsUrl = TextImprover.MODELS_ENDPOINT,
+                modelsUrl = AiRequests.MODELS_ENDPOINT,
                 summaryRes = R.string.asetus_malli_nykyinen,
                 authorize = { connection, apiKey ->
                     connection.setRequestProperty("x-api-key", apiKey)
                     connection.setRequestProperty("anthropic-version", "2023-06-01")
                 },
-                parse = TextImprover::parseModels,
+                parse = AiRequests::parseModels,
             )
             setupModelPreference(
                 key = "openai_malli",
-                defaultModel = TextImprover.OPENAI_MODEL,
+                defaultModel = AiRequests.OPENAI_MODEL,
                 slot = ApiKeyStore.Slot.OPENAI,
-                modelsUrl = TextImprover.OPENAI_MODELS_ENDPOINT,
+                modelsUrl = AiRequests.OPENAI_MODELS_ENDPOINT,
                 summaryRes = R.string.asetus_malli_nykyinen_openai,
                 authorize = { connection, apiKey ->
                     connection.setRequestProperty("authorization", "Bearer $apiKey")
                 },
-                parse = TextImprover::parseOpenAiModels,
+                parse = AiRequests::parseOpenAiModels,
             )
         }
 
@@ -229,12 +229,12 @@ class SettingsActivity : AppCompatActivity() {
                 key = OpenAiDictation.PREF_MODEL,
                 defaultModel = OpenAiDictation.DEFAULT_MODEL,
                 slot = ApiKeyStore.Slot.OPENAI,
-                modelsUrl = TextImprover.OPENAI_MODELS_ENDPOINT,
+                modelsUrl = AiRequests.OPENAI_MODELS_ENDPOINT,
                 summaryRes = R.string.asetus_malli_nykyinen_openai,
                 authorize = { connection, apiKey ->
                     connection.setRequestProperty("authorization", "Bearer $apiKey")
                 },
-                parse = TextImprover::parseTranscribeModels,
+                parse = AiRequests::parseTranscribeModels,
             )
         }
 
@@ -271,14 +271,14 @@ class SettingsActivity : AppCompatActivity() {
                 name,
             )
             // Avainrivit näkyvät aina: OpenAI-avainta tarvitaan saneluun
-            // silloinkin, kun Paranna teksti käyttää Claudea — palvelut
+            // silloinkin, kun AI-käännös käyttää Claudea — palvelut
             // toimivat rinnakkain eikä valinta piilota toisen avainta.
             findPreference<Preference>("claude_malli")?.isVisible = !chatgpt
             findPreference<Preference>("openai_malli")?.isVisible = chatgpt
         }
 
         /**
-         * Paranna teksti -mallin valinta: lista haetaan palvelun
+         * AI-käännöksen mallin valinta: lista haetaan palvelun
          * Models-rajapinnasta käyttäjän omalla avaimella, joten uudet
          * mallit näkyvät ilman sovelluspäivitystä.
          */
@@ -323,7 +323,7 @@ class SettingsActivity : AppCompatActivity() {
                         // Nopeus- ja hintaluokka auttaa valinnassa, kun
                         // mallilista elää eikä hintoja saada rajapinnasta.
                         val labels = models.map { model ->
-                            TextImprover.modelHint(model.first)
+                            AiRequests.modelHint(model.first)
                                 ?.let { "${model.second} – $it" } ?: model.second
                         }
                         MaterialAlertDialogBuilder(requireContext())
@@ -367,7 +367,7 @@ class SettingsActivity : AppCompatActivity() {
                         } else {
                             val body = connection.errorStream
                                 ?.bufferedReader()?.use { it.readText() }
-                            error = TextImprover.parseErrorMessage(body)
+                            error = AiRequests.parseErrorMessage(body)
                                 ?: "HTTP ${connection.responseCode}"
                             null
                         }

@@ -2,10 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Verkkoyhteys kolmeen tarkoitukseen: käännösmallien kertalataus,
-         valinnaiset AI-toiminnot (Paranna teksti ja ✨-käännös lähettävät
-         käsiteltävän tekstin valitulle palvelulle käyttäjän omalla
-         API-avaimella) sekä valinnainen OpenAI-sanelu. Käännös ilman ✨:ää,
-         oikoluku ja kaikki oppiminen tapahtuvat laitteella. Mitään ei lähetetä
+         valinnainen ✨-AI-käännös (lähettää käännettävän tekstin valitulle
+         palvelulle käyttäjän omalla API-avaimella) sekä valinnainen
+         OpenAI-sanelu. Käännös ilman ✨:ää ja kaikki oppiminen tapahtuvat
+         laitteella. Mitään ei lähetetä
          ilman käyttäjän omaa toimintoa: jokainen lähetys alkaa napin
          painalluksesta, eikä sovellus tee taustakyselyitä. -->
     <uses-permission android:name="android.permission.INTERNET" />

@@ -34,17 +34,15 @@ class SuggestionEngine(
     }
 
     /**
-     * Koko sanan vaihtoehdot jälkikäteiseen korjaukseen. Ehdolle pääsevät
+     * Koko sanan vaihtoehdot automaattikorjaukselle. Ehdolle pääsevät
      * kirjoitusasultaan läheiset sanat (kirjoitusvirheet) sekä sanat, jotka
-     * sopivat paikkaan ympäröivien sanojen perusteella (omat sanaparit) —
+     * sopivat paikkaan edeltävien sanojen perusteella (omat sanaparit) —
      * siksi lyhyetkin sanat saavat vaihtoehtoja. Kaikki pisteytetään samalla
-     * mallilla; muokkausetäisyys painaa kaukaisempia alaspäin ja sopivuus
-     * seuraavan sanan eteen nostaa.
+     * mallilla; muokkausetäisyys painaa kaukaisempia alaspäin.
      */
     fun alternatives(
         word: String,
         context: List<String> = emptyList(),
-        nextWord: String? = null,
         max: Int = 8,
     ): List<String> {
         if (word.isEmpty() || max <= 0) return emptyList()
@@ -69,13 +67,9 @@ class SuggestionEngine(
         }
         val contextMatches = learning.contextMatches(context)
         candidates += contextMatches.keys
-        val rightFit = nextWord?.let { learning.previousMatches(it) } ?: emptyMap()
-        candidates += rightFit.keys
         candidates -= key
         return rank(candidates, contextMatches, max) { candidate, base ->
-            val fit = rightFit[candidate] ?: 0f
-            val score = base + fit / (fit + 3f) * BIGRAM_WEIGHT
-            score * closeness(key, candidate)
+            base * closeness(key, candidate)
         }
     }
 

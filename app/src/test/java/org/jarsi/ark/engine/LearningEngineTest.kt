@@ -86,47 +86,6 @@ class LearningEngineTest {
     }
 
     @Test
-    fun `kerran kirjoitettu sana ei ole viela vakiintunut oikoluvulle`() {
-        val e = engine()
-        e.onWordCommitted("Kuki")
-        assertTrue(e.isOwnWord("Kuki"))
-        assertFalse(e.isEstablishedWord("Kuki"))
-    }
-
-    @Test
-    fun `toistuvasti kirjoitettu sana vakiintuu`() {
-        val e = engine()
-        e.onWordCommitted("prx4")
-        e.onWordCommitted("prx4")
-        assertTrue(e.isEstablishedWord("prx4"))
-    }
-
-    @Test
-    fun `hyvaksytty ehdotus vakiinnuttaa sanan heti`() {
-        val e = engine()
-        e.onWordCommitted("prx4")
-        e.onSuggestionAccepted("prx4")
-        assertTrue(e.isEstablishedWord("prx4"))
-    }
-
-    @Test
-    fun `kiinnitetty sana on vakiintunut`() {
-        val e = engine()
-        e.onWordCommitted("prx4")
-        e.setPinned("prx4", true)
-        assertTrue(e.isEstablishedWord("prx4"))
-    }
-
-    @Test
-    fun `estetty sana ei ole vakiintunut`() {
-        val e = engine()
-        e.onWordCommitted("moro")
-        e.onWordCommitted("moro")
-        e.blockWord("moro")
-        assertFalse(e.isEstablishedWord("moro"))
-    }
-
-    @Test
     fun `estetty ei nay ja esto toimii vieraalle sanalle`() {
         val e = engine()
         e.onWordCommitted("moro")
@@ -372,7 +331,6 @@ class LearningEngineTest {
         e.drainDirty()
         e.removeWord("toka")
         assertTrue(e.predictNext(listOf("eka")).isEmpty())
-        assertTrue(e.previousMatches("kolmas").isEmpty())
         val dirty = e.drainDirty()
         assertTrue("toka" in dirty.removedWords)
         assertTrue("toka" in dirty.removedChainWords)
@@ -409,35 +367,5 @@ class LearningEngineTest {
         val e = engine()
         listOf("eka", "toka", "kolmas").forEach { e.onWordCommitted(it) }
         assertEquals(2, e.biasWords(2).size)
-    }
-
-    @Test
-    fun `previousMatches loytaa sanaa edeltaneet sanat`() {
-        val e = engine()
-        listOf("koira", "on", "kiva").forEach { e.onWordCommitted(it) }
-        e.resetContext()
-        listOf("talo", "on").forEach { e.onWordCommitted(it) }
-        val matches = e.previousMatches("on")
-        assertTrue(matches.getValue("koira") > 0f)
-        assertTrue(matches.getValue("talo") > 0f)
-        assertFalse("kiva" in matches)
-    }
-
-    @Test
-    fun `previousMatches ei anna estettya sanaa`() {
-        val e = engine()
-        listOf("paha", "on").forEach { e.onWordCommitted(it) }
-        e.blockWord("paha")
-        assertFalse("paha" in e.previousMatches("on"))
-    }
-
-    @Test
-    fun `onCorrectionAccepted kirjaa hyvaksynnan ilman ketjua`() {
-        val e = engine()
-        e.onWordCommitted("eka")
-        e.drainDirty()
-        e.onCorrectionAccepted("toka")
-        assertEquals(1, e.signals("toka")!!.acceptedCount)
-        assertTrue(e.drainDirty().bigrams.isEmpty())
     }
 }

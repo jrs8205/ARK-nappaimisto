@@ -161,23 +161,6 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
         chain(word)
     }
 
-    /**
-     * Sana korvattiin vaihtoehtolistasta jälkikäteen: hyväksyntä kirjautuu
-     * kuten ehdotuksen valinnassa, mutta ketjua ei jatketa, koska kursori
-     * on hypännyt keskelle vanhaa tekstiä.
-     */
-    @Synchronized
-    fun onCorrectionAccepted(word: String) {
-        if (!loaded) return
-        val key = keyOf(word)
-        val state = words.getOrPut(key) { WordState(word, 0, clock(), false, clock()) }
-        if (state.count > 0) state.count++
-        state.acceptedCount++
-        state.ignoredCount = 0
-        state.lastUsed = clock()
-        dirtyWords += key
-    }
-
     /** Käytetyimmät omat sanat esim. puheentunnistuksen sanastovihjeiksi. */
     @Synchronized
     fun biasWords(max: Int): List<String> {
@@ -187,25 +170,6 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
             .sortedByDescending { it.count * recency(it.lastUsed) }
             .take(max)
             .map { it.word }
-    }
-
-    /**
-     * Sanat, jotka ovat aiemmin edeltäneet [next]-sanaa, bigramivahvuuksineen.
-     * Käytetään paikkaan sopivien vaihtoehtojen hakuun: ehdokas kelpaa, jos
-     * se on joskus esiintynyt juuri ennen seuraavaa sanaa.
-     */
-    @Synchronized
-    fun previousMatches(next: String): Map<String, Float> {
-        if (!loaded) return emptyMap()
-        val nextKey = keyOf(next)
-        val result = HashMap<String, Float>()
-        for ((previous, followers) in bigrams) {
-            val state = followers[nextKey] ?: continue
-            // Estetty sana ei kelpaa vaihtoehdoksi tässäkään suunnassa.
-            if (words[previous]?.blocked == true) continue
-            result[previous] = state.count * recency(state.lastUsed)
-        }
-        return result
     }
 
     /** Omat sanat enintään [maxDistance] muokkauksen päässä, käytetyin ensin. */
@@ -370,20 +334,6 @@ class LearningEngine(private val clock: () -> Long = System::currentTimeMillis) 
     @Synchronized
     fun isOwnWord(word: String): Boolean =
         words[keyOf(word)]?.let { it.count > 0 && !it.blocked } == true
-
-    /**
-     * Onko sana vakiintunut käyttäjän omaksi: käytetty useammin kuin
-     * kerran, hyväksytty ehdotuksesta tai kiinnitetty. Oikoluku ohittaa
-     * vain vakiintuneet — kerran kirjoitettu tuntematon voi olla
-     * lyöntivirhe, joten se alleviivataan vielä. Automaattikorjaus
-     * käyttää löyhempää [isOwnWord]-ehtoa, ettei kertaalleen kirjoitettu
-     * sana ala korjautua toiseksi.
-     */
-    @Synchronized
-    fun isEstablishedWord(word: String): Boolean =
-        words[keyOf(word)]?.let {
-            !it.blocked && (it.count > 1 || it.acceptedCount > 0 || it.pinned)
-        } == true
 
     @Synchronized
     fun isBlocked(word: String): Boolean = words[keyOf(word)]?.blocked == true

@@ -391,9 +391,9 @@ class OpenAiDictation(
     companion object {
         /**
          * Oletuksena suoratoistomalli: teksti ilmestyy puheen tahdissa.
-         * Puhemallit ovat oma perheensä eivätkä seuraa Paranna teksti
-         * -mallivalintaa; lista haetaan livenä
-         * [TextImprover.parseTranscribeModels].
+         * Puhemallit ovat oma perheensä eivätkä seuraa AI-käännöksen
+         * mallivalintaa; lista haetaan livenä
+         * [AiRequests.parseTranscribeModels].
          */
         const val DEFAULT_MODEL = "gpt-live-transcribe"
         const val PREF_MODEL = "sanelu_malli"

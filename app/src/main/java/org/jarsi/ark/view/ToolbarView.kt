@@ -21,7 +21,6 @@ class ToolbarView(context: Context) : View(context) {
         fun onToggleDictation()
         fun onToggleEmoji()
         fun onToggleClipboard()
-        fun onToggleCorrection()
         fun onToggleTranslation()
         fun onUndo()
         fun onOpenSettings()
@@ -73,13 +72,6 @@ class ToolbarView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** Korostaa korjausnapin, kun korjausnäkymä on auki. */
-    var correctionActive = false
-        set(value) {
-            field = value
-            invalidate()
-        }
-
     /** Korostaa emojinapin, kun emojipaneeli on auki. */
     var emojiActive = false
         set(value) {
@@ -116,7 +108,6 @@ class ToolbarView(context: Context) : View(context) {
     private val micIcon = context.getDrawable(R.drawable.ic_mic)?.mutate()
     private val emojiIcon = context.getDrawable(R.drawable.ic_emoji)?.mutate()
     private val clipboardIcon = context.getDrawable(R.drawable.ic_clipboard)?.mutate()
-    private val correctionIcon = context.getDrawable(R.drawable.ic_spellcheck)?.mutate()
     private val translateIcon = context.getDrawable(R.drawable.ic_translate)?.mutate()
     private val undoIcon = context.getDrawable(R.drawable.ic_undo)?.mutate()
     private val settingsIcon = context.getDrawable(R.drawable.ic_settings)?.mutate()
@@ -167,7 +158,6 @@ class ToolbarView(context: Context) : View(context) {
                 (tool == ToolbarTool.MIC && micActive) ||
                 (tool == ToolbarTool.EMOJI && emojiActive) ||
                 (tool == ToolbarTool.CLIPBOARD && clipboardActive) ||
-                (tool == ToolbarTool.CORRECTION && correctionActive) ||
                 (tool == ToolbarTool.TRANSLATE && translationActive)
             if (tool == ToolbarTool.MIC && micActive) {
                 // Kehä sykkii puheen tahdissa ja laskee itsestään hiljaisuudessa.
@@ -202,7 +192,6 @@ class ToolbarView(context: Context) : View(context) {
                 ToolbarTool.MIC -> micIcon
                 ToolbarTool.EMOJI -> emojiIcon
                 ToolbarTool.CLIPBOARD -> clipboardIcon
-                ToolbarTool.CORRECTION -> correctionIcon
                 ToolbarTool.TRANSLATE -> translateIcon
                 ToolbarTool.UNDO -> undoIcon
                 else -> settingsIcon
@@ -231,7 +220,6 @@ class ToolbarView(context: Context) : View(context) {
                         ToolbarTool.MIC -> listener?.onToggleDictation()
                         ToolbarTool.EMOJI -> listener?.onToggleEmoji()
                         ToolbarTool.CLIPBOARD -> listener?.onToggleClipboard()
-                        ToolbarTool.CORRECTION -> listener?.onToggleCorrection()
                         ToolbarTool.TRANSLATE -> listener?.onToggleTranslation()
                         ToolbarTool.UNDO -> listener?.onUndo()
                         ToolbarTool.SETTINGS -> listener?.onOpenSettings()

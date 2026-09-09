@@ -110,7 +110,6 @@ class ToolbarOrderActivity : AppCompatActivity() {
             ToolbarTool.MIC -> R.string.tyokalu_mikrofoni
             ToolbarTool.EMOJI -> R.string.tyokalu_emojit
             ToolbarTool.CLIPBOARD -> R.string.tyokalu_leikepoyta
-            ToolbarTool.CORRECTION -> R.string.tyokalu_oikoluku
             ToolbarTool.TRANSLATE -> R.string.tyokalu_kaannos
             ToolbarTool.UNDO -> R.string.tyokalu_peruutus
             ToolbarTool.SETTINGS -> R.string.tyokalu_asetukset
@@ -123,7 +122,6 @@ class ToolbarOrderActivity : AppCompatActivity() {
         ToolbarTool.MIC -> R.drawable.ic_mic
         ToolbarTool.EMOJI -> R.drawable.ic_emoji
         ToolbarTool.CLIPBOARD -> R.drawable.ic_clipboard
-        ToolbarTool.CORRECTION -> R.drawable.ic_spellcheck
         ToolbarTool.TRANSLATE -> R.drawable.ic_translate
         ToolbarTool.UNDO -> R.drawable.ic_undo
         ToolbarTool.SETTINGS -> R.drawable.ic_settings

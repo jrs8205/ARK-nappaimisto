@@ -104,7 +104,7 @@ class SuggestionEngineTest {
         val (s, l) = build("on 100", "ei 90")
         listOf("koira", "on", "kiva").forEach { l.onWordCommitted(it) }
         l.resetContext()
-        assertEquals(listOf("on"), s.alternatives("ei", listOf("Koira"), nextWord = "kiva"))
+        assertEquals(listOf("on"), s.alternatives("ei", listOf("Koira")))
     }
 
     @Test
@@ -112,7 +112,7 @@ class SuggestionEngineTest {
         val (s, l) = build("koira 100", "kissa 90")
         listOf("se", "kissa", "naukuu").forEach { l.onWordCommitted(it) }
         l.resetContext()
-        val result = s.alternatives("koirra", listOf("se"), nextWord = "naukuu")
+        val result = s.alternatives("koirra", listOf("se"))
         assertTrue("koira" in result)
         assertTrue("kissa" in result)
     }

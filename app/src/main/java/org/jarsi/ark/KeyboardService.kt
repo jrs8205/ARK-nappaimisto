@@ -518,8 +518,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 refreshClipboardPanel()
             } else {
                 val uri = item.uri ?: return
-                if (contentResolver.getType(uri)?.startsWith("image/") == true) {
-                    copyImageClip(uri)
+                // Tyyppi tarjoajalta; jos se ei kerro, leikkeen oma kuvaus
+                // riittää (jotkin sovellukset ilmoittavat kuvan vain siinä).
+                val type = contentResolver.getType(uri) ?: clip.description.imageMimeType()
+                if (type?.startsWith("image/") == true) {
+                    copyImageClip(uri, type)
                 }
             }
         } catch (e: Exception) {
@@ -527,17 +530,19 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
     }
 
-    private fun copyImageClip(uri: Uri) {
+    private fun ClipDescription.imageMimeType(): String? =
+        (0 until mimeTypeCount).map(::getMimeType).firstOrNull { it.startsWith("image/") }
+
+    private fun copyImageClip(uri: Uri, type: String) {
         // Tiedostopääte säilyttää todellisen kuvatyypin liittämistä varten.
         // Tuntematonta tyyppiä ei tallenneta väärällä nimellä eikä väitetä
         // liitettäessä PNG:ksi — sellainen leike ohitetaan.
-        val type = contentResolver.getType(uri)
         val extension = when (type) {
-            "image/jpeg" -> "jpg"
+            "image/jpeg", "image/jpg" -> "jpg"
             "image/webp" -> "webp"
             "image/png" -> "png"
             "image/gif" -> "gif"
-            else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(type ?: "")
+            else -> MimeTypeMap.getSingleton().getExtensionFromMimeType(type)
         } ?: return
         executeIo {
             val dir = File(filesDir, "clips").apply { mkdirs() }

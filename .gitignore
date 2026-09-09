@@ -34,4 +34,5 @@ Screenshot_*.png
 # Ulkopuoliset katselmointipyynnöt ja -raportit: työkaluja kehityksen
 # aikana, eivät osa julkaistavaa projektia.
 /BUG_HUNT_REQUEST.md
+/review-request.md
 *_REVIEW_*.md

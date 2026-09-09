@@ -8,12 +8,14 @@ object Layouts {
     private fun key(char: String, longPress: List<String> = emptyList()) =
         Key(KeyAction.Text(char), char, longPress = longPress)
 
-    // Pitkän painalluksen merkit numeroriville suomalaisen fyysisen asettelun mukaan.
+    // Pitkän painalluksen merkit numeroriville suomalaisen fyysisen asettelun
+    // mukaan; nelosessa viiva on ensimmäisenä, koska sitä tarvitaan
+    // valuuttamerkkiä useammin.
     private val numberRow = listOf(
         key("1", listOf("!")),
         key("2", listOf("\"", "@")),
         key("3", listOf("#")),
-        key("4", listOf("¤", "$")),
+        key("4", listOf("-", "$", "¤")),
         key("5", listOf("%")),
         key("6", listOf("&")),
         key("7", listOf("/", "\\")),

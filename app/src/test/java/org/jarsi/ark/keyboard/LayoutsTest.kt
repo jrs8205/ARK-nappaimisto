@@ -27,6 +27,14 @@ class LayoutsTest {
     }
 
     @Test
+    fun `numerorivin nelosen pitka painallus antaa ensin viivan`() {
+        val four = Layouts.letters().rows[0][3]
+        assertEquals("4", four.label)
+        assertEquals("-", four.longPress.first())
+        assertTrue("¤" in four.longPress)
+    }
+
+    @Test
     fun `numerorivin kanssa ylarivilla ei ole numeropainalluksia`() {
         val layout = Layouts.letters()
         assertTrue(layout.rows[1].all { it.longPress.isEmpty() })

@@ -51,6 +51,7 @@ import org.jarsi.ark.engine.LearningEngine
 import org.jarsi.ark.engine.SuggestionEngine
 import org.jarsi.ark.engine.TextImprover
 import org.jarsi.ark.engine.WordTools
+import org.jarsi.ark.keyboard.AutoCaps
 import org.jarsi.ark.keyboard.KeyAction
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
@@ -2435,7 +2436,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             maybeFlush()
         }
         feedback()
-        updateAutoCaps()
+        updateAutoCaps(committed)
         updateSuggestions()
     }
 
@@ -2566,6 +2567,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (autoSpaceState > 0) autoSpaceState = 2
             smartSpaceState = 0
             punctSpaceAdded = true
+            updateAutoCaps(text + " ")
             feedback()
             return
         }
@@ -2586,6 +2588,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (prev != null && prev != ' ' && !prev.isDigit() && atLineEnd) {
                 ic.commitText(text + " ", 1)
                 punctSpaceAdded = true
+                updateAutoCaps(text + " ")
                 feedback()
                 return
             }
@@ -2662,6 +2665,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     onTranslateBufferChanged()
                 } else if (doubleTap && smartSpaceField && performDoubleSpacePeriod()) {
                     lastSpaceTime = 0
+                    updateAutoCaps(". ")
                 } else if (swallowPunctSpace &&
                     currentInputConnection?.getTextBeforeCursor(1, 0)?.toString() == " "
                 ) {
@@ -2669,6 +2673,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     // ettei "sana, " saa tuplaväliä totutusta näppäilystä.
                 } else {
                     commitSpaceWithAutoCorrect()
+                    updateAutoCaps(" ")
                 }
                 feedback(AudioManager.FX_KEYPRESS_SPACEBAR)
             }
@@ -2754,38 +2759,47 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             ic.performEditorAction(action)
         } else {
             ic.commitText("\n", 1)
+            updateAutoCaps("\n")
         }
         feedback(AudioManager.FX_KEYPRESS_RETURN)
     }
 
-    private fun updateAutoCaps() {
+    /**
+     * Iso alkukirjain päätellään kursorin edeltävästä tekstistä itse, ei
+     * kentän getCursorCapsMode-vastauksesta: moni sovellus ei toteuta sitä
+     * tai vastaa vanhentuneesta tekstistä, ja vastaus voi jäädä kokonaan
+     * tulematta sovelluksen ollessa kiireinen. [pending] on juuri lähetetty
+     * teksti, jota kenttä ei välttämättä ole vielä ehtinyt käsitellä — sen
+     * kanssa vuoro vaihtuu heti näkyvästi kuten Gboardissa eikä odota
+     * sovelluksen valintapäivitystä, joka jää joissain sovelluksissa
+     * kokonaan tulematta.
+     */
+    private fun updateAutoCaps(pending: String = "") {
         if (page != Page.LETTERS || manualShift || shiftState == ShiftState.CAPS) return
         val caps = if (translateMode) {
-            translateAutoCaps()
+            val buffer = activeTranslateBuffer()
+            AutoCaps.wanted(buffer.text.substring(0, buffer.cursor), AutoCaps.SENTENCES)
         } else {
             val info = currentInputEditorInfo ?: return
-            val ic = currentInputConnection ?: return
-            info.inputType != InputType.TYPE_NULL &&
-                ic.getCursorCapsMode(info.inputType) != 0
+            if (!AutoCaps.requested(info.inputType)) {
+                false
+            } else {
+                val ic = currentInputConnection ?: return
+                val known = ic.getTextBeforeCursor(MAX_WORD_LOOKBACK, 0)?.toString()
+                val before = when {
+                    known != null -> known + pending
+                    // Rivinvaihdon jälkeen tulos ei riipu edeltävästä tekstistä.
+                    pending.endsWith("\n") -> pending
+                    else -> return
+                }
+                AutoCaps.wanted(before, info.inputType)
+            }
         }
         val newState = if (caps) ShiftState.SHIFT else ShiftState.OFF
         if (newState != shiftState) {
             shiftState = newState
             keyboardView?.shiftState = newState
         }
-    }
-
-    /**
-     * Käännösnäkymän iso alkukirjain kuten kentissä: alueen alussa ja
-     * lauseen päättävän välimerkin ja välin jälkeen.
-     */
-    private fun translateAutoCaps(): Boolean {
-        val buffer = activeTranslateBuffer()
-        val before = buffer.text.substring(0, buffer.cursor)
-        if (before.isBlank()) return true
-        if (!before.endsWith(" ")) return false
-        val trimmed = before.trimEnd(' ')
-        return trimmed.isNotEmpty() && trimmed.last() in ".!?…"
     }
 
     override fun onUpdateSelection(

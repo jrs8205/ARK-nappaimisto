@@ -157,7 +157,9 @@ object Layouts {
             listOf(key("1"), key("2"), key("3"), Key(KeyAction.Backspace, "⌫", repeatable = true)),
             listOf(key("4"), key("5"), key("6"), key("-", listOf("*", "#"))),
             listOf(key("7"), key("8"), key("9"), key(",")),
-            listOf(key("."), key("0"), key("+"), Key(KeyAction.Enter, "⏎")),
+            // Kellonaika- ja päivämääräkentät tarvitsevat kaksoispisteen ja
+            // kauttaviivan; ne löytyvät pisteen pitkällä painalluksella.
+            listOf(key(".", listOf(":", "/")), key("0"), key("+"), Key(KeyAction.Enter, "⏎")),
         )
     )
 }

@@ -97,6 +97,13 @@ class KeyboardView(context: Context) : View(context) {
         var spaceSwiping = false
         var committed = false
         var alternatesOpen = false
+
+        // Sormen viimeisin x: vaihtoehtovalikko avataan sen kohdalle, ja
+        // valinta vaihtuu vasta kun sormi on liikkunut avauskohdasta
+        // selvästi — muuten sormen tärinä valitsisi vahingossa.
+        var lastX = 0f
+        var alternateAnchorX = 0f
+        var alternatesArmed = false
         val longPressRunnable = Runnable { handleLongPress(this) }
         val repeatRunnable: Runnable = object : Runnable {
             override fun run() {
@@ -114,6 +121,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private val pressed = mutableMapOf<Int, PressInfo>()
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     // Esikatselukupla
     private var previewPopup: PopupWindow? = null
@@ -324,6 +332,7 @@ class KeyboardView(context: Context) : View(context) {
     private fun handleDown(pointerId: Int, x: Float, y: Float) {
         val bounded = keyAt(x, y) ?: return
         val info = PressInfo(bounded)
+        info.lastX = x
         pressed[pointerId] = info
         val key = bounded.key
         if (key.repeatable) {
@@ -347,7 +356,12 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun handleMove(pointerId: Int, x: Float) {
         val info = pressed[pointerId] ?: return
+        info.lastX = x
         if (info.alternatesOpen) {
+            if (!info.alternatesArmed) {
+                if (abs(x - info.alternateAnchorX) < touchSlop) return
+                info.alternatesArmed = true
+            }
             updateAlternateSelection(x)
             return
         }
@@ -410,18 +424,27 @@ class KeyboardView(context: Context) : View(context) {
         val key = info.bounded.key
         if (key.longPress.isEmpty() || alternatesPopup != null) return
         info.alternatesOpen = true
+        info.alternateAnchorX = info.lastX
+        info.alternatesArmed = false
         hidePreview()
-        showAlternates(info.bounded)
+        showAlternates(info.bounded, info.lastX)
     }
 
-    private fun showAlternates(bounded: BoundedKey) {
+    /**
+     * Avaa pitkän painalluksen vaihtoehdot. Ensimmäinen lisämerkki on
+     * valmiiksi valittuna ja sormen kohdalla, joten pelkkä pitkä painallus
+     * ja irrotus antaa näppäimen vihjemerkin (esim. numeron ilman
+     * numeroriviä); perusmerkki on yhä valittavissa liu'uttamalla.
+     * Solut kapenevat, jotta koko rivi mahtuu kapeallekin näytölle.
+     */
+    private fun showAlternates(bounded: BoundedKey, fingerX: Float) {
         val base = (bounded.key.action as? KeyAction.Text)?.text
         alternateValues = buildList {
             if (base != null) add(base)
             addAll(bounded.key.longPress)
         }.map { if (shiftState != ShiftState.OFF && it.length == 1) it.uppercase(fiLocale) else it }
-        alternateSelected = 0
-        alternateCellWidth = dp(46f)
+        alternateSelected = if (alternateValues.size > 1) 1 else 0
+        alternateCellWidth = minOf(dp(46f), (width - dp(8f)) / alternateValues.size)
         val cellHeight = dp(52f)
 
         val container = LinearLayout(context).apply {
@@ -449,7 +472,8 @@ class KeyboardView(context: Context) : View(context) {
         updateAlternateHighlight()
 
         val totalWidth = alternateCellWidth * alternateValues.size
-        alternatesLeft = (bounded.rect.centerX() - totalWidth / 2f)
+        // Valittu solu sormen kohdalle; näytön reunassa rivi siirtyy sisään.
+        alternatesLeft = (fingerX - (alternateSelected + 0.5f) * alternateCellWidth)
             .coerceIn(dp(4f), (width - totalWidth - dp(4f)).coerceAtLeast(dp(4f)))
         val location = IntArray(2)
         getLocationInWindow(location)

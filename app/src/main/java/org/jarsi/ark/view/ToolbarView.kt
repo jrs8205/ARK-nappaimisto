@@ -242,6 +242,14 @@ class ToolbarView(context: Context) : View(context) {
         return true
     }
 
-    private fun indexAt(x: Float, y: Float): Int =
-        tools.indices.firstOrNull { buttonRect(it).contains(x, y) } ?: -1
+    // Napit piirretään 32 dp:n kokoisina, mutta osuma-alue kattaa rivin
+    // koko korkeuden ja puolet nappien välistä, jotta sormi osuu varmasti.
+    private fun indexAt(x: Float, y: Float): Int {
+        if (y < 0f || y >= height) return -1
+        val halfGap = dp(3f) * widthScale()
+        return tools.indices.firstOrNull {
+            val rect = buttonRect(it)
+            x >= rect.left - halfGap && x < rect.right + halfGap
+        } ?: -1
+    }
 }

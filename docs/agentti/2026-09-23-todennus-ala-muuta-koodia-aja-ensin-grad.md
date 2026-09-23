@@ -33,3 +33,35 @@ Muutokset:
  gradlew                                                          |  0
  2 files changed, 28 insertions(+)
 ```
+
+## Vuoro 2 – 23.9.2026 19:59 – claude/fable
+
+Ohje: Koita nyt ajaa gradle uudestaan ja kaikki testit ja raportoi sitten tilanne minulle.
+
+Loppuviesti:
+
+Koko yksikkötestisarja meni läpi. Yhtään komentoa ei hylätty luvan puutteen takia.
+
+**Mitä löysin**
+
+- Komento `./gradlew :app:testDebugUnitTest` päättyi BUILD SUCCESSFUL noin 38 sekunnissa. Käännös oli ajantasainen edellisestä ajosta, joten vain testitaski suoritettiin.
+- Tulosraportit kattavat 23 testiluokkaa ja yhteensä 309 testiä. Kaikki menivät läpi, 0 epäonnistumista, 0 virhettä, 0 ohitettua.
+- Suurimmat luokat ovat WordToolsTest (44), LearningEngineTest (38), SuggestionEngineTest (24) sekä RealtimeEventsTest ja TranslateBufferTest (23 kumpikin).
+- Edellisen ajon debug-APK on edelleen polussa `app/build/outputs/apk/debug/app-debug.apk`.
+
+**Mitä muutin**
+
+- En muuttanut koodia. Työpuussa on edelleen aiemmin muokattu `gradlew`, johon en koskenut.
+
+**Mitä pitää tarkistaa kotona**
+
+- Että 309 testin määrä vastaa odotusta, eli mikään testiluokka ei ole jäänyt pois esimerkiksi nimeämissyistä.
+- Ajoin vain yksikkötestit debug-variantilla. Release-variantin testejä tai laitetta vaativia instrumentointitestejä en ajanut, koska emulaattoria ei saa käynnistää.
+- Edellisessä raportissa mainittu Metaspace-varoitus ei toistunut tällä kevyellä ajolla, mutta se voi palata täydessä käännöksessä.
+
+Muutokset:
+
+```
+.../agentti/2026-09-23-todennus-ala-muuta-koodia-aja-ensin-grad.md | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+```

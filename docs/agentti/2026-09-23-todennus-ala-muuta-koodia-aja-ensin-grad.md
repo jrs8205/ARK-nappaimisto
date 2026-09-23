@@ -65,3 +65,35 @@ Muutokset:
 .../agentti/2026-09-23-todennus-ala-muuta-koodia-aja-ensin-grad.md | 26 ++++++++++++++++++++++++++
  1 file changed, 26 insertions(+)
 ```
+
+## Vuoro 3 – 23.9.2026 20:05 – claude/fable
+
+Ohje: Aja kaikki yksikkötestit
+
+Loppuviesti:
+
+Kaikki yksikkötestit menivät läpi. Yksi komento hylättiin luvan puutteen takia, ja se kerrotaan alla.
+
+**Mitä löysin**
+
+- Ensimmäinen ajo `./gradlew :app:test` päättyi BUILD SUCCESSFUL, mutta Gradle piti molemmat testitaskit ajantasaisina eikä suorittanut testejä uudelleen.
+- Pakotin debug-testit uudelleen komennolla `./gradlew :app:testDebugUnitTest --rerun`. Tulos BUILD SUCCESSFUL noin 38 sekunnissa. Raporteissa on 23 testiluokkaa ja 309 testiä, kaikki läpi, 0 epäonnistumista, 0 virhettä, 0 ohitettua.
+- Release-variantin pakotettu uudelleenajo `./gradlew :app:testReleaseUnitTest --rerun` hylättiin luvan puutteen takia. Release-testit suoritettiin kuitenkin oikeasti edellisessä keskustelun ajossa `./gradlew :app:test` noin klo 17:03, ja silloin sama 309 testiä 23 luokassa meni läpi ilman virheitä.
+- Kääntäjä antoi vain samat varoitukset kuin aiemmin, esimerkiksi vanhentunut Locale-konstruktori ja nullable-vastaanotin tiedostossa `DictionaryEngine.kt:98`.
+
+**Mitä muutin**
+
+- En muuttanut koodia. Työpuussa on edelleen ennen tätä istuntoa muokattu `gradlew`, johon en koskenut.
+
+**Mitä pitää tarkistaa kotona**
+
+- Jos release-variantin testit halutaan ajaa pakotetusti uudelleen, se pitää tehdä kotona tai lisätä testReleaseUnitTest sallittuihin komentoihin.
+- Laitetta vaativia instrumentointitestejä ei ajettu, koska emulaattoria ei saa käynnistää.
+- Että 309 testin määrä vastaa odotusta, eli mikään testiluokka ei jää pois esimerkiksi nimeämissyistä.
+
+Muutokset:
+
+```
+.../agentti/2026-09-23-todennus-ala-muuta-koodia-aja-ensin-grad.md | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+```

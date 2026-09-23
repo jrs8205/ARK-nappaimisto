@@ -21,6 +21,7 @@ import android.widget.TextView
 import org.jarsi.ark.R
 import org.jarsi.ark.keyboard.Key
 import org.jarsi.ark.keyboard.KeyAction
+import org.jarsi.ark.keyboard.KeyboardHeight
 import org.jarsi.ark.keyboard.KeyboardLayout
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
@@ -90,7 +91,13 @@ class KeyboardView(context: Context) : View(context) {
 
     private var boundedKeys: List<BoundedKey> = emptyList()
     private var rowHeight = 0f
-    private var bottomInset = 0
+
+    /** Navigointipalkin varaus näkymän alareunassa pikseleinä. */
+    var bottomInset = 0
+        private set
+
+    /** Kutsutaan, kun navigointipalkin varaus muuttuu (korkeuskaton laskentaan). */
+    var onBottomInsetChanged: (() -> Unit)? = null
 
     private inner class PressInfo(val bounded: BoundedKey) {
         var spaceAnchorX = 0f
@@ -166,6 +173,7 @@ class KeyboardView(context: Context) : View(context) {
         if (bottom != bottomInset) {
             bottomInset = bottom
             requestLayout()
+            onBottomInsetChanged?.invoke()
         }
         return super.onApplyWindowInsets(insets)
     }
@@ -177,9 +185,10 @@ class KeyboardView(context: Context) : View(context) {
      */
     fun desiredHeight(): Int {
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val baseRowHeight = dp(if (landscape) 44f else 56f)
+        val baseRowHeight = dp(KeyboardHeight.baseRowDp(landscape))
         val rows = layout.rows.size.coerceAtLeast(1)
-        return (baseRowHeight * rows * heightScale + dp(4f)).roundToInt() + bottomInset
+        return (baseRowHeight * rows * heightScale + dp(KeyboardHeight.BOTTOM_PADDING_DP)).roundToInt() +
+            bottomInset
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -197,7 +206,7 @@ class KeyboardView(context: Context) : View(context) {
             boundedKeys = emptyList()
             return
         }
-        rowHeight = (height - dp(4f) - bottomInset) / rows.size.toFloat()
+        rowHeight = (height - dp(KeyboardHeight.BOTTOM_PADDING_DP) - bottomInset) / rows.size.toFloat()
         val result = mutableListOf<BoundedKey>()
         rows.forEachIndexed { rowIndex, row ->
             val totalWeight = row.sumOf { it.widthWeight.toDouble() }.toFloat()

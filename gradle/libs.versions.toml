@@ -12,6 +12,7 @@ ksp = "2.2.20-2.0.4"
 recyclerview = "1.4.0"
 emojipicker = "1.5.0"
 viewpager2 = "1.1.0"
+autofill = "1.1.0"
 # 17.0.3 tuo 16 kt -sivukokoyhteensopivan natiivikirjaston (Play-vaatimus).
 mlkitTranslate = "17.0.3"
 mlkitLanguageId = "17.0.6"
@@ -29,6 +30,7 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "recyclerview" }
 androidx-emojipicker = { group = "androidx.emoji2", name = "emoji2-emojipicker", version.ref = "emojipicker" }
 androidx-viewpager2 = { group = "androidx.viewpager2", name = "viewpager2", version.ref = "viewpager2" }
+androidx-autofill = { group = "androidx.autofill", name = "autofill", version.ref = "autofill" }
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 mlkit-language-id = { group = "com.google.mlkit", name = "language-id", version.ref = "mlkitLanguageId" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }

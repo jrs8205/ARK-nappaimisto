@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import org.jarsi.ark.R
+import org.jarsi.ark.keyboard.KeyboardHeight
 import org.jarsi.ark.theme.KeyboardTheme
 import kotlin.math.abs
 import kotlin.math.max
@@ -96,7 +97,7 @@ class SuggestionBarView(context: Context) : View(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(width, (dp(44f) * heightScale).roundToInt())
+        setMeasuredDimension(width, (dp(KeyboardHeight.SUGGESTION_BAR_DP) * heightScale).roundToInt())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

@@ -1,6 +1,7 @@
 package org.jarsi.ark
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
@@ -9,6 +10,18 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
+import android.os.Bundle
+import android.graphics.drawable.Icon
+import android.util.Size
+import android.view.ViewGroup
+import android.view.inputmethod.InlineSuggestionsRequest
+import android.view.inputmethod.InlineSuggestionsResponse
+import android.widget.inline.InlinePresentationSpec
+import androidx.annotation.RequiresApi
+import androidx.autofill.inline.UiVersions
+import androidx.autofill.inline.common.TextViewStyle
+import androidx.autofill.inline.common.ViewStyle
+import androidx.autofill.inline.v1.InlineSuggestionUi
 import android.inputmethodservice.InputMethodService
 import android.net.Uri
 import android.media.AudioManager
@@ -51,7 +64,9 @@ import org.jarsi.ark.engine.LearningEngine
 import org.jarsi.ark.engine.SuggestionEngine
 import org.jarsi.ark.engine.WordTools
 import org.jarsi.ark.keyboard.AutoCaps
+import org.jarsi.ark.keyboard.InlineChips
 import org.jarsi.ark.keyboard.KeyAction
+import org.jarsi.ark.keyboard.KeyboardHeight
 import org.jarsi.ark.keyboard.Layouts
 import org.jarsi.ark.keyboard.ShiftState
 import org.jarsi.ark.keyboard.SmartSpace
@@ -64,6 +79,7 @@ import org.jarsi.ark.keyboard.TranslatePrep
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
+import org.jarsi.ark.view.InlineChipsView
 import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
@@ -309,6 +325,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private val mainHandler = Handler(Looper.getMainLooper())
     @Volatile private var suggestGeneration = 0
     private var suggestionsVisible = true
+    private var inlineChips: InlineChipsView? = null
+    // Kasvaa jokaisella inline-vastauksella ja kentän vaihdolla: myöhässä
+    // valmistuva chip ei saa päätyä uudemman kentän riville.
+    private var inlineGeneration = 0
     private var spaceAfterSuggestion = true
     private var commonWordsEnabled = true
 
@@ -444,6 +464,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         flushLearned()
         learning.resetContext()
+        clearInlineChips()
         super.onFinishInputView(finishingInput)
     }
 
@@ -741,7 +762,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         translationFresh = false
         stopTranslationEditing()
         translateBar?.visibility = View.GONE
-        suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
+        updateSuggestionRow()
         toolbar?.translationActive = false
         updateSuggestions()
     }
@@ -1580,9 +1601,23 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         applyVisualSettings()
     }
 
+    /**
+     * Korkeusasetus on pystysuunnan koko; vaakasuunnassa ja pienillä
+     * näytöillä rivit kutistuvat, ettei näppäimistö peitä koko sovellusta.
+     */
+    private fun effectiveHeightScale(): Float {
+        val metrics = resources.displayMetrics
+        return KeyboardHeight.effectiveScale(
+            prefScale = prefs.getInt("korkeus", 100) / 100f,
+            landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE,
+            windowHeightDp = metrics.heightPixels / metrics.density,
+            bottomInsetDp = (keyboardView?.bottomInset ?: 0) / metrics.density,
+        )
+    }
+
     private fun applyVisualSettings() {
         val theme = KeyboardTheme.load(this)
-        val heightScale = prefs.getInt("korkeus", 100) / 100f
+        val heightScale = effectiveHeightScale()
         vibrationEnabled = prefs.getBoolean("varina", true)
         keyboardView?.applySettings(
             theme,
@@ -1592,6 +1627,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             vibrationEnabled,
         )
         suggestionBar?.applySettings(theme, heightScale)
+        inlineChips?.applySettings(theme, heightScale)
         toolbar?.applySettings(theme)
         clipboardPanel?.applySettings(theme)
         emojiPanel?.applySettings(theme)
@@ -1852,6 +1888,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 ),
             )
         }
+        inlineChips = InlineChipsView(this).also {
+            it.visibility = View.GONE
+            container.addView(it, LinearLayout.LayoutParams(params))
+        }
         suggestionBar = SuggestionBarView(this).also {
             it.listener = ::onSuggestionPicked
             it.menuListener = object : SuggestionBarView.MenuListener {
@@ -1884,6 +1924,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         keyboardView = KeyboardView(this).also {
             it.listener = this
+            // Navigointipalkin varaus selviää vasta ikkunassa; korkeuskatto
+            // lasketaan silloin uudelleen.
+            it.onBottomInsetChanged = { applyVisualSettings() }
             container.addView(it, LinearLayout.LayoutParams(params))
         }
         clipboardPanel = ClipboardPanelView(this).also {
@@ -1970,6 +2013,91 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         return container
     }
 
+    /** Ehdotusrivin paikka: täyttöchipit, kun niitä on, muuten sanaehdotukset. */
+    private fun updateSuggestionRow() {
+        val state = InlineChips.rowState(suggestionsVisible, inlineChips?.count ?: 0)
+        inlineChips?.visibility = if (state.chipsVisible) View.VISIBLE else View.GONE
+        suggestionBar?.visibility = if (state.suggestionsVisible) View.VISIBLE else View.GONE
+    }
+
+    private fun clearInlineChips() {
+        inlineGeneration++
+        if ((inlineChips?.count ?: 0) == 0) return
+        inlineChips?.clear()
+        updateSuggestionRow()
+    }
+
+    /**
+     * Täyttöpalvelun (esim. Holvi) ehdotukset pyydetään näppäimistön riville
+     * kentän viereisen pudotusvalikon sijaan: chip näkyy silloinkin, kun
+     * kenttä itse on näppäimistön alla piilossa. Chipin korkeus on
+     * ehdotusrivin korkeus ja ulkoasu teeman väreistä.
+     */
+    @RequiresApi(Build.VERSION_CODES.R)
+    override fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
+        val chips = inlineChips ?: return null
+        val metrics = resources.displayMetrics
+        val bounds = InlineChips.specBounds(chips.barHeightPx(), metrics.widthPixels, metrics.density)
+        val spec = InlinePresentationSpec.Builder(
+            Size(bounds.minWidth, bounds.height),
+            Size(bounds.maxWidth, bounds.height),
+        ).setStyle(inlineChipStyle()).build()
+        return InlineSuggestionsRequest.Builder(listOf(spec))
+            .setMaxSuggestionCount(InlineChips.MAX_SUGGESTIONS)
+            .build()
+    }
+
+    // ViewStyle.Builderin setBackground/setPadding periytyvät kirjaston sisäiseksi
+    // merkitystä BaseBuilderista, vaikka ne ovat julkista API:a; lintin
+    // RestrictedApi on tässä väärä hälytys (androidx.autofill 1.1.0).
+    @SuppressLint("RestrictedApi")
+    @RequiresApi(Build.VERSION_CODES.R)
+    private fun inlineChipStyle(): Bundle {
+        val theme = KeyboardTheme.load(this)
+        val pad = (10 * resources.displayMetrics.density).toInt()
+        val chip = ViewStyle.Builder()
+            .setBackground(
+                Icon.createWithResource(this, R.drawable.inline_chip_bg).setTint(theme.specialKey)
+            )
+            .setPadding(pad, 0, pad, 0)
+            .build()
+        val style = InlineSuggestionUi.newStyleBuilder()
+            .setChipStyle(chip)
+            .setSingleIconChipStyle(chip)
+            .setTitleStyle(TextViewStyle.Builder().setTextColor(theme.text).setTextSize(15f).build())
+            .setSubtitleStyle(TextViewStyle.Builder().setTextColor(theme.hint).setTextSize(13f).build())
+            .build()
+        return UiVersions.newStylesBuilder().addStyle(style).build()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    override fun onInlineSuggestionsResponse(response: InlineSuggestionsResponse): Boolean {
+        val chips = inlineChips ?: return false
+        val generation = ++inlineGeneration
+        val suggestions = response.inlineSuggestions
+        if (suggestions.isEmpty()) {
+            chips.clear()
+            updateSuggestionRow()
+            return true
+        }
+        val size = Size(ViewGroup.LayoutParams.WRAP_CONTENT, chips.chipHeightPx())
+        val views = arrayOfNulls<View>(suggestions.size)
+        var pending = suggestions.size
+        suggestions.forEachIndexed { index, suggestion ->
+            suggestion.inflate(this, size, mainExecutor) { view ->
+                // Vastaus vanheni (kenttä vaihtui tai uusi vastaus tuli)
+                // ennen kuin chip valmistui.
+                if (generation != inlineGeneration) return@inflate
+                views[index] = view
+                if (--pending == 0) {
+                    chips.setChips(views.filterNotNull())
+                    updateSuggestionRow()
+                }
+            }
+        }
+        return true
+    }
+
     // Koko näytön muokkaustila vaakasuunnassa peittäisi sovelluksen — pidetään pois.
     override fun onEvaluateFullscreenMode(): Boolean = false
 
@@ -2036,6 +2164,8 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         learning.resetContext()
         reloadLearnedIfChanged()
         if (!restarting) {
+            // Vanhan kentän täyttöchipit eivät kuulu uudelle kentälle.
+            clearInlineChips()
             // Kentän vaihto (esim. sovelluksen lähetysnappi) katkaisee
             // sanelun ja sulkee näkymät. Saman kentän syötteen uudelleen-
             // käynnistys (restartInput, esim. sovelluksen reaktio näkymän
@@ -2092,7 +2222,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         suggestionsVisible = prefs.getBoolean("ehdotukset", true) &&
             !passwordField &&
             page != Page.NUMERIC
-        suggestionBar?.visibility = if (suggestionsVisible) View.VISIBLE else View.GONE
+        updateSuggestionRow()
         updateLayout()
         updateAutoCaps()
         updateSuggestions()

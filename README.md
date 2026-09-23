@@ -77,10 +77,16 @@ Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
 * kenttäkohtainen mukautus: @ sähköpostikentässä, / osoitekentässä,
   Enter-näppäimen toiminto kentän mukaan (Hae, Lähetä, Siirry…)
 * vaalea ja tumma teema järjestelmän asetuksen mukaan
-* säädettävä näppäimistön korkeus
+* säädettävä näppäimistön korkeus; asetus on pystysuunnan koko, ja
+  vaakasuunnassa tai pienellä näytöllä rivit kutistuvat niin, ettei
+  näppäimistö vie yli 65 % ikkunasta (Gboardin vaakasuhde)
 * näppäinäänet, värinä ja esikatselukupla
 * välilyönnin pyyhkäisy siirtää kursoria
 * salasanakentissä esikatselu pois käytöstä
+* täyttöpalvelun (esim. Holvi) ehdotukset näppäimistön ehdotusrivillä
+  (inline autofill, Android 11+): chip näkyy myös silloin, kun kenttä on
+  näppäimistön alla piilossa, ja korvaa sanaehdotukset niin kauan kuin
+  täyttöehdotuksia on
 
 ## Ominaisuudet (vaihe 2)
 

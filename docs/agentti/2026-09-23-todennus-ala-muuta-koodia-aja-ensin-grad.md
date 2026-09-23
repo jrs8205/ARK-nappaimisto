@@ -97,3 +97,35 @@ Muutokset:
 .../agentti/2026-09-23-todennus-ala-muuta-koodia-aja-ensin-grad.md | 26 ++++++++++++++++++++++++++
  1 file changed, 26 insertions(+)
 ```
+
+## Vuoro 4 – 23.9.2026 20:06 – claude/fable
+
+Ohje: Okei, onko tiedot kaikista asioista nyt jossain tallessa?
+
+Loppuviesti:
+
+Kyllä, kaikki kolmen vuoron loppuraportit ovat tallessa repossa ja committattuna haaraan. Ainoastaan Gradlen omat tulostiedostot jäävät vain palvelimen levylle.
+
+**Mitä löysin**
+
+- Agenttid on kirjannut jokaisen vuoron ohjeen ja loppuviestin tiedostoon `docs/agentti/2026-09-23-todennus-ala-muuta-koodia-aja-ensin-grad.md`. Siellä ovat kaikki kolme raporttia: LayoutsTest ja APK, debug-testit sekä täysi testiajo.
+- Haarassa on kolme agentin committia (1ac5c29, 9a2df24, bdd8401) main-haaran version 0.15.0 päällä. Työpuu on nyt puhdas, eli mitään ei ole committaamatta.
+- Ensimmäisen vuoron commit sisälsi myös tiedoston `gradlew` ilman rivimuutoksia. Kyse on todennäköisesti suoritusoikeuden muutoksesta, jonka Gradle-ajo tarvitsi.
+- Gradlen testiraportit (HTML ja XML) sekä debug-APK ovat kansiossa `app/build`, joka on gitignoressa. Ne eivät siis siirry haaran mukana kotiin, vaan ne saa uudelleen ajamalla testit ja käännöksen siellä.
+
+**Mitä muutin**
+
+- En muuttanut mitään tällä vuorolla.
+
+**Mitä pitää tarkistaa kotona**
+
+- Hae haara komennolla, joka on lokitiedoston alussa, ja lue raportit docs/agentti-kansiosta.
+- Katso ensimmäisen commitin `gradlew`-muutos ja päätä, halutaanko suoritusoikeuden muutos pitää.
+- Jos haluat testiraportit tai APK:n talteen, aja testit ja assembleDebug kotona, koska build-kansio ei kulje gitin mukana.
+
+Muutokset:
+
+```
+.../agentti/2026-09-23-todennus-ala-muuta-koodia-aja-ensin-grad.md | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+```

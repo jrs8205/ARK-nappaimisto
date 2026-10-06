@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.Icon
 import android.util.Size
 import android.view.ViewGroup
@@ -30,11 +31,14 @@ import android.os.Looper
 import android.text.InputType
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
+import android.view.Gravity
 import android.view.View
 import android.os.SystemClock
 import android.view.inputmethod.EditorInfo
 import android.webkit.MimeTypeMap
 import android.widget.LinearLayout
+import android.widget.PopupWindow
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.core.view.inputmethod.EditorInfoCompat
@@ -103,6 +107,7 @@ import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
+import kotlin.math.roundToInt
 
 /** ARK-näppäimistön pääpalvelu. */
 class KeyboardService : InputMethodService(), KeyboardView.Listener {
@@ -251,15 +256,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 }
 
                 override fun onDictationError(messageResId: Int) {
-                    Toast.makeText(this@KeyboardService, messageResId, Toast.LENGTH_SHORT).show()
+                    showMessage(messageResId)
                 }
 
                 override fun onDictationErrorMessage(message: String) {
-                    Toast.makeText(
-                        this@KeyboardService,
-                        getString(R.string.sanelu_verkkovirhe, message),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    showMessage(getString(R.string.sanelu_verkkovirhe, message), long = true)
                 }
 
                 override fun onSpeechLevel(level: Float) {
@@ -308,7 +309,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 engine.start()
                 return
             }
-            Toast.makeText(this, R.string.sanelu_openai_ei_avainta, Toast.LENGTH_SHORT).show()
+            showMessage(R.string.sanelu_openai_ei_avainta)
         }
         dictation.silenceLimitMs = silence
         dictation.start()
@@ -456,7 +457,68 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         super.onDestroy()
     }
 
+    // Oma ilmoituskupla näppäimistön yllä. Järjestelmä vaimentaa
+    // syötepalvelun Toast-ilmoitukset ("Suppressing toast ... by user
+    // request"), koska palvelu ei ole etualan sovellus eikä sillä ole
+    // ilmoituslupaa — esimerkiksi AI-käännöksen virheen syy ei näkynyt.
+    private var messagePopup: PopupWindow? = null
+    private val hideMessageRunnable = Runnable { hideMessage() }
+
+    private fun showMessage(resId: Int, long: Boolean = false) =
+        showMessage(getString(resId), long)
+
+    private fun showMessage(text: String, long: Boolean = false) {
+        hideMessage()
+        val anchor = toolbar?.takeIf { it.isShown && it.windowToken != null }
+        if (anchor == null) {
+            // Näppäimistö ei ole esillä: kupla ei voi näkyä.
+            Toast.makeText(this, text, if (long) Toast.LENGTH_LONG else Toast.LENGTH_SHORT).show()
+            return
+        }
+        val theme = KeyboardTheme.load(this)
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).roundToInt()
+        val view = TextView(this).apply {
+            this.text = text
+            textSize = 14f
+            gravity = Gravity.CENTER
+            // Käänteiset värit kuten Toastissa: kupla erottuu näppäimistön
+            // ja käännösnäkymän pinnoista kummassakin teemassa.
+            setTextColor(theme.background)
+            setPadding(dp(16), dp(10), dp(16), dp(10))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(20).toFloat()
+                setColor(theme.text)
+            }
+        }
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(anchor.width - dp(32), View.MeasureSpec.AT_MOST),
+            View.MeasureSpec.UNSPECIFIED,
+        )
+        val location = IntArray(2)
+        anchor.getLocationInWindow(location)
+        messagePopup = PopupWindow(view, view.measuredWidth, view.measuredHeight).apply {
+            isTouchable = false
+            isClippingEnabled = false
+            elevation = dp(4).toFloat()
+            showAtLocation(
+                anchor,
+                Gravity.NO_GRAVITY,
+                location[0] + (anchor.width - view.measuredWidth) / 2,
+                location[1] - view.measuredHeight - dp(8),
+            )
+        }
+        mainHandler.postDelayed(hideMessageRunnable, if (long) MESSAGE_LONG_MS else MESSAGE_SHORT_MS)
+    }
+
+    private fun hideMessage() {
+        mainHandler.removeCallbacks(hideMessageRunnable)
+        messagePopup?.dismiss()
+        messagePopup = null
+    }
+
     override fun onFinishInputView(finishingInput: Boolean) {
+        hideMessage()
         // Lupa-aktiviteetin avaus piilottaa näppäimistön hetkeksi; silloin
         // sanelua ei pysäytetä, jotta se voi alkaa luvan myöntämisen jälkeen.
         if (!pendingDictation) {
@@ -881,9 +943,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             }
             .addOnFailureListener {
                 if (generation == translationGeneration && translateMode) {
-                    Toast.makeText(
-                        this, R.string.kaannos_lataus_virhe, Toast.LENGTH_SHORT
-                    ).show()
+                    showMessage(R.string.kaannos_lataus_virhe)
                 }
             }
     }
@@ -1020,7 +1080,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         }
         val client = translator
         if (client == null || !translatorReady) {
-            Toast.makeText(this, R.string.kaannos_ladataan, Toast.LENGTH_SHORT).show()
+            showMessage(R.string.kaannos_ladataan)
             return
         }
         val generation = ++translationGeneration
@@ -1043,7 +1103,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 if (translateMode && generation == translationGeneration &&
                     session == editorSessionId
                 ) {
-                    Toast.makeText(this, R.string.kaannos_virhe, Toast.LENGTH_SHORT).show()
+                    showMessage(R.string.kaannos_virhe)
                 }
             },
         )
@@ -1086,9 +1146,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val text = translateBuffer.toString()
         if (text.isBlank()) return
         if (text.length > AiRequests.MAX_INPUT_CHARS) {
-            Toast.makeText(
-                this, R.string.kaannos_ai_liian_pitka, Toast.LENGTH_SHORT
-            ).show()
+            showMessage(R.string.kaannos_ai_liian_pitka)
             return
         }
         val openAi = openAiSelected()
@@ -1097,7 +1155,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             if (openAi) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
         ).orEmpty()
         if (apiKey.isEmpty()) {
-            Toast.makeText(this, R.string.malli_aseta_avain, Toast.LENGTH_SHORT).show()
+            showMessage(R.string.malli_aseta_avain)
             return
         }
         // AI-käännös korvaa alueen sisällön, joten käsin korjaus päättyy.
@@ -1143,11 +1201,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     // Live-käännös palaa näkyviin ja syy kerrotaan.
                     updateTranslateBar()
                     val reason = error ?: getString(R.string.kaannos_ai_tyhja_vastaus)
-                    Toast.makeText(
-                        this,
-                        getString(R.string.kaannos_ai_virhe_syy, reason),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    showMessage(getString(R.string.kaannos_ai_virhe_syy, reason), long = true)
                 }
             }
         }
@@ -1274,13 +1328,13 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 .getMimeTypeFromExtension(path.substringAfterLast('.', ""))
         }
         if (mime == null) {
-            Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+            showMessage(R.string.leike_kuva_ei_tuettu)
             return
         }
         val supported = EditorInfoCompat.getContentMimeTypes(info)
             .any { ClipDescription.compareMimeTypes(mime, it) }
         if (!supported) {
-            Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+            showMessage(R.string.leike_kuva_ei_tuettu)
             return
         }
         try {
@@ -1295,10 +1349,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 hideClipboardPanel()
                 feedback()
             } else {
-                Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+                showMessage(R.string.leike_kuva_ei_tuettu)
             }
         } catch (e: Exception) {
-            Toast.makeText(this, R.string.leike_kuva_ei_tuettu, Toast.LENGTH_SHORT).show()
+            showMessage(R.string.leike_kuva_ei_tuettu)
         }
     }
 
@@ -1796,11 +1850,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     )
                     // Järjestelmä ei näytä omaa kopiointikuplaansa
                     // näppäimistön kopioinneista, joten kuittaus on omamme.
-                    Toast.makeText(
-                        this@KeyboardService,
-                        R.string.kaannos_kopioitu,
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    showMessage(R.string.kaannos_kopioitu)
                 }
 
                 override fun onInsert() {
@@ -1853,11 +1903,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                     clipboardManager?.setPrimaryClip(ClipData.newPlainText("", text))
                     // Järjestelmä ei näytä omaa kopiointikuplaansa
                     // näppäimistön kopioinneista, joten kuittaus on omamme.
-                    Toast.makeText(
-                        this@KeyboardService,
-                        R.string.kaannos_kopioitu,
-                        Toast.LENGTH_SHORT,
-                    ).show()
+                    showMessage(R.string.kaannos_kopioitu)
                 }
 
                 override fun onPaste() {
@@ -1950,11 +1996,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         )
                     } catch (e: Exception) {
-                        Toast.makeText(
-                            this@KeyboardService,
-                            R.string.leike_haku_epaonnistui,
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                        showMessage(R.string.leike_haku_epaonnistui)
                     }
                 }
 
@@ -2718,6 +2760,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         const val PREF_DICTATION_SILENCE = "sanelu_hiljaisuus"
         const val PREF_TRANSLATE_MEMORY = "kaannos_muisti"
 
+        // Ilmoituskuplan näkyvyysajat kuten Toastin lyhyt ja pitkä.
+        const val MESSAGE_SHORT_MS = 2000L
+        const val MESSAGE_LONG_MS = 3500L
         /** Kielen päättely vaatii vähintään tämän verran tekstiä. */
         private const val AUTODETECT_MIN_CHARS = 6
 

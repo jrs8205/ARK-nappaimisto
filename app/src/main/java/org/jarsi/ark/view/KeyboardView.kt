@@ -8,7 +8,6 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
@@ -22,6 +21,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
+import androidx.core.graphics.drawable.toDrawable
 import org.jarsi.ark.R
 import org.jarsi.ark.keyboard.Key
 import org.jarsi.ark.keyboard.KeyAction
@@ -505,7 +505,7 @@ class KeyboardView(context: Context) : View(context) {
             isFocusable = false
             // Napautus työkaluriville tai sovellukseen sulkee valikon.
             isOutsideTouchable = true
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
             setOnDismissListener { alternatesPopup = null }
             showAtLocation(
                 this@KeyboardView,

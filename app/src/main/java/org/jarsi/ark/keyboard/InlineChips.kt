@@ -4,7 +4,7 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * Täyttöpalvelun inline-ehdotusten (esim. Holvin "Vahvista Holvissa") rivin
+ * Täyttöpalvelun inline-ehdotusten (esim. salasanojen hallinnan tunnusehdotus) rivin
  * säännöt. Chipit ovat ehdotusrivin paikalla: kun niitä on, sanaehdotukset
  * väistyvät, ja salasanakentässäkin rivi näkyy vain chippien kanssa.
  */

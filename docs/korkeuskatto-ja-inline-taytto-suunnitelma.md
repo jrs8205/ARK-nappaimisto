@@ -10,8 +10,8 @@ Suunnitelma 23.9.2026. Tausta: käytettävyyskatselmus 8a:lla korkeudella 130 %.
 | Vaaka | 387 dp → leikkautuu koko ikkunaan | 267 dp (65 %) |
 | Selain, käyttäjätunnus | 513 dp + osoitepalkki 77 dp + lomakemuistin chipit 55 dp → kenttä piilossa | |
 
-Salasanakentässä ehdotusrivi katoaa ja korkeus hyppää 57 dp. Holvi (salasana-sovellus)
-on AutofillService, jonka ehdotus näkyy vain kentän viereisenä pudotusvalikkona, koska
+Salasanakentässä ehdotusrivi katoaa ja korkeus hyppää 57 dp. Täyttöpalvelun
+(salasanojen hallinta) ehdotus näkyy vain kentän viereisenä pudotusvalikkona, koska
 ARK ei pyydä inline-ehdotuksia.
 
 ## 1. Korkeuskatto
@@ -42,20 +42,11 @@ ikkunan korkeudesta (Gboardin vaakasuhde).
 - Kentän vaihto ja näkymän sulku tyhjentävät chipit.
 - `InlineChips.rowState` ja `InlineChips.specSize` ovat puhtaita ja yksikkötestattuja.
 
-## 3. Holvi
-
-`HolviAutofillService.confirmationResponse` liittää datasetiin `InlinePresentation`-
-esityksen, kun `FillRequest.inlineSuggestionsRequest` on mukana: otsikko
-"Vahvista Holvissa", alaotsikko domain, Holvin kuvake. Salaisuuksia ei näytetä,
-vahvistuspolku (`AutofillAuthActivity`, laitelukko) ja selaimen varmennus pysyvät
-samoina. Ilman inline-pyyntöä vastaus on ennallaan.
-
 ## Todennus (23.9.2026)
 
 - ARK: 323 yksikkötestiä, lint 0 virhettä. 8a:lla mitattu `dumpsys window`
   -kehyksestä: pysty 513 dp ennallaan, vaaka 387 dp → 267 dp (= Gboard).
-- Holvi 1.1.3: 245 testiä, lintDebug/lintRelease 0 virhettä, allekirjoitus ennallaan.
 - Chip: ensimmäinen build ei näyttänyt chipiä, koska `setChips` korvasi alustan
   antamat LayoutParams-mitat WRAP_CONTENT-leveydellä, joka mittautuu nollaksi
   (`InlineContentView` ei mittaa itseään). Korjattu `InlineChips.chipSize`-säännöllä.
-  Omistaja todensi 10 Prolla oikealla tunnuksella: chip näkyy ja täyttö toimii.
+  Todennettu 10 Prolla oikealla tunnuksella: chip näkyy ja täyttö toimii, kun täyttöpalvelu tarjoaa inline-esityksen.

@@ -11,7 +11,7 @@ import org.jarsi.ark.theme.KeyboardTheme
 import kotlin.math.roundToInt
 
 /**
- * Täyttöpalvelun inline-ehdotukset (esim. Holvin "Vahvista Holvissa")
+ * Täyttöpalvelun inline-ehdotukset (esim. salasanojen hallinnan tunnusehdotus)
  * vaakarullattavana chipirivinä ehdotusrivin paikalla. Chipit ovat
  * täyttöpalvelun piirtämiä [android.widget.inline.InlineContentView]-
  * näkymiä, joten ne tarvitsevat oikean näkymäpuun eivätkä mahdu Canvasille

@@ -3,259 +3,132 @@
 [![Lataukset](https://img.shields.io/github/downloads/jrs8205/ARK-nappaimisto/total?label=lataukset)](https://github.com/jrs8205/ARK-nappaimisto/releases)
 [![Uusin versio](https://img.shields.io/github/v/release/jrs8205/ARK-nappaimisto?label=uusin%20versio)](https://github.com/jrs8205/ARK-nappaimisto/releases/latest)
 
-Oma suomalainen näppäimistösovellus Androidille (IME, Input Method Editor).
+Suomalainen Android-näppäimistö, joka oppii sinun sanasi ja kirjoitustapasi
+– kokonaan laitteella. Mukana sanelu, leikepöytä, emojit ja Google Kääntäjän
+kaltainen käännösnäkymä.
 
-ARK-näppäimistö toimii Androidin järjestelmätason näppäimistönä, jonka voi ottaa
-käyttöön puhelimen asetuksista ja käyttää lähes kaikissa sovelluksissa:
-viestisovelluksissa, selaimessa, sähköpostissa, muistiinpanoissa ja muissa
-tekstikentissä.
+<p>
+  <img src="docs/kuvat/ehdotukset.png" width="200" alt="Sanaehdotukset kirjoitettaessa">
+  <img src="docs/kuvat/pitka-painallus.png" width="200" alt="Pitkän painalluksen merkkivalikko">
+  <img src="docs/kuvat/kaannos.png" width="200" alt="Käännösnäkymä ja AI-käännös">
+  <img src="docs/kuvat/leikepoyta.png" width="200" alt="Leikepöytä ja kiinnitetyt leikkeet">
+</p>
 
 ## Lataus ja asennus
 
-Uusin versio on [Releases-sivulla](https://github.com/jrs8205/ARK-nappaimisto/releases/latest)
-(`ark-nappaimisto-vX.Y.Z.apk`).
+1. Lataa `ark-nappaimisto-vX.Y.Z.apk` [Releases-sivulta](https://github.com/jrs8205/ARK-nappaimisto/releases/latest)
+   puhelimella ja avaa se. Salli asennus kysyttäessä.
+2. Avaa ARK-näppäimistö-sovellus. Ensimmäinen avaus opastaa käyttöönoton
+   (näppäimistön salliminen ja valinta) ja esittelee ominaisuudet.
 
-1. Lataa APK puhelimella ja avaa se; salli asennus kysyttäessä.
-2. Avaa ARK-näppäimistö-sovellus: ensimmäinen avaus opastaa
-   käyttöönoton (näppäimistön salliminen ja valinta oletukseksi) ja
-   esittelee tärkeimmät ominaisuudet. Esittelyn voi katsoa uudelleen
-   asetuksista.
+Päivitykset asentuvat vanhan päälle, ja opitut sanat säilyvät. Laitteelta
+toiselle tiedot siirtyvät varmuuskopiolla (Asetukset → Varmuuskopio).
 
-Päivitykset asentuvat vanhan version päälle ja opitut sanat säilyvät.
-Oppimisdatan voi siirtää laitteelta toiselle varmuuskopiolla
-(Asetukset → Varmuuskopio).
+## Ominaisuudet
 
-## Tavoite
+**Kirjoittaminen**
 
-Näppäimistön keskeinen tarkoitus on oppia käyttäjän oma kirjoitustapa
-tavallisia näppäimistöjä tehokkaammin:
+* Suomalainen QWERTY (Å, Ä, Ö). Numerorivin voi piilottaa, jolloin
+  numerot ja erikoismerkit löytyvät kirjainten pitkällä painalluksella.
+* Pitkä painallus avaa merkkivalikon, josta merkki valitaan napauttamalla.
+  Napautus muualle sulkee valikon.
+* Oppii omat sanasi, sanaparisi ja sanaketjusi (myös rivinvaihtojen yli) ja
+  ennustaa seuraavan sanan. Yleissanastossa on 170 100 sanaa.
+* Ehdotusrivillä on 5–8 vieritettävää ehdotusta. Pitkä painallus ehdotukseen
+  kiinnittää, poistaa tai estää sanan.
+* Varovainen automaattikorjaus: askelpalautin heti korjauksen jälkeen peruu
+  sen, ja ARK oppii sanan.
+* Välimerkkien jälkiväli, kaksoisvälilyönti pisteeksi ja iso alkukirjain
+  lauseen alussa. Osoitteet (jarsi.org) ja desimaalit (3,14) säilyvät
+  ehjinä.
+* Välilyönnin liu'utus siirtää kursoria. Pohjassa pidetty askelpalautin
+  poistaa sana kerrallaan.
+* Kenttäkohtaiset näppäimet (@ sähköpostissa, / osoitteessa, Enterin
+  toiminto kentän mukaan).
+* Korkeus on säädettävissä. Vaakasuunnassa näppäimistö vie enintään 65 %
+  ikkunasta.
+* Täyttöpalvelujen (esim. Googlen salasanojen hallinta, Bitwarden)
+  ehdotukset näkyvät ehdotusrivillä (Android 11+).
 
-* usein käytetyt sanat ja käyttäjän omat erikoissanat
-* usein käytetyt sanaparit ja lauseiden alut
-* tietyissä sovelluksissa käytetty sanasto
-* hyväksytyt ja hylätyt ehdotukset
-* automaattisesti korjatut ja takaisin palautetut sanat
-* käyttäjän viimeaikaiset kirjoitusaiheet
+**Työkalurivi**
 
-## Lupaukset
+* Kursoritila, verkko-osoitteet, sanelu, emojit, leikepöytä, käännös,
+  peruutus ja asetukset. Järjestyksen ja näkyvyyden voi muokata.
+* Leikepöytä: tekstit ja kuvat, kiinnitetyt leikkeet ja oma uusi leike.
+  Kiinnittämättömät leikkeet vanhenevat tunnissa, eikä arkaluonteisiksi
+  merkittyjä kopioita tallenneta.
 
-* oppii käyttäjän omat sanat nopeasti
-* ei pakota yleissanakirjan sanoja käyttäjän omien sanojen edelle
-* muistaa usein käytetyt sanaparit
-* oppii automaattikorjausten peruuttamisesta
-* näyttää enemmän kuin kolme ehdotusta (5–8 vieritettävällä rivillä)
-* oppii ja ehdottaa täysin paikallisesti
-* ei lähetä kirjoitettua tekstiä minnekään ilman käyttäjän omaa,
-  tietoista toimintoa
-* antaa käyttäjän hallita kaikkea opittua tietoa
+**Käännös**
 
-## Tila
+* Kirjoitusalue ylhäällä, käännös alla livenä. Käännös tehdään laitteella
+  (Google ML Kit), ja kielimallit (~30 Mt/kieli) ladataan kerran luvallasi.
+* Lähdekieli tunnistetaan tekstistä. Käännöstä voi korjata paikallaan, ja
+  sen voi kopioida tai viedä kenttään.
+* ✨ hakee laadukkaamman AI-käännöksen (ks. alla). AI- ja käsin korjatut
+  käännökset muistetaan, joten samasta tekstistä ei makseta kahdesti.
+* Teksti säilyy näkymässä sovelluksesta toiseen vaihtaessa (5–120 min,
+  säädettävissä).
 
-Projekti on kehitysvaiheessa. Vaiheittainen eteneminen:
+**Sanelu**
 
-| Vaihe | Sisältö | Tila |
+* Oletuksena käytetään laitteen omaa puheentunnistusta (ilmainen).
+* Vaihtoehtona on OpenAI-puheentunnistus. Se tunnistaa suomea tarkemmin
+  eikä katkea melussa, ja teksti ilmestyy puheen tahdissa. Omat sanasi
+  menevät tunnistukselle vihjeinä.
+
+**Muuta**
+
+* Opittujen sanojen hallinta: haku, kiinnitys, eston purku, poisto ja
+  tyhjennys.
+* Varmuuskopio: sanat, sanaketjut, kiinnitetyt leikkeet ja asetukset
+  (ei API-avaimia).
+* Erikoismerkkien järjestys on muokattavissa raahaamalla.
+* Teema seuraa järjestelmän tummaa tilaa ja Material You -värejä. Värit
+  täyttävät WCAG AAA -kontrastivaatimukset.
+
+## AI-käännös ja sanelu: API-avaimet ja kirjautuminen
+
+Näppäimistö toimii kokonaan ilman tilejä ja avaimia. Vain kaksi valinnaista
+toimintoa käyttää ulkopuolista palvelua:
+
+| Toiminto | Mitä tarvitaan | Hinta |
 |---|---|---|
-| 1 | Toimiva perusnäppäimistö: suomalainen QWERTY, numerorivi, teemat, asetussivu | Valmis |
-| 2 | Vieritettävä ehdotusrivi ja yleinen suomen sanalista | Valmis |
-| 3 | Henkilökohtaisten sanojen oppiminen | Valmis |
-| 4 | Sanaparit ja trigrammit, seuraavan sanan ennustus | Valmis |
-| 5 | Palautteesta oppiminen (hyväksynnät, hylkäykset, korjausten peruutukset) | Valmis |
-| 6 | Sovelluskohtainen oppiminen | Poistettu suunnitelmasta |
-| 7 | Oikeinkirjoitus ja varovainen automaattikorjaus | Valmis |
-| 8 | Fraasit ja tekstipohjat | Katettu kiinnitetyillä leikkeillä |
-| 9 | Paikallinen kielimalli ehdotusten uudelleenjärjestämiseen | — |
-| 10 | Edistyneet ominaisuudet | — |
+| Live-käännös (laitteella) | ei mitään | ilmainen |
+| ✨ AI-käännös | Claude- tai OpenAI-API-avain | käytön mukaan, viestin käännös maksaa sentin murto-osan |
+| Sanelu, laitteen tunnistus | ei mitään | ilmainen |
+| Sanelu, OpenAI | OpenAI-API-avain | käytön mukaan (minuuttihinta) |
 
-## Ominaisuudet (vaihe 1)
+**API-avain ei ole sama asia kuin tilaus.** Claude Pro/Max- tai ChatGPT
+Plus/Pro -tilaus ei sisällä API-käyttöä. API-avain luodaan erikseen
+osoitteessa [platform.claude.com](https://platform.claude.com/) tai
+[platform.openai.com](https://platform.openai.com/), ja sen käyttö
+laskutetaan tililtä käytön mukaan. Avain syötetään ARKin asetuksiin
+(Tekoäly), ja se säilyy laitteella Android Keystorella salattuna.
 
-* suomalainen QWERTY-asettelu Å-, Ä- ja Ö-kirjaimilla
-* numerorivi, jonka voi piilottaa asetuksista; piilotettuna numerot
-  löytyvät ylärivin pitkällä painalluksella
-* Shift, isot lukkoon toisella napautuksella, automaattinen iso alkukirjain
-* pitkä painallus lisämerkeille numerorivillä ja välimerkeissä
-* kaksi symbolisivua ja numeronäppäimistö numerokentille
-* kenttäkohtainen mukautus: @ sähköpostikentässä, / osoitekentässä,
-  Enter-näppäimen toiminto kentän mukaan (Hae, Lähetä, Siirry…)
-* vaalea ja tumma teema järjestelmän asetuksen mukaan
-* säädettävä näppäimistön korkeus; asetus on pystysuunnan koko, ja
-  vaakasuunnassa tai pienellä näytöllä rivit kutistuvat niin, ettei
-  näppäimistö vie yli 65 % ikkunasta (Gboardin vaakasuhde)
-* näppäinäänet, värinä ja esikatselukupla
-* välilyönnin pyyhkäisy siirtää kursoria
-* salasanakentissä esikatselu pois käytöstä
-* täyttöpalvelun (esim. Holvi) ehdotukset näppäimistön ehdotusrivillä
-  (inline autofill, Android 11+): chip näkyy myös silloin, kun kenttä on
-  näppäimistön alla piilossa, ja korvaa sanaehdotukset niin kauan kuin
-  täyttöehdotuksia on
+**Claude-tilauksella kirjautuminen ei ole mahdollista.** Anthropic ei salli
+muiden sovellusten kirjautumista Claude-tilillä eikä tilauksen käyttöä
+niiden kautta ([Anthropicin ehdot](https://code.claude.com/docs/en/legal-and-compliance),
+tilanne 10/2026). Claude toimii ARKissa vain API-avaimella.
 
-## Ominaisuudet (vaihe 2)
-
-* vieritettävä ehdotusrivi: täydennykset yleisestä suomen sanalistasta
-  (nykyisin 170 100 sanamuotoa taajuuksineen, ks.
-  [docs/sanalista.md](docs/sanalista.md))
-* työkalurivi: kursorinsiirtotila, verkko-osoitesivu, sanelu, emojit,
-  leikepöytä, käännös, peruutus ja asetukset; nappien
-  järjestyksen ja näkyvyyden voi muokata asetuksista
-* välimerkki siirtyy ehdotuksen lisäämän välilyönnin eteen
-* älykäs jälkiväli: välimerkin perään kirjoitettu kirjain saa välin
-  eteensä ja uusi lause alkaa isolla; askelpalautin peruu välin, joten
-  osoitteet (jarsi.org) ja desimaalit (3.14) säilyvät ehjinä
-* isot alkukirjaimet ehdotuksissa lauseen alussa
-* ehdotusten asetukset: näkyvyys, välilyönti hyväksynnän jälkeen,
-  yleisimmät sanat tyhjällä syötteellä
-* teema seuraa järjestelmän tummaa tilaa; salasana- ja numerokentissä
-  ehdotukset pois käytöstä
-
-## Ominaisuudet (vaihe 3)
-
-* henkilökohtaisten sanojen oppiminen: käsin kirjoitetut sanat (myös
-  numeroita sisältävät kuten tuotekoodit sekä verkko-osoitteet) nousevat
-  ehdotuksiin heti ensimmäisestä kerrasta
-* omat sanat ehdotusrivin kärkeen käyttömäärän ja tuoreuden mukaan,
-  alkuperäisessä kirjoitusasussaan
-* pitkä painallus ehdotukseen: Poista opittu sana / Älä ehdota tätä
-* sanaketjujen tallennus rivinvaihtojen yli seuraavan sanan ennustusta
-  varten (vaihe 4)
-* kaikki oppimisdata paikallisessa tietokannassa; salasanakentissä ei
-  opita mitään
-
-## Ominaisuudet (vaihe 4)
-
-* seuraavan sanan ennustus omista sanaketjuista: sanan päätyttyä rivin
-  kärkeen nousevat todennäköisimmät jatkot
-* ketjut tallentuvat rivinvaihtojen yli, joten myös listamaiset
-  kirjoitusrutiinit (esim. koodi ⏎ määrä ⏎ nouto) ennustuvat — ominaisuus,
-  jota yleiset näppäimistöt eivät osaa
-* trigramit tarkentavat ennustusta, kun kaksi edeltävää sanaa tunnetaan
-* ennustus toimii myös vanhan tekstin perään jatkettaessa
-
-## Ominaisuudet (vaihe 5)
-
-* yhtenäinen pisteytysmalli: yleisyys, oma käyttö, ketjuosumat,
-  hyväksynnät, kiinnitys ja ohitukset painottavat ehdotuksia yhdessä
-* hyväksytty ehdotus nousee jatkossa korkeammalle; toistuvasti ohitettu
-  täydennys laskee hiljalleen
-* sanan kiinnitys: kiinnitetty sana nousee aina kärkeen kun sanan alku
-  täsmää, ja se merkitään ehdotuksessa pienellä pisteellä
-* korjausten peruutuksista oppiminen tulee automaattikorjauksen mukana
-  (vaihe 7)
-
-## Ominaisuudet (vaihe 7)
-
-* varovainen automaattikorjaus: välilyönti korjaa tuntemattoman sanan
-  lähimpään tunnettuun; omat sanat, koodit ja estetyt jäävät aina rauhaan
-* askelpalautin heti korjauksen jälkeen peruu sen — peruttu sana opitaan,
-  eikä sitä korjata enää uudestaan
-
-## Muut ominaisuudet
-
-* opittujen sanojen hallinta asetuksissa: haku, kiinnitys, eston purku,
-  poisto ja koko oppimishistorian tyhjennys; käyttömäärät laskevat myös
-  ehdotusriviltä valitut kerrat
-* peruutusnappi työkalurivillä: peruu viimeisimmän näppäimistön
-  toimenpiteen (esim. liittämisen tai automaattikorjauksen); muissa
-  tilanteissa pyytää kentän omaa peruutusta
-* välitön jälkiväli: välimerkki sanan perässä saa välin heti peräänsä
-  ("sana," → "sana, ") sekä kentässä että käännösrivillä; numeroiden
-  välissä (3,14) sääntö ei laukea, ja osoitteen (jarsi.org) välin saa
-  pois yhdellä askelpalauttimella. Osoite-, sähköposti- ja
-  salasanakentissä sääntö ei ole käytössä. Säännöt toimivat myös
-  monirivisten kenttien rivien lopussa.
-* askelpalautin pohjassa poistaa sanan kerrallaan; napautus poistaa
-  merkin kerrallaan
-* kaksoisvälilyönti lisää pisteen: kaksi nopeaa välilyöntiä sanan
-  perässä muuttuu muotoon ". " (kytkettävissä pois asetuksista)
-* yleissanasto 170 100 sanaa: Parole-taajuuslista täydennettynä Kotuksen
-  Nykysuomen sanalistalla (ks. [docs/sanalista.md](docs/sanalista.md))
-* jatkuva sanelu työkalurivin mikrofonista: Android 13:sta alkaen
-  mikrofoni pysyy auki tulosten välillä, joten puhetta ei katoa
-  taukojen katveisiin. Sanelu alkaa aina isolla kirjaimella ja päättyy
-  hiljaisuuteen (raja säädettävissä asetuksista 2–10 sekuntia),
-  mikrofonin napautukseen tai kentän vaihtumiseen. Puhe käsitellään
-  laitteen puheentunnistuspalvelussa — ensisijaisesti laitteella; jos
-  suomen laitemallia ei ole, laitteen palvelu voi käyttää verkkoa.
-  Sanellut sanat oppivat kuten kirjoitetut.
-* sanelun tunnistus valittavissa (asetukset → Sanelu): laitteen oma
-  tunnistus tai OpenAI-puheentunnistus. OpenAI tunnistaa suomea
-  selvästi tarkemmin eikä lopeta kuuntelua melussa: ääni virtaa
-  jatkuvana OpenAI:n Realtime-rajapintaan omalla API-avaimella, ja
-  teksti ilmestyy kenttään puheen tahdissa. Laitteella ei pätkitä
-  puhetta, joten sanoja ei katoa pätkien rajoilta. Käytetyimmät opitut
-  sanat lähtevät sanastovihjeinä, jolloin omat nimet ja termit
-  tunnistuvat oikein. Tunnistusmallin voi valita asetuksista, ja ilman
-  avainta käytetään laitteen tunnistusta.
-* leikepöytä työkaluriviltä: tekstit ja kuvat kaksisarakkeisessa
-  ruudukossa, kiinnitys neulasta, kolmen pisteen valikosta liittäminen,
-  haku verkosta ja poisto, sekä oman kiinnitetyn leikkeen luonti
-  plus-napista. Kiinnittämättömät vanhenevat tunnissa, ja
-  arkaluonteisiksi merkityt kopiot ohitetaan kokonaan.
-* varmuuskopio asetuksista: opitut sanat, sanaketjut ja kiinnitetyt
-  tekstileikkeet JSON-tiedostoon ja takaisin; tuonti yhdistää tiedot
-  turvallisesti, joten saman tiedoston voi tuoda useankin kerran
-* erikoismerkkien järjestys: symbolisivujen merkit voi järjestää
-  asetuksissa raahaamalla, myös sivujen välillä
-* sanelun sanastovihjeet: käytetyimmät omat sanat ohjaavat
-  puheentunnistusta (Android 13 tai uudempi)
-* emojipaneeli työkaluriviltä: kategoriat, viimeksi käytetyt ja
-  laitetuen mukainen valikoima
-* käännösnäkymä työkaluriviltä: oma kääntäjä näppäimistön sisällä
-  Google Kääntäjän tapaan. Ylhäällä on monirivinen kirjoitusalue, joka
-  kasvaa tekstin mukana, ja sen alla käännös päivittyy livenä
-  laitteella (Google ML Kit) — mitään ei kirjoiteta kenttään
-  itsestään. Käännöksen voi kopioida leikepöydälle tai viedä
-  Lisää-napilla kenttään, jolloin uusi vienti korvaa edellisen.
-  ✨-nappi hakee laadukkaamman käännöksen valitulta AI-palvelulta
-  (Anthropicin Claude tai OpenAI:n ChatGPT; vaatii oman API-avaimen,
-  joka säilytetään laitteella Android Keystorella salattuna). Mallin
-  voi valita asetuksista — lista haetaan palvelusta, joten uudet mallit
-  näkyvät ilman sovelluspäivitystä. Lähetettävän tekstin pituus on
-  rajattu, ja mahdollisen virheen syy näytetään ilmoituksessa. Myös
-  käännöstä voi napauttaa: kursori
-  siirtyy siihen ja konekäännöksen voi viimeistellä paikallaan ennen
-  vientiä — korjattu teksti on se, joka viedään ja kopioidaan.
-  Lähdekieli tunnistetaan kirjoitetusta tekstistä laitteella omien
-  ladattujen kielten joukosta, ja kielet valitaan pillereitä
-  napauttamalla; kielimallit ladataan vasta käyttäjän luvalla
-  (~30 Mt/kieli, kertalataus) ja niitä hallitaan asetuksista.
-  Kirjoitusalueella toimivat sanaehdotukset, kursorin siirto, valinta
-  kahvoineen, Kopioi/Liitä sekä välimerkkisäännöt, ja teksti säilyy
-  kunnes sen itse tyhjentää — myös sovelluksesta toiseen vaihtaessa
-  (säilytysaika säädettävissä asetuksista 5–120 minuuttia).
-  Rivinvaihdot säilyvät käännöksessä, ja käännettävä teksti
-  esikäsitellään kokonaisiksi lauseiksi, mikä parantaa käännösten
-  laatua.
-* asetussivujen Material 3 -ilme: iso kutistuva otsikko, korttirivit,
-  kuvakkeet ja Material You -värit (Android 12+). Värit täyttävät
-  WCAG AAA -kontrastivaatimukset molemmissa teemoissa.
+**ChatGPT-tilauksella kirjautuminen on suunnitteilla.** OpenAI tarjoaa
+avoimen lähdekoodin sovelluksille
+[Sign in with ChatGPT](https://developers.openai.com/siwc) -kirjautumisen.
+Sen avulla AI-käännös voisi kuluttaa ChatGPT-tilauksen kiintiötä
+API-saldon sijaan. Kirjautuminen kattaa vain tekstipyynnöt, joten
+OpenAI-sanelu vaatii jatkossakin API-avaimen.
 
 ## Yksityisyys
 
-Oppiminen ja ehdotukset ovat kokonaan paikallisia, eikä sovelluksessa ole
-analytiikkaa tai mainoksia. Sovelluksella on internet-oikeus kolmea
-tarkoitusta varten:
+* Oppiminen ja ehdotukset ovat täysin paikallisia. Sovelluksessa ei ole
+  analytiikkaa eikä mainoksia.
+* Teksti lähtee laitteelta vain, kun itse painat ✨-AI-käännöstä. Puhe
+  lähtee vain, kun olet valinnut OpenAI-sanelun ja sanelu on käynnissä
+  (enintään viisi minuuttia kerrallaan). Molemmat vaativat oman avaimesi.
+* Verkkoa käytetään lisäksi käännösmallien kertalataukseen (Google ML Kit)
+  ja AI-mallilistan hakuun omalla avaimellasi.
+* Salasana- ja muissa arkaluonteisissa kentissä ei opita mitään.
 
-* käännöskielten mallien kertalataus (Google ML Kit)
-* valinnainen ✨-AI-käännös, joka lähettää tekstin valittuun
-  AI-palveluun (Anthropic tai OpenAI) vain kun käyttäjä itse painaa
-  nappia ja on ensin asettanut oman API-avaimensa
-* valinnainen OpenAI-puheentunnistus: puhe virtaa OpenAI:lle vain kun
-  käyttäjä on itse valinnut sen sanelun tunnistukseksi asetuksista ja
-  asettanut oman API-avaimensa, ja vain sanelun ollessa käynnissä.
-  Puheen mukana lähetetään käytetyimmät opitut sanat sanastovihjeinä,
-  jotta omat nimet ja termit tunnistuvat oikein; opittu sanasto itsessään
-  pysyy laitteella eikä siirry mihinkään muualle. Yksi sanelu kestää
-  enintään viisi minuuttia, jottei kuuntelu jatkuisi vahingossa.
-  Oletuksena sanelu käyttää laitteen omaa puheentunnistusta.
-
-API-avaimet säilytetään laitteella Android Keystorella salattuina.
-Live-käännös ja lähdekielen tunnistus tehdään laitteella, eikä
-kirjoitettua tekstiä lähetetä minnekään ilman käyttäjän omaa,
-tietoista toimintoa. Oppiminen kytkeytyy kokonaan pois salasana- ja
-muissa arkaluonteisissa kentissä.
-
-## Kääntäminen
-
-Projekti käännetään Android Studiolla tai komentoriviltä:
+## Kääntäminen lähdekoodista
 
 ```
 ./gradlew :app:assembleDebug
@@ -265,9 +138,7 @@ Vaatimukset: JDK 17 tai uudempi ja Android SDK (compileSdk 36).
 
 ## Lisenssi
 
-Katso [LICENSE](LICENSE).
-
-Yleinen suomen sanalista on muodostettu Kotimaisten kielten keskuksen
-Parole-taajuuslistasta ja Nykysuomen sanalistasta
-([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fi)),
-katso [docs/sanalista.md](docs/sanalista.md).
+[GPL-3.0](LICENSE). Yleinen suomen sanalista on muodostettu Kotimaisten
+kielten keskuksen Parole-taajuuslistasta ja Nykysuomen sanalistasta
+([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fi)), ks.
+[docs/sanalista.md](docs/sanalista.md).

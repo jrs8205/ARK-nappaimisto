@@ -2140,7 +2140,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     }
 
     /**
-     * Täyttöpalvelun (esim. Holvi) ehdotukset pyydetään näppäimistön riville
+     * Täyttöpalvelun (esim. salasanojen hallinnan) ehdotukset pyydetään näppäimistön riville
      * kentän viereisen pudotusvalikon sijaan: chip näkyy silloinkin, kun
      * kenttä itse on näppäimistön alla piilossa. Chipin korkeus on
      * ehdotusrivin korkeus ja ulkoasu teeman väreistä.

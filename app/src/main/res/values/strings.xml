@@ -65,7 +65,7 @@
 
     <string name="asetukset_tekoaly">Tekoäly</string>
     <string name="asetus_ai_avain_ohje">API-avain ei ole sama asia kuin Claude- tai ChatGPT-tilaus</string>
-    <string name="asetus_ai_avain_ohje_kuvaus">AI-käännös ja OpenAI-sanelu käyttävät palvelun omaa API-avainta. API-käyttö laskutetaan käytön mukaan erikseen eikä sisälly Claude Pro- tai ChatGPT Plus -tilaukseen. Avaimen saa osoitteesta platform.claude.com (Claude) tai platform.openai.com (OpenAI).\n\nClaude-tilauksella ei voi kirjautua: Anthropic ei salli sitä muille sovelluksille. ChatGPT-tilauksella kirjautuminen ei ole vielä käytössä. Sanelu toimii aina vain OpenAI:n API-avaimella.</string>
+    <string name="asetus_ai_avain_ohje_kuvaus">AI-käännös ja OpenAI-sanelu käyttävät palvelun omaa API-avainta. API-käyttö laskutetaan käytön mukaan erikseen eikä sisälly Claude Pro- tai ChatGPT Plus -tilaukseen. Avaimen saa osoitteesta platform.claude.com (Claude) tai platform.openai.com (OpenAI).\n\nClaude-tilauksella ei voi kirjautua: Anthropic ei salli sitä muille sovelluksille. ChatGPT-tilauksella kirjautuminen ei ole vielä käytössä. OpenAI-sanelu vaatii aina OpenAI:n API-avaimen; laitteen oma puheentunnistus toimii ilman avainta.</string>
     <string name="asetus_ai_palvelu">AI-palvelu (Claude / ChatGPT)</string>
     <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s (käännösnäkymän AI-käännös). Napauta vaihtaaksesi palvelua.</string>
     <string name="asetus_ai_palvelu_ei_avainta">Ei käytössä: lisää %1$s-avain alle, niin AI-toiminnot tulevat käyttöön.</string>

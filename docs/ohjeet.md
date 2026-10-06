@@ -61,9 +61,13 @@ makseta kahdesti.
 
 - Oppiminen ja ehdotukset ovat paikallisia. Sovelluksessa ei ole
   analytiikkaa eikä mainoksia.
-- Teksti lähtee laitteelta vain, kun itse painat ✨.
-- Puhe lähtee vain, kun OpenAI-sanelu on valittu ja käynnissä (enintään
-  viisi minuuttia kerrallaan).
+- Kirjoittamasi teksti lähtee laitteelta vain, kun itse painat ✨.
+- OpenAI-sanelussa puhe virtaa OpenAI:lle vain sanelun ollessa käynnissä
+  (enintään viisi minuuttia kerrallaan). Mukana lähtevät käytetyimmät
+  opitut sanasi tunnistusvihjeinä, jotta omat nimet ja termit tunnistuvat;
+  itse sanasto pysyy laitteella.
+- Laitteen oma puheentunnistus toimii ensisijaisesti laitteella. Jos
+  suomen laitemallia ei ole, puhelimen tunnistuspalvelu voi käyttää verkkoa.
 - Lisäksi verkkoa käytetään käännösmallien kertalataukseen (~30 Mt/kieli)
   ja AI-mallilistan hakuun.
 - API-avaimet säilyvät laitteella Android Keystorella salattuina.

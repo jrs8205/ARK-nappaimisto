@@ -447,6 +447,8 @@ class KeyboardView(context: Context) : View(context) {
                 cornerRadius = keyCornerRadius
                 setColor(theme.specialKey)
             }
+            // Varjo erottaa valikon alla olevista samanvärisistä näppäimistä.
+            elevation = dp(6f)
         }
         for (value in values) {
             row.addView(

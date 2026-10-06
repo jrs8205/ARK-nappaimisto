@@ -25,23 +25,54 @@ object Layouts {
     )
 
     // Kirjainnäppäimissä ei ole tarkkeellisia lisämerkkejä: suomessa niitä ei tarvita.
-    // Numerorivin ollessa piilossa numerot löytyvät ylärivin pitkällä painalluksella.
+    // Numerorivin ollessa piilossa ylärivin kirjaimet kantavat numerot
+    // numerorivin omine merkkeineen ja muut kirjaimet yleisimmät
+    // erikoismerkit Gboardin tapaan; ne valitaan pitkän painalluksen
+    // valikosta ja ensimmäinen näkyy näppäimen kulmassa.
     private val letterChars1 = listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "å")
 
+    private val letterSymbols = mapOf(
+        "å" to listOf("%"),
+        "a" to listOf("@"),
+        "s" to listOf("#"),
+        "d" to listOf("€", "$"),
+        "f" to listOf("_"),
+        "g" to listOf("&"),
+        "h" to listOf("-", "–"),
+        "j" to listOf("+"),
+        "k" to listOf("(", "["),
+        "l" to listOf(")", "]"),
+        "ö" to listOf("/", "\\"),
+        "ä" to listOf("=", "<", ">"),
+        "z" to listOf("*"),
+        "x" to listOf("\""),
+        "c" to listOf("'"),
+        "v" to listOf(":"),
+        "b" to listOf(";"),
+        "n" to listOf("!"),
+        "m" to listOf("?"),
+    )
+
+    private fun letterKey(char: String, numberRow: Boolean) =
+        key(char, if (numberRow) emptyList() else letterSymbols[char].orEmpty())
+
     private fun letterRow1(numberRow: Boolean) = letterChars1.mapIndexed { i, c ->
-        key(c, if (!numberRow && i < 10) listOf("${(i + 1) % 10}") else emptyList())
+        if (!numberRow && i < 10) {
+            val digit = Layouts.numberRow[i]
+            key(c, listOf(digit.label) + digit.longPress)
+        } else {
+            letterKey(c, numberRow)
+        }
     }
 
-    private val letterRow2 = listOf(
-        key("a"), key("s"), key("d"), key("f"), key("g"), key("h"),
-        key("j"), key("k"), key("l"), key("ö"), key("ä"),
-    )
+    private fun letterRow2(numberRow: Boolean) =
+        listOf("a", "s", "d", "f", "g", "h", "j", "k", "l", "ö", "ä").map { letterKey(it, numberRow) }
 
-    private val letterRow3 = listOf(
-        Key(KeyAction.Shift, "⇧", widthWeight = 1.5f),
-        key("z"), key("x"), key("c"), key("v"), key("b"), key("n"), key("m"),
-        Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true),
-    )
+    private fun letterRow3(numberRow: Boolean) = buildList {
+        add(Key(KeyAction.Shift, "⇧", widthWeight = 1.5f))
+        listOf("z", "x", "c", "v", "b", "n", "m").forEach { add(letterKey(it, numberRow)) }
+        add(Key(KeyAction.Backspace, "⌫", widthWeight = 1.5f, repeatable = true))
+    }
 
     private fun bottomRow(extraKey: String?): List<Key> {
         val row = mutableListOf(
@@ -60,14 +91,14 @@ object Layouts {
      * Kirjainasettelu. [extraKey] lisää kenttäkohtaisen merkin pilkun viereen,
      * esimerkiksi @ sähköpostikentässä tai / osoitekentässä. [numberRow]
      * piilottaa numerorivin; numerot jäävät ?123-sivulle ja ylärivin
-     * pitkiin painalluksiin.
+     * pitkiin painalluksiin, erikoismerkit muiden kirjainten painalluksiin.
      */
     fun letters(extraKey: String? = null, numberRow: Boolean = true) = KeyboardLayout(
         buildList {
             if (numberRow) add(Layouts.numberRow)
             add(letterRow1(numberRow))
-            add(letterRow2)
-            add(letterRow3)
+            add(letterRow2(numberRow))
+            add(letterRow3(numberRow))
             add(bottomRow(extraKey))
         }
     )

@@ -19,11 +19,36 @@ class LayoutsTest {
         assertEquals(4, layout.rows.size)
         val topRow = layout.rows[0]
         assertEquals("q", topRow.first().label)
-        assertEquals(listOf("1"), topRow[0].longPress)
-        assertEquals(listOf("9"), topRow[8].longPress)
-        assertEquals(listOf("0"), topRow[9].longPress)
+        // Numero ensin (näkyy vihjeenä), perässä numerorivin omat merkit.
+        assertEquals(listOf("1", "!"), topRow[0].longPress)
+        assertEquals(listOf("2", "\"", "@"), topRow[1].longPress)
+        assertEquals(listOf("4", "-", "$", "¤"), topRow[3].longPress)
+        assertEquals(listOf("9", ")", "]"), topRow[8].longPress)
+        assertEquals(listOf("0", "=", "}"), topRow[9].longPress)
         // å-näppäimelle ei tule numeroa.
-        assertTrue(topRow[10].longPress.isEmpty())
+        assertTrue(topRow[10].longPress.none { it.first().isDigit() })
+    }
+
+    @Test
+    fun `ilman numerorivia muut kirjaimet kantavat erikoismerkit`() {
+        val layout = Layouts.letters(numberRow = false)
+        val middle = layout.rows[1].associate { it.label to it.longPress }
+        assertEquals("@", middle.getValue("a").first())
+        assertEquals("#", middle.getValue("s").first())
+        assertTrue("€" in middle.getValue("d"))
+        val bottom = layout.rows[2].associate { it.label to it.longPress }
+        assertEquals("*", bottom.getValue("z").first())
+        assertEquals("?", bottom.getValue("m").first())
+        // Jokaisella kirjaimella on jokin merkki, ettei valikkoa tarvitse arvata.
+        val letters = layout.rows.take(3).flatten().filter { it.action is KeyAction.Text }
+        assertTrue(letters.all { it.longPress.isNotEmpty() })
+    }
+
+    @Test
+    fun `numerorivin kanssa kirjaimissa ei ole erikoismerkkeja`() {
+        val layout = Layouts.letters()
+        val letters = layout.rows.drop(1).take(3).flatten().filter { it.action is KeyAction.Text }
+        assertTrue(letters.all { it.longPress.isEmpty() })
     }
 
     @Test

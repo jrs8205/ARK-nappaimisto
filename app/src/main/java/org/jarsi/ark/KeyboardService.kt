@@ -80,6 +80,7 @@ import org.jarsi.ark.keyboard.ToolbarOrder
 import org.jarsi.ark.keyboard.TranslateBuffer
 import org.jarsi.ark.keyboard.TranslateLines
 import org.jarsi.ark.keyboard.TranslatePrep
+import org.jarsi.ark.keyboard.TranslationMemory
 import org.jarsi.ark.keyboard.nextOnTap
 import org.jarsi.ark.settings.SettingsActivity
 import org.jarsi.ark.theme.KeyboardTheme
@@ -193,6 +194,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     // AI-käännös on kesken: estää saman pyynnön laskuttamisen moneen kertaan.
     private var aiTranslateRunning = false
+
+    // AI- ja käsin korjatut käännökset tekstin ja kieliparin mukaan: sama
+    // teksti saa paremman käännöksensä takaisin ilman uutta maksullista
+    // pyyntöä. Unohtuu muistiajan kuluttua kuten puskurikin.
+    private val translationMemory = TranslationMemory()
+
+    /** Muistettu käännös [text]-tekstille nykyisellä kieliparilla. */
+    private fun rememberedTranslation(
+        text: String = translateBuffer.toString(),
+    ): TranslationMemory.Remembered? =
+        translationMemory.get(text, translationSource(), translationTarget())
     private var translator: Translator? = null
     private var translatorReady = false
 
@@ -780,9 +792,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Vanha käännösteksti unohtuu muistiajan kuluttua: tuntien takainen
         // teksti avautuisi muuten yllättäen uuden käännöstyön pohjaksi.
         val memoryMs = prefs.getInt(PREF_TRANSLATE_MEMORY, 30) * 60_000L
-        if (translateBuffer.text.isNotEmpty() && translateLastUsed > 0 &&
+        val expired = translateLastUsed > 0 &&
             SystemClock.elapsedRealtime() - translateLastUsed > memoryMs
-        ) {
+        // Muistetut käännökset unohtuvat samalla, vaikka rivi olisi jo tyhjä.
+        if (expired) translationMemory.clear()
+        if (translateBuffer.text.isNotEmpty() && expired) {
             translateBuffer.clear()
             lastInsertedTranslation = ""
         }
@@ -792,8 +806,12 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         hideAllPanels()
         resetSidePage()
         translateMode = true
-        currentTranslation = ""
-        translationFresh = false
+        // Aiempi AI- tai käsin korjattu käännös palaa näkyviin heti, eikä
+        // konekäännös korvaa sitä — muuten maksullinen käännös pitäisi
+        // pyytää uudelleen joka kerta näkymään palatessa.
+        val remembered = rememberedTranslation()
+        currentTranslation = remembered?.translation.orEmpty()
+        translationFresh = remembered != null
         stopTranslationEditing()
         bar.visibility = View.VISIBLE
         toolbar?.translationActive = true
@@ -954,6 +972,16 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             // uutta konekäännöstä ei haeta ennen kuin lähdeteksti muuttuu.
             currentTranslation = translationBuffer.toString()
             translationFresh = currentTranslation.isNotBlank()
+            // Korjaus muistetaan tekstille; korjattu AI-käännös pysyy
+            // AI-käännöksenä, ettei ✨ pyydä sitä turhaan uudelleen.
+            val text = translateBuffer.toString()
+            translationMemory.put(
+                text,
+                translationSource(),
+                translationTarget(),
+                currentTranslation,
+                fromAi = rememberedTranslation(text)?.fromAi == true,
+            )
             updateTranslateBar()
             updateSuggestions()
             return
@@ -975,8 +1003,20 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     private fun runLiveTranslate() {
         // Käsin korjattua käännöstä ei ylikirjoiteta kesken muokkauksen.
-        if (!translateMode || !translatorReady || translationEditing) return
+        if (!translateMode || translationEditing) return
         val text = translateBuffer.toString()
+        // Muistettu AI- tai käsin korjattu käännös voittaa konekäännöksen
+        // ja näkyy heti, vaikka kääntäjä vasta valmistuisi.
+        val remembered = rememberedTranslation(text)
+        if (remembered != null) {
+            currentTranslation = remembered.translation
+            translationFresh = true
+            translateBar?.setTranslation(
+                currentTranslation, getString(R.string.kaannos_tyhja)
+            )
+            return
+        }
+        if (!translatorReady) return
         if (text.isBlank()) {
             currentTranslation = ""
             translationFresh = false
@@ -1078,6 +1118,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             onDone()
             return
         }
+        rememberedTranslation(text)?.let { remembered ->
+            commitTranslation(remembered.translation)
+            onDone()
+            return
+        }
         val client = translator
         if (client == null || !translatorReady) {
             showMessage(R.string.kaannos_ladataan)
@@ -1149,6 +1194,18 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             showMessage(R.string.kaannos_ai_liian_pitka)
             return
         }
+        // Sama teksti on jo AI-käännetty tällä kieliparilla: muistettu
+        // käännös näytetään eikä uutta maksullista pyyntöä tehdä.
+        val remembered = rememberedTranslation(text)
+        if (remembered?.fromAi == true) {
+            stopTranslationEditing()
+            translateRunnable?.let { mainHandler.removeCallbacks(it) }
+            currentTranslation = remembered.translation
+            translationFresh = true
+            updateTranslateBar()
+            showMessage(R.string.kaannos_ai_muistista)
+            return
+        }
         val openAi = openAiSelected()
         val apiKey = ApiKeyStore.read(
             prefs,
@@ -1161,8 +1218,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // AI-käännös korvaa alueen sisällön, joten käsin korjaus päättyy.
         stopTranslationEditing()
         translateBar?.setTranslation("", getString(R.string.kaannos_ai_kaannetaan))
-        val sourceName = languageName(translationSource())
-        val targetName = languageName(translationTarget())
+        val sourceCode = translationSource()
+        val targetCode = translationTarget()
+        val sourceName = languageName(sourceCode)
+        val targetName = languageName(targetCode)
         val generation = ++aiTranslateGeneration
         aiTranslateRunning = true
         aiExecutor.execute {
@@ -1187,7 +1246,18 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 // Vapautetaan lukko ennen kaikkia paluureittejä, ettei nappi
                 // jää pysyvästi lukkoon keskeytyneen pyynnön jälkeen.
                 aiTranslateRunning = false
-                if (generation != aiTranslateGeneration || destroyed || !translateMode) {
+                if (destroyed) return@post
+                // Maksettu käännös muistetaan, vaikka näkymä ehdittiin sulkea
+                // tai kielipari vaihtaa — palatessa se on valmiina. Käyttäjän
+                // välissä tekemää korjausta se ei kuitenkaan korvaa.
+                if (!translation.isNullOrBlank() && (
+                        generation == aiTranslateGeneration ||
+                            translationMemory.get(text, sourceCode, targetCode) == null
+                        )
+                ) {
+                    translationMemory.put(text, sourceCode, targetCode, translation, fromAi = true)
+                }
+                if (generation != aiTranslateGeneration || !translateMode) {
                     return@post
                 }
                 if (text != translateBuffer.toString()) return@post
@@ -2763,6 +2833,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         // Ilmoituskuplan näkyvyysajat kuten Toastin lyhyt ja pitkä.
         const val MESSAGE_SHORT_MS = 2000L
         const val MESSAGE_LONG_MS = 3500L
+
         /** Kielen päättely vaatii vähintään tämän verran tekstiä. */
         private const val AUTODETECT_MIN_CHARS = 6
 

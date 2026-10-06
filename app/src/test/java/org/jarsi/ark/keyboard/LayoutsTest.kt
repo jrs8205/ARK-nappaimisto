@@ -35,6 +35,13 @@ class LayoutsTest {
     }
 
     @Test
+    fun `numeronappaimiston pisteen pitka painallus antaa kaksoispisteen ja kauttaviivan`() {
+        val dot = Layouts.numeric.rows[3][0]
+        assertEquals(".", dot.label)
+        assertEquals(listOf(":", "/"), dot.longPress)
+    }
+
+    @Test
     fun `numerorivin kanssa ylarivilla ei ole numeropainalluksia`() {
         val layout = Layouts.letters()
         assertTrue(layout.rows[1].all { it.longPress.isEmpty() })

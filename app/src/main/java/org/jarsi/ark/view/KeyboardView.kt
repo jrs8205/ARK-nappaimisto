@@ -1,20 +1,24 @@
 package org.jarsi.ark.view
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.os.Build
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.WindowInsets
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
@@ -126,13 +130,10 @@ class KeyboardView(context: Context) : View(context) {
     private var previewPopup: PopupWindow? = null
     private var previewView: TextView? = null
 
-    // Pitkän painalluksen vaihtoehtomerkit
+    // Pitkän painalluksen vaihtoehtomerkit: valikko jää auki sormen
+    // noustessa ja merkki valitaan napauttamalla. Liu'utusvalinta osui
+    // helposti viereiseen merkkiin.
     private var alternatesPopup: PopupWindow? = null
-    private var alternateViews: List<TextView> = emptyList()
-    private var alternateValues: List<String> = emptyList()
-    private var alternateSelected = 0
-    private var alternatesLeft = 0f
-    private var alternateCellWidth = 0f
 
     fun setKeyboardLayout(newLayout: KeyboardLayout) {
         if (newLayout == layout) return
@@ -331,6 +332,9 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun handleDown(pointerId: Int, x: Float, y: Float) {
+        // Valikon peittokuva ottaa näppäinalueen kosketukset; tänne asti
+        // päätyy vain jo alkanut kosketus, joka ei saa kirjoittaa mitään.
+        if (alternatesPopup != null) return
         val bounded = keyAt(x, y) ?: return
         val info = PressInfo(bounded)
         pressed[pointerId] = info
@@ -356,10 +360,7 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun handleMove(pointerId: Int, x: Float) {
         val info = pressed[pointerId] ?: return
-        if (info.alternatesOpen) {
-            updateAlternateSelection(x)
-            return
-        }
+        if (info.alternatesOpen) return
         if (info.bounded.key.action == KeyAction.Space) {
             val threshold = dp(16f)
             var dx = x - info.spaceAnchorX
@@ -379,7 +380,8 @@ class KeyboardView(context: Context) : View(context) {
         removeCallbacks(info.repeatRunnable)
         hidePreview()
         when {
-            info.alternatesOpen -> commitAlternate()
+            // Valikko jää auki; merkki valitaan napauttamalla.
+            info.alternatesOpen -> Unit
             info.spaceSwiping || info.committed -> Unit
             else -> commit(info.bounded.key)
         }
@@ -423,94 +425,98 @@ class KeyboardView(context: Context) : View(context) {
         showAlternates(info.bounded)
     }
 
+    /**
+     * Avaa pitkän painalluksen vaihtoehdot napautettavana rivinä näppäimen
+     * ylle. Läpinäkyvä peittokuva kattaa koko näppäinalueen: napautus
+     * merkkiin valitsee sen, napautus muualle sulkee valikon kirjoittamatta
+     * mitään. Kosketukset näppäimistön ulkopuolella sulkevat valikon myös.
+     * Solut kapenevat, jotta koko rivi mahtuu kapeallekin näytölle.
+     */
     private fun showAlternates(bounded: BoundedKey) {
         val base = (bounded.key.action as? KeyAction.Text)?.text
-        alternateValues = buildList {
+        val values = buildList {
             if (base != null) add(base)
             addAll(bounded.key.longPress)
         }.map { if (shiftState != ShiftState.OFF && it.length == 1) it.uppercase(fiLocale) else it }
-        alternateSelected = 0
-        alternateCellWidth = dp(46f)
+        val cellWidth = minOf(dp(46f), (width - dp(8f)) / values.size)
         val cellHeight = dp(52f)
 
-        val container = LinearLayout(context).apply {
+        val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             background = GradientDrawable().apply {
                 cornerRadius = keyCornerRadius
                 setColor(theme.specialKey)
             }
         }
-        val views = mutableListOf<TextView>()
-        for (value in alternateValues) {
-            val cell = TextView(context).apply {
-                text = value
-                gravity = Gravity.CENTER
-                textSize = 20f
-                layoutParams = LinearLayout.LayoutParams(
-                    alternateCellWidth.roundToInt(),
-                    cellHeight.roundToInt(),
-                )
-            }
-            views += cell
-            container.addView(cell)
+        for (value in values) {
+            row.addView(
+                TextView(context).apply {
+                    text = value
+                    gravity = Gravity.CENTER
+                    textSize = 20f
+                    // Painettu solu korostuu kuten painettu näppäin.
+                    setTextColor(
+                        ColorStateList(
+                            arrayOf(intArrayOf(android.R.attr.state_pressed), intArrayOf()),
+                            intArrayOf(theme.accentText, theme.text),
+                        )
+                    )
+                    background = StateListDrawable().apply {
+                        addState(
+                            intArrayOf(android.R.attr.state_pressed),
+                            GradientDrawable().apply {
+                                cornerRadius = keyCornerRadius
+                                setColor(theme.accent)
+                            },
+                        )
+                    }
+                    setOnClickListener {
+                        hideAlternates()
+                        listener?.onText(value)
+                    }
+                },
+                LinearLayout.LayoutParams(cellWidth.roundToInt(), cellHeight.roundToInt()),
+            )
         }
-        alternateViews = views
-        updateAlternateHighlight()
 
-        val totalWidth = alternateCellWidth * alternateValues.size
-        alternatesLeft = (bounded.rect.centerX() - totalWidth / 2f)
+        val totalWidth = cellWidth * values.size
+        val left = (bounded.rect.centerX() - totalWidth / 2f)
             .coerceIn(dp(4f), (width - totalWidth - dp(4f)).coerceAtLeast(dp(4f)))
+        // Rivin yläreuna näkymän koordinaateissa; ylimmällä rivillä se on
+        // näppäimistön yläpuolella, ja peittokuva alkaa siitä.
+        val rowTop = bounded.rect.top - cellHeight - dp(8f)
+        val overlayTop = minOf(rowTop, 0f)
+        val overlay = FrameLayout(context).apply {
+            setOnClickListener { hideAlternates() }
+            addView(
+                row,
+                FrameLayout.LayoutParams(totalWidth.roundToInt(), cellHeight.roundToInt()).apply {
+                    leftMargin = left.roundToInt()
+                    topMargin = (rowTop - overlayTop).roundToInt()
+                },
+            )
+        }
         val location = IntArray(2)
         getLocationInWindow(location)
-        alternatesPopup = PopupWindow(container, totalWidth.roundToInt(), cellHeight.roundToInt()).apply {
-            isTouchable = false
+        alternatesPopup = PopupWindow(overlay, width, (height - overlayTop).roundToInt()).apply {
             isClippingEnabled = false
+            isFocusable = false
+            // Napautus työkaluriville tai sovellukseen sulkee valikon.
+            isOutsideTouchable = true
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setOnDismissListener { alternatesPopup = null }
             showAtLocation(
                 this@KeyboardView,
                 Gravity.NO_GRAVITY,
-                location[0] + alternatesLeft.roundToInt(),
-                location[1] + (bounded.rect.top - cellHeight - dp(8f)).roundToInt(),
+                location[0],
+                location[1] + overlayTop.roundToInt(),
             )
         }
-    }
-
-    private fun updateAlternateSelection(x: Float) {
-        if (alternateValues.isEmpty()) return
-        val index = ((x - alternatesLeft) / alternateCellWidth).toInt()
-            .coerceIn(0, alternateValues.size - 1)
-        if (index != alternateSelected) {
-            alternateSelected = index
-            updateAlternateHighlight()
-            // Kevyt napsaus jokaisesta valinnan vaihtumisesta, kuten kursoriliu'utuksessa.
-            if (hapticsEnabled) {
-                performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-            }
-        }
-    }
-
-    private fun updateAlternateHighlight() {
-        alternateViews.forEachIndexed { i, view ->
-            if (i == alternateSelected) {
-                view.setBackgroundColor(theme.accent)
-                view.setTextColor(theme.accentText)
-            } else {
-                view.setBackgroundColor(0)
-                view.setTextColor(theme.text)
-            }
-        }
-    }
-
-    private fun commitAlternate() {
-        val value = alternateValues.getOrNull(alternateSelected)
-        hideAlternates()
-        if (value != null) listener?.onText(value)
     }
 
     private fun hideAlternates() {
         alternatesPopup?.dismiss()
         alternatesPopup = null
-        alternateViews = emptyList()
-        alternateValues = emptyList()
     }
 
     private fun showPreview(bounded: BoundedKey) {

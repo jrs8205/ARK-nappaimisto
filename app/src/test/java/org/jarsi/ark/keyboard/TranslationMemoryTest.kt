@@ -95,6 +95,45 @@ class TranslationMemoryTest {
     }
 
     @Test
+    fun `myohastynyt kaannos tallentuu kun merkinta ei muuttunut`() {
+        val memory = TranslationMemory()
+        // Käsin korjattu konekäännös ennen AI-pyyntöä.
+        memory.put("Hei", "fi", "en", "Hello there", fromAi = false)
+        val atStart = memory.get("Hei", "fi", "en")
+        assertTrue(memory.putIfUnchanged("Hei", "fi", "en", "Hi", fromAi = true, expected = atStart))
+        val remembered = memory.get("Hei", "fi", "en")!!
+        assertEquals("Hi", remembered.translation)
+        assertTrue(remembered.fromAi)
+    }
+
+    @Test
+    fun `myohastynyt kaannos tallentuu tyhjaan muistiin`() {
+        val memory = TranslationMemory()
+        assertTrue(memory.putIfUnchanged("Hei", "fi", "en", "Hi", fromAi = true, expected = null))
+        assertEquals("Hi", memory.get("Hei", "fi", "en")?.translation)
+    }
+
+    @Test
+    fun `myohastynyt kaannos ei korvaa pyynnon aikana tehtya korjausta`() {
+        val memory = TranslationMemory()
+        memory.put("Hei", "fi", "en", "Hello there", fromAi = false)
+        val atStart = memory.get("Hei", "fi", "en")
+        // Käyttäjä korjaa käännöstä pyynnön ollessa kesken — myös saman
+        // tekstin uudelleen kirjoittaminen on uusi korjaus.
+        memory.put("Hei", "fi", "en", "Hello there", fromAi = false)
+        assertFalse(memory.putIfUnchanged("Hei", "fi", "en", "Hi", fromAi = true, expected = atStart))
+        assertEquals("Hello there", memory.get("Hei", "fi", "en")?.translation)
+    }
+
+    @Test
+    fun `myohastynyt kaannos ei korvaa pyynnon aikana syntynytta merkintaa`() {
+        val memory = TranslationMemory()
+        memory.put("Hei", "fi", "en", "Hello there", fromAi = false)
+        assertFalse(memory.putIfUnchanged("Hei", "fi", "en", "Hi", fromAi = true, expected = null))
+        assertEquals("Hello there", memory.get("Hei", "fi", "en")?.translation)
+    }
+
+    @Test
     fun `tyhjennys unohtaa kaiken`() {
         val memory = TranslationMemory()
         memory.put("Hei", "fi", "en", "Hi", fromAi = true)

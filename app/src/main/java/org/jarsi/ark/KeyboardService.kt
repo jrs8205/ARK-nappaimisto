@@ -1224,6 +1224,9 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val sourceName = languageName(sourceCode)
         val targetName = languageName(targetCode)
         val generation = ++aiTranslateGeneration
+        // Tekstin muistettu merkintä pyynnön alkaessa: vastaus saa korvata
+        // sen vain, jos käyttäjä ei ole korjannut käännöstä välissä.
+        val rememberedAtStart = translationMemory.get(text, sourceCode, targetCode)
         aiTranslateRunning = true
         aiExecutor.execute {
             val body = if (openAi) {
@@ -1250,13 +1253,18 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 if (destroyed) return@post
                 // Maksettu käännös muistetaan, vaikka näkymä ehdittiin sulkea
                 // tai kielipari vaihtaa — palatessa se on valmiina. Käyttäjän
-                // välissä tekemää korjausta se ei kuitenkaan korvaa.
-                if (!translation.isNullOrBlank() && (
-                        generation == aiTranslateGeneration ||
-                            translationMemory.get(text, sourceCode, targetCode) == null
-                        )
-                ) {
-                    translationMemory.put(text, sourceCode, targetCode, translation, fromAi = true)
+                // pyynnön aikana tekemää korjausta se ei kuitenkaan korvaa;
+                // ennen pyyntöä tehty korjaus taas ei saa hukata maksettua
+                // tulosta, muuten seuraava ✨ maksaisi saman käännöksen uudelleen.
+                if (!translation.isNullOrBlank()) {
+                    translationMemory.putIfUnchanged(
+                        text,
+                        sourceCode,
+                        targetCode,
+                        translation,
+                        fromAi = true,
+                        expected = rememberedAtStart,
+                    )
                 }
                 if (generation != aiTranslateGeneration || !translateMode) {
                     return@post

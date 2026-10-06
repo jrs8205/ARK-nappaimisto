@@ -42,6 +42,26 @@ class TranslationMemory(private val capacity: Int = DEFAULT_CAPACITY) {
         }
     }
 
+    /**
+     * Tallentaa käännöksen vain, jos tekstin merkintä on yhä täsmälleen
+     * [expected] (sama olio kuin pyynnön alkaessa, tai molemmat puuttuvat).
+     * Myöhästynyt AI-vastaus ei näin korvaa pyynnön aikana tehtyä korjausta,
+     * mutta ei myöskään hukkaa maksettua tulosta, kun muistissa oli jo
+     * ennen pyyntöä tehty korjaus. Palauttaa, tallentuiko käännös.
+     */
+    fun putIfUnchanged(
+        text: String,
+        source: String,
+        target: String,
+        translation: String,
+        fromAi: Boolean,
+        expected: Remembered?,
+    ): Boolean {
+        if (get(text, source, target) !== expected) return false
+        put(text, source, target, translation, fromAi)
+        return true
+    }
+
     fun clear() {
         entries.clear()
     }

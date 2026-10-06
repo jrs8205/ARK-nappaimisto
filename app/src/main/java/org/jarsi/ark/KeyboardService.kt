@@ -531,6 +531,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
 
     override fun onFinishInputView(finishingInput: Boolean) {
         hideMessage()
+        keyboardView?.dismissPopups()
         // Lupa-aktiviteetin avaus piilottaa näppäimistön hetkeksi; silloin
         // sanelua ei pysäytetä, jotta se voi alkaa luvan myöntämisen jälkeen.
         if (!pendingDictation) {

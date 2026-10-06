@@ -388,6 +388,13 @@ class KeyboardView(context: Context) : View(context) {
         invalidate()
     }
 
+    /**
+     * Sulkee kuplat ja pitkän painalluksen valikon. Valikko jää auki sormen
+     * noustessa, joten se suljetaan näppäimistön piiloutuessa — muuten se
+     * ilmestyisi seuraavalla avauksella uudelleen.
+     */
+    fun dismissPopups() = cancelAll()
+
     private fun cancelAll() {
         for (info in pressed.values) {
             removeCallbacks(info.longPressRunnable)

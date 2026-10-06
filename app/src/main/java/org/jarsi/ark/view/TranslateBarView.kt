@@ -358,11 +358,10 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
         }
     }.apply {
         textSize = LARGE_TEXT_SP
-        // Teksti rivittyy vapaasti kuten Google Kääntäjässä; alue kasvaa
-        // sisällön mukana CappedScrollView'n ylärajaan asti. Oikeaan
-        // reunaan jää tilaa kulman tyhjennysnapille.
+        // Teksti rivittyy vapaasti kuten Google Kääntäjässä; alueen korkeus
+        // tulee CappedScrollView'ltä. Oikeaan reunaan jää tilaa kulman
+        // tyhjennysnapille.
         gravity = Gravity.TOP
-        minimumHeight = areaHeight
         setPadding(dp(16), dp(10), dp(44), dp(10))
         setOnTouchListener { view, event ->
             val textView = view as TextView
@@ -420,11 +419,19 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * Tekstialue vierii sisältönsä yli. Korkeus on enintään ihanne,
-     * mutta ahtaassa tilassa emo antaa vähemmän — silloin alue kutistuu
-     * eikä työnnä alempia rivejä ulos näytöltä.
+     * Tekstialue vierii sisältönsä yli. Korkeus on ihanne, mutta ahtaassa
+     * tilassa emo antaa vähemmän — silloin alue kutistuu eikä työnnä
+     * alempia rivejä ulos näytöltä. Lyhyt teksti venyy täyttämään alueen
+     * (fillViewport), joten vieritettävää on vain, kun teksti oikeasti
+     * ylittää alueen. Tekstille annettu vähimmäiskorkeus teki ahtaassa
+     * tilassa tyhjästäkin alueesta vieritettävän, ja ✕:n jälkeen uusi
+     * teksti alkoi vanhasta vierityskohdasta yläreunan taakse.
      */
     private inner class CappedScrollView : ScrollView(context) {
+        init {
+            isFillViewport = true
+        }
+
         override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
             val limit = if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
                 areaHeight
@@ -433,7 +440,7 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
             }
             super.onMeasure(
                 widthMeasureSpec,
-                MeasureSpec.makeMeasureSpec(limit, MeasureSpec.AT_MOST),
+                MeasureSpec.makeMeasureSpec(limit, MeasureSpec.EXACTLY),
             )
         }
     }
@@ -491,7 +498,6 @@ class TranslateBarView(context: Context) : LinearLayout(context) {
     private val translationView = TextView(context).apply {
         textSize = LARGE_TEXT_SP
         gravity = Gravity.TOP
-        minimumHeight = areaHeight
         setPadding(dp(16), dp(10), dp(16), dp(10))
         setOnTouchListener { view, event ->
             when (event.actionMasked) {

@@ -64,6 +64,8 @@
     <string name="opitut_tyhjenna_varmistus">Poistetaanko kaikki opitut sanat ja sanaketjut? Tätä ei voi perua.</string>
 
     <string name="asetukset_tekoaly">Tekoäly</string>
+    <string name="asetus_ai_avain_ohje">API-avain ei ole sama asia kuin Claude- tai ChatGPT-tilaus</string>
+    <string name="asetus_ai_avain_ohje_kuvaus">AI-käännös ja OpenAI-sanelu käyttävät palvelun omaa API-avainta. API-käyttö laskutetaan käytön mukaan erikseen eikä sisälly Claude Pro- tai ChatGPT Plus -tilaukseen. Avaimen saa osoitteesta platform.claude.com (Claude) tai platform.openai.com (OpenAI).\n\nClaude-tilauksella ei voi kirjautua: Anthropic ei salli sitä muille sovelluksille. ChatGPT-tilauksella kirjautuminen ei ole vielä käytössä. Sanelu toimii aina vain OpenAI:n API-avaimella.</string>
     <string name="asetus_ai_palvelu">AI-palvelu (Claude / ChatGPT)</string>
     <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s (käännösnäkymän AI-käännös). Napauta vaihtaaksesi palvelua.</string>
     <string name="asetus_ai_palvelu_ei_avainta">Ei käytössä: lisää %1$s-avain alle, niin AI-toiminnot tulevat käyttöön.</string>
@@ -71,7 +73,7 @@
     <string name="asetus_api_avain_kuvaus">Ottaa käyttöön käännösnäkymän AI-käännöksen. Teksti lähetetään Anthropicin palveluun vain kun käytät toimintoa itse; avain säilyy vain tällä laitteella salattuna.</string>
     <string name="asetus_malli">AI-käännöksen Claude-malli</string>
     <string name="asetus_malli_nykyinen">Käytössä: %1$s. Lista haetaan Anthropicilta omalla avaimellasi.</string>
-    <string name="asetus_openai_avain">ChatGPT API -avain</string>
+    <string name="asetus_openai_avain">OpenAI API -avain (ChatGPT)</string>
     <string name="asetus_openai_avain_kuvaus">Ottaa käyttöön käännösnäkymän AI-käännöksen ja OpenAI-sanelun. Teksti tai puhe lähetetään OpenAI:n palveluun vain kun käytät toimintoa itse; avain säilyy vain tällä laitteella salattuna.</string>
     <string name="asetus_openai_malli">AI-käännöksen ChatGPT-malli</string>
     <string name="asetus_malli_nykyinen_openai">Käytössä: %1$s. Lista haetaan OpenAI:lta omalla avaimellasi.</string>

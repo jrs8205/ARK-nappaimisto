@@ -38,6 +38,10 @@ object ChatGptPlan {
     fun save(prefs: SharedPreferences, login: ChatGptAuth.Login): Boolean =
         ApiKeyStore.save(prefs, login.toJson(), ApiKeyStore.Slot.CHATGPT_LOGIN)
 
+    // Sama lukko kuin päivityksellä: uloskirjautuminen kesken päivityksen
+    // odottaa sen loppuun, eikä päivitys voi tallentaa poistettua tietuetta
+    // takaisin.
+    @Synchronized
     fun clear(prefs: SharedPreferences) {
         ApiKeyStore.save(prefs, "", ApiKeyStore.Slot.CHATGPT_LOGIN)
         prefs.edit { remove(PREF_MODEL) }
@@ -67,6 +71,13 @@ object ChatGptPlan {
         login: ChatGptAuth.Login,
         now: Long = System.currentTimeMillis(),
     ): Access {
+        // Kutsujan tietue voi olla vanhentunut: toinen säie on voinut jo
+        // kiertää tokenin tai kirjata ulos. Vanhalla refresh-tokenilla tehty
+        // päivitys hylättäisiin (refresh_token_reused) ja hävittäisi uuden,
+        // toimivan tietueen, joten uudempi tietue käytetään sellaisenaan.
+        val current = load(prefs)
+            ?: return Access.Failed("ei kirjautumista", signInRequired = true)
+        if (current.refreshToken != login.refreshToken) return Access.Ok(current)
         val (_, body) = postForm(
             ChatGptAuth.TOKEN_ENDPOINT,
             ChatGptAuth.refreshBody(login.clientId, login.refreshToken),

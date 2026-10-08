@@ -24,6 +24,10 @@ object ApiKeyStore {
     enum class Slot(val plainPref: String, val encryptedPref: String) {
         CLAUDE("claude_api_avain", "claude_api_avain_salattu"),
         OPENAI("openai_api_avain", "openai_api_avain_salattu"),
+
+        // ChatGPT-tilauksen kirjautuminen: koko tietue (laitteen
+        // rekisteröinti + tokenit) JSON-muodossa samalla salauksella.
+        CHATGPT_LOGIN("chatgpt_kirjautuminen", "chatgpt_kirjautuminen_salattu"),
     }
 
     private const val KEYSTORE = "AndroidKeyStore"

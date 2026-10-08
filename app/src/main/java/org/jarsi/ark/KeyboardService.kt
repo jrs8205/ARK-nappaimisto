@@ -49,6 +49,7 @@ import org.jarsi.ark.clipboard.Clip
 import org.jarsi.ark.clipboard.ClipStore
 import org.jarsi.ark.clipboard.NewClipActivity
 import org.jarsi.ark.data.ApiKeyStore
+import org.jarsi.ark.data.ChatGptPlan
 import org.jarsi.ark.data.ClipEntity
 import org.jarsi.ark.dictation.DictationController
 import org.jarsi.ark.dictation.DictationText
@@ -866,10 +867,11 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         bar.pasteAvailable = clipboardManager?.hasPrimaryClip() == true
         // ✨ piilotetaan kokonaan, kun valitulla palvelulla ei ole avainta —
         // nappi joka ei tee mitään hämmentäisi.
-        bar.aiEnabled = ApiKeyStore.exists(
-            prefs,
-            if (openAiSelected()) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
-        )
+        bar.aiEnabled = if (openAiSelected()) {
+            ChatGptPlan.exists(prefs) || ApiKeyStore.exists(prefs, ApiKeyStore.Slot.OPENAI)
+        } else {
+            ApiKeyStore.exists(prefs, ApiKeyStore.Slot.CLAUDE)
+        }
         // Kursori näkyy vain siinä alueessa, johon näppäily kohdistuu.
         bar.setBuffer(
             translateBuffer.text,
@@ -1208,11 +1210,17 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
             return
         }
         val openAi = openAiSelected()
-        val apiKey = ApiKeyStore.read(
-            prefs,
-            if (openAi) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
-        ).orEmpty()
-        if (apiKey.isEmpty()) {
+        // ChatGPT-valinnalla kirjautunut tilaus menee API-avaimen edelle.
+        val usePlan = openAi && ChatGptPlan.exists(prefs)
+        val apiKey = if (usePlan) {
+            ""
+        } else {
+            ApiKeyStore.read(
+                prefs,
+                if (openAi) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
+            ).orEmpty()
+        }
+        if (!usePlan && apiKey.isEmpty()) {
             showMessage(R.string.malli_aseta_avain)
             return
         }
@@ -1229,22 +1237,10 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         val rememberedAtStart = translationMemory.get(text, sourceCode, targetCode)
         aiTranslateRunning = true
         aiExecutor.execute {
-            val body = if (openAi) {
-                val model = prefs.getString(PREF_OPENAI_MODEL, null)
-                    ?.takeIf { it.isNotBlank() } ?: AiRequests.OPENAI_MODEL
-                AiRequests.buildOpenAiTranslateRequest(text, sourceName, targetName, model)
+            val (translation, error) = if (usePlan) {
+                translateWithPlan(text, sourceName, targetName)
             } else {
-                val model = prefs.getString(PREF_CLAUDE_MODEL, null)
-                    ?.takeIf { it.isNotBlank() } ?: AiRequests.MODEL
-                AiRequests.buildTranslateRequest(text, sourceName, targetName, model)
-            }
-            val (response, error) = postAi(openAi, apiKey, body)
-            val translation = response?.let {
-                if (openAi) {
-                    AiRequests.parseOpenAiResponse(it)
-                } else {
-                    AiRequests.parseResponse(it)
-                }
+                translateWithKey(openAi, apiKey, text, sourceName, targetName)
             }
             mainHandler.post {
                 // Vapautetaan lukko ennen kaikkia paluureittejä, ettei nappi
@@ -1339,6 +1335,76 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
     private fun openAiSelected(): Boolean =
         prefs.getString(PREF_AI_SERVICE, "claude") == "chatgpt"
 
+    /** Käännös API-avaimella: (käännös, virhe). Taustasäikeessä. */
+    private fun translateWithKey(
+        openAi: Boolean,
+        apiKey: String,
+        text: String,
+        sourceName: String,
+        targetName: String,
+    ): Pair<String?, String?> {
+        val body = if (openAi) {
+            val model = prefs.getString(PREF_OPENAI_MODEL, null)
+                ?.takeIf { it.isNotBlank() } ?: AiRequests.OPENAI_MODEL
+            AiRequests.buildOpenAiTranslateRequest(text, sourceName, targetName, model)
+        } else {
+            val model = prefs.getString(PREF_CLAUDE_MODEL, null)
+                ?.takeIf { it.isNotBlank() } ?: AiRequests.MODEL
+            AiRequests.buildTranslateRequest(text, sourceName, targetName, model)
+        }
+        val reply = postAi(openAi, apiKey, body)
+        val translation = reply.body?.let {
+            if (openAi) AiRequests.parseOpenAiResponse(it) else AiRequests.parseResponse(it)
+        }
+        return translation to reply.error
+    }
+
+    /**
+     * Käännös ChatGPT-tilauksen tokenilla: token päivitetään tarvittaessa
+     * ennen pyyntöä, ja hylätty token (401) päivitetään kerran ennen
+     * luovuttamista. Vastaus on suoratoisto, joka luetaan loppuun ja
+     * tulkitaan kokonaisuutena.
+     */
+    private fun translateWithPlan(
+        text: String,
+        sourceName: String,
+        targetName: String,
+    ): Pair<String?, String?> {
+        var login = when (val access = ChatGptPlan.access(prefs)) {
+            is ChatGptPlan.Access.Ok -> access.login
+            is ChatGptPlan.Access.Failed ->
+                return null to planFailure(access.message, access.signInRequired)
+        }
+        val model = ChatGptPlan.model(prefs, login.accessToken)
+            ?: return null to getString(R.string.kaannos_ai_tilaus_ei_mallia)
+        val body = AiRequests.buildChatGptPlanTranslateRequest(text, sourceName, targetName, model)
+        var reply = postAi(openAi = true, apiKey = login.accessToken, body = body)
+        if (reply.status == 401) {
+            login = when (val access = ChatGptPlan.refresh(prefs, login)) {
+                is ChatGptPlan.Access.Ok -> access.login
+                is ChatGptPlan.Access.Failed ->
+                    return null to planFailure(access.message, access.signInRequired)
+            }
+            reply = postAi(openAi = true, apiKey = login.accessToken, body = body)
+        }
+        val raw = reply.body ?: return null to planErrorText(reply.error)
+        val result = AiRequests.parseChatGptStream(raw)
+        return result.text to planErrorText(result.error)
+    }
+
+    private fun planFailure(message: String, signInRequired: Boolean): String =
+        if (signInRequired) getString(R.string.kaannos_ai_kirjaudu_uudelleen) else message
+
+    // Kiintiövirhe suomeksi; muut syyt sellaisinaan.
+    private fun planErrorText(error: String?): String? = when {
+        error == null -> null
+        "subscription_sharing_usage_limit_exceeded" in error ->
+            getString(R.string.kaannos_ai_kiintio)
+        else -> error
+    }
+
+    private data class AiReply(val status: Int, val body: String?, val error: String?)
+
     /**
      * Lähettää pyynnön valittuun AI-palveluun ja palauttaa vastausrungon
      * tai virheen selitteen käyttäjälle näytettäväksi.
@@ -1347,7 +1413,7 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
         openAi: Boolean,
         apiKey: String,
         body: String,
-    ): Pair<String?, String?> = try {
+    ): AiReply = try {
         val endpoint = if (openAi) AiRequests.OPENAI_ENDPOINT else AiRequests.ENDPOINT
         val connection = java.net.URL(endpoint)
             .openConnection() as javax.net.ssl.HttpsURLConnection
@@ -1364,19 +1430,19 @@ class KeyboardService : InputMethodService(), KeyboardView.Listener {
                 connection.setRequestProperty("anthropic-version", "2023-06-01")
             }
             connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            if (connection.responseCode in 200..299) {
-                connection.inputStream.bufferedReader().use { it.readText() } to null
+            val status = connection.responseCode
+            if (status in 200..299) {
+                AiReply(status, connection.inputStream.bufferedReader().use { it.readText() }, null)
             } else {
                 val errorBody = connection.errorStream
                     ?.bufferedReader()?.use { it.readText() }
-                null to (AiRequests.parseErrorMessage(errorBody)
-                    ?: "HTTP ${connection.responseCode}")
+                AiReply(status, null, AiRequests.parseErrorMessage(errorBody) ?: "HTTP $status")
             }
         } finally {
             connection.disconnect()
         }
     } catch (e: Exception) {
-        null to e.javaClass.simpleName
+        AiReply(0, null, e.javaClass.simpleName)
     }
 
     private fun pasteClip(clip: Clip) {

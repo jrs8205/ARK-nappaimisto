@@ -188,6 +188,12 @@
             android:icon="@drawable/ic_tune"
             android:title="@string/asetus_malli"
             app:singleLineTitle="false" />
+        <Preference
+            android:key="chatgpt_kirjautuminen"
+            android:icon="@drawable/ic_sparkle"
+            android:title="@string/asetus_chatgpt_kirjautuminen"
+            android:summary="@string/asetus_chatgpt_kirjautuminen_kuvaus"
+            app:singleLineTitle="false" />
         <EditTextPreference
             android:key="openai_api_avain"
             android:icon="@drawable/ic_sparkle"

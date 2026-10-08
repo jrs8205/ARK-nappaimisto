@@ -236,4 +236,108 @@ class AiRequestsTest {
             AiRequests.parseOpenAiModels(body).map { it.first },
         )
     }
+
+    // --- ChatGPT-tilaus (Sign in with ChatGPT) ---
+
+    @Test
+    fun `tilauspyynto noudattaa tilausreitin pakollisia muotoja`() {
+        val json = JSONObject(
+            AiRequests.buildChatGptPlanTranslateRequest("moi \"x\"", "suomi", "englanti", "gpt-6.1-sol")
+        )
+        assertEquals("gpt-6.1-sol", json.getString("model"))
+        assertFalse(json.getBoolean("store"))
+        assertTrue(json.getBoolean("stream"))
+        val input = json.getJSONArray("input")
+        assertEquals(1, input.length())
+        assertEquals("user", input.getJSONObject(0).getString("role"))
+        assertEquals("moi \"x\"", input.getJSONObject(0).getString("content"))
+        val instructions = json.getString("instructions")
+        assertTrue("suomi" in instructions && "englanti" in instructions)
+        assertEquals("low", json.getJSONObject("reasoning").getString("effort"))
+        assertTrue(json.getInt("max_output_tokens") > 0)
+        assertFalse(json.has("temperature"))
+    }
+
+    private val sse = """
+        event: response.created
+        data: {"type":"response.created","response":{"id":"resp_1","status":"in_progress","output":[]}}
+
+        event: response.output_text.delta
+        data: {"type":"response.output_text.delta","delta":"Good "}
+
+        event: response.output_text.delta
+        data: {"type":"response.output_text.delta","delta":"morning!"}
+
+        event: response.completed
+        data: {"type":"response.completed","response":{"id":"resp_1","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":" Good morning! "}]}]}}
+
+    """.trimIndent()
+
+    @Test
+    fun `suoratoistosta poimitaan valmis teksti`() {
+        val result = AiRequests.parseChatGptStream(sse)
+        assertEquals("Good morning!", result.text)
+        assertNull(result.error)
+    }
+
+    @Test
+    fun `suoratoisto ilman valmistumista antaa deltojen tekstin ja virheen`() {
+        val cut = sse.substringBefore("event: response.completed")
+        val result = AiRequests.parseChatGptStream(cut)
+        assertNull(result.text)
+        assertTrue(result.error!!.isNotBlank())
+    }
+
+    @Test
+    fun `epaonnistunut suoratoisto kertoo syyn`() {
+        val failed = """
+            event: response.created
+            data: {"type":"response.created","response":{"id":"r","status":"in_progress"}}
+
+            event: response.failed
+            data: {"type":"response.failed","response":{"id":"r","status":"failed","error":{"code":"subscription_sharing_usage_limit_exceeded","message":"Usage limit reached"}}}
+
+        """.trimIndent()
+        val result = AiRequests.parseChatGptStream(failed)
+        assertNull(result.text)
+        assertTrue(result.error!!.contains("subscription_sharing_usage_limit_exceeded"))
+    }
+
+    @Test
+    fun `tilauksen mallilista nayttaa vain listattavat mallit palvelun jarjestyksessa`() {
+        val body = """{"models":[
+            {"slug":"gpt-6.1-sol","display_name":"GPT-6.1-Sol","visibility":"list"},
+            {"slug":"gpt-reserve","display_name":"GPT-Reserve","visibility":"hide"},
+            {"slug":"gpt-5.6-luna","display_name":"GPT-5.6-Luna","visibility":"list"},
+            {"slug":"","display_name":"tyhjä","visibility":"list"}]}"""
+        assertEquals(
+            listOf("gpt-6.1-sol" to "GPT-6.1-Sol", "gpt-5.6-luna" to "GPT-5.6-Luna"),
+            AiRequests.parseChatGptPlanModels(body),
+        )
+        assertEquals(emptyList<Pair<String, String>>(), AiRequests.parseChatGptPlanModels("x"))
+    }
+
+    @Test
+    fun `tilausreitin virhemuodot tulkitaan`() {
+        assertEquals(
+            "Store must be set to false",
+            AiRequests.parseErrorMessage("""{"detail":"Store must be set to false"}"""),
+        )
+        assertEquals(
+            "invalid_token",
+            AiRequests.parseErrorMessage("""{"detail":{"error_code":"invalid_token"}}"""),
+        )
+        assertEquals(
+            "invalid_grant: The refresh token has been invalidated.",
+            AiRequests.parseErrorMessage(
+                """{"error":"invalid_grant","error_description":"The refresh token has been invalidated."}"""
+            ),
+        )
+        assertEquals(
+            "Encountered invalidated oauth token",
+            AiRequests.parseErrorMessage(
+                """{"error":{"message":"Encountered invalidated oauth token","code":"token_revoked"},"status":401}"""
+            ),
+        )
+    }
 }

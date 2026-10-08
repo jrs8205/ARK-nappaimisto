@@ -18,7 +18,7 @@ laitteella.
 - **Oppii sinun sanasi** ja ennustaa seuraavan sanan
 - **5–8 ehdotusta** vieritettävällä rivillä
 - **Merkkivalikko** pitkällä painalluksella, valinta napauttamalla
-- **Käännösnäkymä** laitteella sekä valinnainen ✨ AI-käännös
+- **Käännösnäkymä** laitteella sekä valinnainen ✨ AI-käännös (ChatGPT-tilauksella tai API-avaimella)
 - **Sanelu** laitteen tai OpenAI:n puheentunnistuksella
 - **Leikepöytä** kiinnitettävine leikkeineen
 - **Emojit**, kursoritila ja muokattava työkalurivi

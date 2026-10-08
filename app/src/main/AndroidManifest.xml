@@ -76,6 +76,14 @@
             android:exported="false"
             android:label="@string/kaannoskielet" />
 
+        <!-- Kirjautumisen kuuntelija elää aktiviteetissa: kääntö ei saa
+             luoda sitä uudelleen kesken selainkäynnin. -->
+        <activity
+            android:name=".settings.ChatGptLoginActivity"
+            android:exported="false"
+            android:label="@string/chatgpt_kirjautuminen_otsikko"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+
         <activity
             android:name=".dictation.RecordAudioPermissionActivity"
             android:exported="false"

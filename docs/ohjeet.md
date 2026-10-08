@@ -25,12 +25,13 @@ API-avaimet eivät kulje varmuuskopiossa.
 ## AI-käännös ja sanelu
 
 Näppäimistö toimii kokonaan ilman tilejä ja avaimia. Kaksi valinnaista
-toimintoa käyttää ulkopuolista palvelua omalla API-avaimellasi.
+toimintoa käyttää ulkopuolista palvelua omalla ChatGPT-tilauksellasi tai
+API-avaimellasi.
 
 | Toiminto | Tarvitaan | Hinta |
 |---|---|---|
 | Live-käännös | – | ilmainen |
-| ✨ AI-käännös | Claude- tai OpenAI-API-avain | sentin murto-osa / viesti |
+| ✨ AI-käännös | ChatGPT Plus/Pro -tilaus TAI Claude-/OpenAI-API-avain | tilauksen kiintiöstä tai sentin murto-osa / viesti |
 | Sanelu, laitteen tunnistus | – | ilmainen |
 | Sanelu, OpenAI | OpenAI-API-avain | minuuttihinta |
 
@@ -44,15 +45,26 @@ Avain luodaan erikseen, ja sen käyttö laskutetaan käytön mukaan:
 
 Avain syötetään ARKin asetuksiin kohtaan Tekoäly.
 
-### Kirjautuminen tilauksella
+### Kirjautuminen ChatGPT-tilauksella
 
-- **Claude-tilauksella ei voi kirjautua.** Anthropic ei salli sitä muille
-  sovelluksille ([ehdot](https://code.claude.com/docs/en/legal-and-compliance),
-  tilanne 10/2026).
-- **ChatGPT-tilauksella kirjautuminen on suunnitteilla.** OpenAI:n
-  [Sign in with ChatGPT](https://developers.openai.com/siwc) -kirjautumisella
-  AI-käännös kuluttaisi tilauksen kiintiötä. Se kattaa vain tekstin, joten
-  OpenAI-sanelu vaatii jatkossakin API-avaimen.
+Asetukset → Tekoäly → **Kirjaudu ChatGPT-tilauksella** avaa selaimeen
+OpenAI:n [Sign in with ChatGPT](https://developers.openai.com/siwc)
+-kirjautumisen. Hyväksy pyydetyt oikeudet ja palaa ARKiin. Sen jälkeen:
+
+- ✨ AI-käännös kuluttaa ChatGPT Plus/Pro -tilauksen kiintiötä eikä
+  OpenAI-API-avainta tarvita siihen. Kun AI-palveluksi on valittu ChatGPT,
+  kirjautuminen menee avaimen edelle.
+- Malli valitaan samasta rivistä kuin ennenkin; lista haetaan OpenAI:lta
+  tilauksen malleista, ja oletuksena on listan ensimmäinen.
+- Kirjautuminen on laitekohtainen eikä sisälly varmuuskopioon.
+  Uloskirjautuminen samasta rivistä kumoaa luvan myös OpenAI:n päässä.
+- Sanelu ei kuulu kirjautumisen piiriin: OpenAI-sanelu vaatii edelleen
+  API-avaimen.
+
+Jos kiintiö täyttyy, ✨ kertoo sen; kiintiön tila näkyy ChatGPT:n
+asetuksissa. **Claude-tilauksella ei voi kirjautua:** Anthropic ei salli
+sitä muille sovelluksille ([ehdot](https://code.claude.com/docs/en/legal-and-compliance),
+tilanne 10/2026).
 
 AI- ja käsin korjatut käännökset muistetaan, joten samasta tekstistä ei
 makseta kahdesti.

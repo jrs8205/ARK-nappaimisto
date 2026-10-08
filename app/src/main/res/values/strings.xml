@@ -65,7 +65,7 @@
 
     <string name="asetukset_tekoaly">Tekoäly</string>
     <string name="asetus_ai_avain_ohje">API-avain ei ole sama asia kuin Claude- tai ChatGPT-tilaus</string>
-    <string name="asetus_ai_avain_ohje_kuvaus">AI-käännös ja OpenAI-sanelu käyttävät palvelun omaa API-avainta. API-käyttö laskutetaan käytön mukaan erikseen eikä sisälly Claude Pro- tai ChatGPT Plus -tilaukseen. Avaimen saa osoitteesta platform.claude.com (Claude) tai platform.openai.com (OpenAI).\n\nClaude-tilauksella ei voi kirjautua: Anthropic ei salli sitä muille sovelluksille. ChatGPT-tilauksella kirjautuminen ei ole vielä käytössä. OpenAI-sanelu vaatii aina OpenAI:n API-avaimen; laitteen oma puheentunnistus toimii ilman avainta.</string>
+    <string name="asetus_ai_avain_ohje_kuvaus">AI-käännös ja OpenAI-sanelu käyttävät palvelun omaa API-avainta. API-käyttö laskutetaan käytön mukaan erikseen eikä sisälly Claude Pro- tai ChatGPT Plus -tilaukseen. Avaimen saa osoitteesta platform.claude.com (Claude) tai platform.openai.com (OpenAI).\n\nClaude-tilauksella ei voi kirjautua: Anthropic ei salli sitä muille sovelluksille. ChatGPT Plus/Pro -tilauksella voi sen sijaan kirjautua alla: silloin AI-käännös kuluttaa tilauksen kiintiötä eikä API-avainta tarvita. OpenAI-sanelu vaatii aina OpenAI:n API-avaimen; laitteen oma puheentunnistus toimii ilman avainta.</string>
     <string name="asetus_ai_palvelu">AI-palvelu (Claude / ChatGPT)</string>
     <string name="asetus_ai_palvelu_nykyinen">Käytössä: %1$s (käännösnäkymän AI-käännös). Napauta vaihtaaksesi palvelua.</string>
     <string name="asetus_ai_palvelu_ei_avainta">Ei käytössä: lisää %1$s-avain alle, niin AI-toiminnot tulevat käyttöön.</string>
@@ -78,6 +78,32 @@
     <string name="asetus_openai_malli">AI-käännöksen ChatGPT-malli</string>
     <string name="asetus_malli_nykyinen_openai">Käytössä: %1$s. Lista haetaan OpenAI:lta omalla avaimellasi.</string>
     <string name="malli_aseta_avain">Aseta ensin API-avain</string>
+
+    <string name="asetus_chatgpt_kirjautuminen">Kirjaudu ChatGPT-tilauksella</string>
+    <string name="asetus_chatgpt_kirjautuminen_kuvaus">AI-käännös käyttää ChatGPT Plus/Pro -tilaustasi API-avaimen sijaan. Kirjautuminen avaa selaimen; sanelu tarvitsee silti OpenAI API -avaimen.</string>
+    <string name="asetus_chatgpt_kirjautunut">Kirjautunut: %1$s. AI-käännös käyttää tilaustasi. Napauta kirjautuaksesi ulos.</string>
+    <string name="ai_palvelu_chatgpt_tilaus">ChatGPT-tilaus</string>
+    <string name="asetus_malli_nykyinen_chatgpt_tilaus">Käytössä: %1$s. Lista haetaan OpenAI:lta tilauksellasi.</string>
+    <string name="asetus_malli_tilaus_oletus">OpenAI:n listan ensimmäinen</string>
+    <string name="chatgpt_kirjautuminen_otsikko">Kirjaudu ChatGPT:llä</string>
+    <string name="chatgpt_kirjautuminen_odottaa">Kirjaudu selaimessa ChatGPT-tiliisi ja hyväksy pyydetyt oikeudet. Palaa sen jälkeen tähän.</string>
+    <string name="chatgpt_kirjautuminen_viimeistely">Viimeistellään kirjautumista…</string>
+    <string name="chatgpt_kirjautuminen_valmis">Kirjautunut: %1$s</string>
+    <string name="chatgpt_kirjautuminen_virhe">Kirjautuminen epäonnistui: %1$s</string>
+    <string name="chatgpt_kirjautuminen_peruttu">kirjautuminen peruttiin</string>
+    <string name="chatgpt_kirjautuminen_ei_oikeutta">tilauksen käyttöoikeutta ei myönnetty – hyväksy kaikki pyydetyt oikeudet</string>
+    <string name="chatgpt_kirjautuminen_ei_selainta">selainta ei löytynyt</string>
+    <string name="chatgpt_kirjautuminen_aikakatkaisu">aikakatkaisu</string>
+    <string name="chatgpt_kirjautuminen_verkkovirhe">verkkovirhe</string>
+    <string name="chatgpt_kirjautuminen_kesken">rekisteröinti jäi kesken</string>
+    <string name="chatgpt_kirjautuminen_vaara_tili">paluu ei vastaa aloitettua kirjautumista</string>
+    <string name="chatgpt_paluusivu">Kirjautuminen valmis. Voit sulkea tämän välilehden ja palata ARK-näppäimistöön.</string>
+    <string name="chatgpt_uloskirjautuminen_varmistus">Kirjaudutaanko ulos ChatGPT-tilauksesta? AI-käännös palaa API-avaimeen, jos sellainen on asetettu.</string>
+    <string name="chatgpt_kirjaudu_ulos">Kirjaudu ulos</string>
+    <string name="chatgpt_kirjauduttu_ulos">Kirjauduttu ulos ChatGPT-tilauksesta</string>
+    <string name="kaannos_ai_kirjaudu_uudelleen">ChatGPT-kirjautuminen ei ole enää voimassa – kirjaudu uudelleen asetuksista</string>
+    <string name="kaannos_ai_kiintio">ChatGPT-tilauksen käyttöraja on täynnä – katso ChatGPT:n asetuksista kohta Käyttö</string>
+    <string name="kaannos_ai_tilaus_ei_mallia">mallilistaa ei saatu OpenAI:lta</string>
 
     <string-array name="ai_palvelu_nimet">
         <item>Claude (Anthropic)</item>

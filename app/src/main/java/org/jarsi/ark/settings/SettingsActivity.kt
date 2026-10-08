@@ -19,6 +19,7 @@ import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.jarsi.ark.R
 import org.jarsi.ark.data.ApiKeyStore
+import org.jarsi.ark.data.ChatGptPlan
 import org.jarsi.ark.dictation.OpenAiDictation
 import org.jarsi.ark.data.Backup
 import org.jarsi.ark.engine.AiRequests
@@ -89,6 +90,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
             }
             setupAiServiceVisibility()
+            setupChatGptLogin()
             setupDictationEngine()
             findPreference<Preference>("avaa_ime_asetukset")?.setOnPreferenceClickListener {
                 startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
@@ -141,17 +143,119 @@ class SettingsActivity : AppCompatActivity() {
                 },
                 parse = AiRequests::parseModels,
             )
-            setupModelPreference(
-                key = "openai_malli",
-                defaultModel = AiRequests.OPENAI_MODEL,
-                slot = ApiKeyStore.Slot.OPENAI,
-                modelsUrl = AiRequests.OPENAI_MODELS_ENDPOINT,
-                summaryRes = R.string.asetus_malli_nykyinen_openai,
-                authorize = { connection, apiKey ->
-                    connection.setRequestProperty("authorization", "Bearer $apiKey")
-                },
-                parse = AiRequests::parseOpenAiModels,
-            )
+            setupOpenAiModelPreference()
+        }
+
+        override fun onResume() {
+            super.onResume()
+            // Kirjautumisesta palatessa rivit kertovat uuden tilan.
+            refreshAiServiceRows(findPreference<ListPreference>("ai_palvelu")?.value)
+        }
+
+        /**
+         * ChatGPT-tilauksen kirjautuminen: kirjautumattomana rivi avaa
+         * selainkirjautumisen, kirjautuneena se kirjaa ulos. Uloskirjautuminen
+         * kumoaa tokenit myös palvelimella, ettei laitteelta mahdollisesti
+         * kopioitu tietue jää käyttökelpoiseksi.
+         */
+        private fun setupChatGptLogin() {
+            val pref = findPreference<Preference>("chatgpt_kirjautuminen") ?: return
+            pref.setOnPreferenceClickListener {
+                val prefs = preferenceManager.sharedPreferences
+                    ?: return@setOnPreferenceClickListener true
+                val login = ChatGptPlan.load(prefs)
+                if (login == null) {
+                    startActivity(Intent(requireContext(), ChatGptLoginActivity::class.java))
+                    return@setOnPreferenceClickListener true
+                }
+                MaterialAlertDialogBuilder(requireContext())
+                    .setMessage(R.string.chatgpt_uloskirjautuminen_varmistus)
+                    .setPositiveButton(R.string.chatgpt_kirjaudu_ulos) { _, _ ->
+                        ioExecutor.execute {
+                            ChatGptPlan.revoke(login)
+                            ChatGptPlan.clear(prefs)
+                            activity?.runOnUiThread {
+                                if (!isAdded) return@runOnUiThread
+                                Toast.makeText(
+                                    requireContext(),
+                                    R.string.chatgpt_kirjauduttu_ulos,
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                                refreshAiServiceRows(
+                                    findPreference<ListPreference>("ai_palvelu")?.value
+                                )
+                            }
+                        }
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+                true
+            }
+        }
+
+        /**
+         * AI-käännöksen ChatGPT-malli: kirjautuneena lista haetaan tilauksen
+         * tokenilla (eri mallijoukko ja oma asetusavain), muuten API-avaimella.
+         * Tilauksen malleille ei näytetä hintaluokkaa, koska ne eivät maksa
+         * erikseen.
+         */
+        private fun setupOpenAiModelPreference() {
+            val pref = findPreference<Preference>("openai_malli") ?: return
+            updateOpenAiModelSummary()
+            pref.setOnPreferenceClickListener {
+                val prefs = preferenceManager.sharedPreferences
+                    ?: return@setOnPreferenceClickListener true
+                if (ChatGptPlan.exists(prefs)) {
+                    ioExecutor.execute {
+                        val (models, error) = ChatGptPlan.models(prefs)
+                        activity?.runOnUiThread {
+                            if (isAdded) {
+                                showModelPicker(
+                                    pref, ChatGptPlan.PREF_MODEL, null, models, error,
+                                    hints = false,
+                                ) { updateOpenAiModelSummary() }
+                            }
+                        }
+                    }
+                    return@setOnPreferenceClickListener true
+                }
+                val apiKey = ApiKeyStore.read(prefs, ApiKeyStore.Slot.OPENAI).orEmpty()
+                if (apiKey.isEmpty()) {
+                    Toast.makeText(
+                        requireContext(), R.string.malli_aseta_avain, Toast.LENGTH_SHORT
+                    ).show()
+                    return@setOnPreferenceClickListener true
+                }
+                fetchModels(
+                    AiRequests.OPENAI_MODELS_ENDPOINT,
+                    apiKey,
+                    { connection, key ->
+                        connection.setRequestProperty("authorization", "Bearer $key")
+                    },
+                    AiRequests::parseOpenAiModels,
+                ) { models, error ->
+                    showModelPicker(
+                        pref, "openai_malli", AiRequests.OPENAI_MODEL, models, error,
+                        hints = true,
+                    ) { updateOpenAiModelSummary() }
+                }
+                true
+            }
+        }
+
+        private fun updateOpenAiModelSummary() {
+            val pref = findPreference<Preference>("openai_malli") ?: return
+            val prefs = preferenceManager.sharedPreferences ?: return
+            pref.summary = if (ChatGptPlan.exists(prefs)) {
+                val current = prefs.getString(ChatGptPlan.PREF_MODEL, null)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: getString(R.string.asetus_malli_tilaus_oletus)
+                getString(R.string.asetus_malli_nykyinen_chatgpt_tilaus, current)
+            } else {
+                val current = prefs.getString("openai_malli", null)
+                    ?.takeIf { it.isNotBlank() } ?: AiRequests.OPENAI_MODEL
+                getString(R.string.asetus_malli_nykyinen_openai, current)
+            }
         }
 
         private fun setupApiKeyPreference(key: String, slot: ApiKeyStore.Slot) {
@@ -253,15 +357,28 @@ class SettingsActivity : AppCompatActivity() {
             val names = resources.getStringArray(R.array.ai_palvelu_nimet)
             val values = resources.getStringArray(R.array.ai_palvelu_arvot)
             val chatgpt = value == "chatgpt"
-            val name = names.getOrNull(values.indexOf(value ?: "claude")) ?: names[0]
-            // "Käytössä" vasta kun valitulla palvelulla on avain — muuten
-            // rivi kertoo, mitä puuttuu.
-            val hasKey = preferenceManager.sharedPreferences?.let {
-                ApiKeyStore.exists(
-                    it,
-                    if (chatgpt) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
-                )
-            } == true
+            val planLogin = preferenceManager.sharedPreferences?.let { ChatGptPlan.load(it) }
+            val name = if (chatgpt && planLogin != null) {
+                getString(R.string.ai_palvelu_chatgpt_tilaus)
+            } else {
+                names.getOrNull(values.indexOf(value ?: "claude")) ?: names[0]
+            }
+            // "Käytössä" vasta kun valitulla palvelulla on avain tai
+            // kirjautuminen — muuten rivi kertoo, mitä puuttuu.
+            val hasKey = (chatgpt && planLogin != null) ||
+                preferenceManager.sharedPreferences?.let {
+                    ApiKeyStore.exists(
+                        it,
+                        if (chatgpt) ApiKeyStore.Slot.OPENAI else ApiKeyStore.Slot.CLAUDE,
+                    )
+                } == true
+            findPreference<Preference>("chatgpt_kirjautuminen")?.summary =
+                if (planLogin != null) {
+                    getString(R.string.asetus_chatgpt_kirjautunut, planLogin.email.orEmpty())
+                } else {
+                    getString(R.string.asetus_chatgpt_kirjautuminen_kuvaus)
+                }
+            updateOpenAiModelSummary()
             service.summary = getString(
                 if (hasKey) {
                     R.string.asetus_ai_palvelu_nykyinen
@@ -309,40 +426,57 @@ class SettingsActivity : AppCompatActivity() {
                     return@setOnPreferenceClickListener true
                 }
                 fetchModels(modelsUrl, apiKey, authorize, parse) { models, error ->
-                    if (models.isNullOrEmpty()) {
-                        // Syy näkyviin, jotta väärä tai rajattu avain erottuu
-                        // verkko-ongelmasta ilman arvailua.
-                        val message = error
-                            ?.let { getString(R.string.malli_haku_virhe_syy, it) }
-                            ?: getString(R.string.malli_haku_virhe)
-                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
-                    } else {
-                        val current = preferenceManager.sharedPreferences
-                            ?.getString(key, null) ?: defaultModel
-                        val checked = models.indexOfFirst { it.first == current }
-                        // Nopeus- ja hintaluokka auttaa valinnassa, kun
-                        // mallilista elää eikä hintoja saada rajapinnasta.
-                        val labels = models.map { model ->
-                            AiRequests.modelHint(model.first)
-                                ?.let { "${model.second} – $it" } ?: model.second
-                        }
-                        MaterialAlertDialogBuilder(requireContext())
-                            .setTitle(pref.title)
-                            .setSingleChoiceItems(
-                                labels.toTypedArray(), checked
-                            ) { dialog, index ->
-                                preferenceManager.sharedPreferences?.edit()
-                                    ?.putString(key, models[index].first)
-                                    ?.apply()
-                                updateSummary()
-                                dialog.dismiss()
-                            }
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .show()
+                    showModelPicker(pref, key, defaultModel, models, error, hints = true) {
+                        updateSummary()
                     }
                 }
                 true
             }
+        }
+
+        /** Mallivalikko haetusta listasta; ilman listaa syy kerrotaan. */
+        private fun showModelPicker(
+            pref: Preference,
+            key: String,
+            defaultModel: String?,
+            models: List<Pair<String, String>>?,
+            error: String?,
+            hints: Boolean,
+            onChosen: () -> Unit,
+        ) {
+            if (models.isNullOrEmpty()) {
+                // Syy näkyviin, jotta väärä tai rajattu avain erottuu
+                // verkko-ongelmasta ilman arvailua.
+                val message = error
+                    ?.let { getString(R.string.malli_haku_virhe_syy, it) }
+                    ?: getString(R.string.malli_haku_virhe)
+                Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()
+                return
+            }
+            val current = preferenceManager.sharedPreferences
+                ?.getString(key, null) ?: defaultModel
+            val checked = models.indexOfFirst { it.first == current }
+            // Nopeus- ja hintaluokka auttaa valinnassa, kun
+            // mallilista elää eikä hintoja saada rajapinnasta.
+            val labels = models.map { model ->
+                if (hints) {
+                    AiRequests.modelHint(model.first)
+                        ?.let { "${model.second} – $it" } ?: model.second
+                } else {
+                    model.second
+                }
+            }
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(pref.title)
+                .setSingleChoiceItems(labels.toTypedArray(), checked) { dialog, index ->
+                    preferenceManager.sharedPreferences?.edit()
+                        ?.putString(key, models[index].first)
+                        ?.apply()
+                    onChosen()
+                    dialog.dismiss()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
 
         private fun fetchModels(

@@ -127,6 +127,118 @@ object AiRequests {
     }
 
     /**
+     * Käännöspyyntö ChatGPT-tilauksen tokenilla samaan Responses-
+     * rajapintaan. Tilausreitti vaatii (mitattu 8.10.2026) `store:false`,
+     * `stream:true` ja listamuotoisen `input`-kentän eikä hyväksy
+     * `temperature`-parametria; päättely rajataan kevyeksi kuten
+     * API-avaimen reitillä, koska kaikki tilauksen mallit ovat
+     * päättelymalleja.
+     */
+    fun buildChatGptPlanTranslateRequest(
+        text: String,
+        sourceName: String,
+        targetName: String,
+        model: String,
+    ): String = JSONObject()
+        .put("model", model)
+        .put("max_output_tokens", openAiMaxTokensFor(text))
+        .put("instructions", translatePrompt(sourceName, targetName))
+        .put(
+            "input",
+            JSONArray().put(JSONObject().put("role", "user").put("content", text)),
+        )
+        .put("reasoning", JSONObject().put("effort", "low"))
+        .put("store", false)
+        .put("stream", true)
+        .toString()
+
+    /** Suoratoistetun vastauksen tulos: teksti tai virheen selite. */
+    data class StreamResult(val text: String?, val error: String?)
+
+    /**
+     * Tulkitsee Responses-rajapinnan SSE-suoratoiston kokonaisuudessaan
+     * luettuna. Teksti kelpaa vasta `response.completed`-tapahtumasta,
+     * jonka response-olio on samanmuotoinen kuin suoratoistamaton vastaus;
+     * katkennut virta tai `response.failed` palauttaa virheen syineen,
+     * jotta kiintiön täyttyminen (429-koodi tapahtumassa) erottuu
+     * verkkoviasta.
+     */
+    fun parseChatGptStream(stream: String): StreamResult {
+        var event: String? = null
+        var completed: String? = null
+        var error: String? = null
+        val deltas = StringBuilder()
+        for (rawLine in stream.lineSequence()) {
+            val line = rawLine.trimEnd()
+            when {
+                line.startsWith("event:") -> event = line.substring(6).trim()
+                line.startsWith("data:") -> {
+                    val data = line.substring(5).trim()
+                    when (event) {
+                        "response.output_text.delta" -> try {
+                            deltas.append(JSONObject(data).optString("delta"))
+                        } catch (e: JSONException) {
+                        }
+                        "response.completed" -> completed = try {
+                            JSONObject(data).optJSONObject("response")?.toString()
+                        } catch (e: JSONException) {
+                            null
+                        }
+                        "response.failed", "response.incomplete", "error" -> {
+                            error = streamErrorText(data) ?: event
+                        }
+                    }
+                }
+            }
+        }
+        if (error != null) return StreamResult(null, error)
+        val text = completed?.let { parseOpenAiResponse(it) }
+            ?: deltas.toString().trim().takeIf { completed != null && it.isNotEmpty() }
+        return if (text != null) {
+            StreamResult(text, null)
+        } else {
+            StreamResult(null, "vastaus jäi kesken")
+        }
+    }
+
+    private fun streamErrorText(data: String): String? = try {
+        val o = JSONObject(data)
+        val err = o.optJSONObject("response")?.optJSONObject("error")
+            ?: o.optJSONObject("error")
+            ?: o.takeIf { it.has("code") || it.has("message") }
+        val code = err?.optString("code")?.takeIf { it.isNotEmpty() }
+        val message = err?.optString("message")?.takeIf { it.isNotEmpty() }
+            ?: o.optJSONObject("response")?.optJSONObject("incomplete_details")
+                ?.optString("reason")?.takeIf { it.isNotEmpty() }
+        listOfNotNull(code, message).joinToString(": ").takeIf { it.isNotEmpty() }
+    } catch (e: JSONException) {
+        null
+    }
+
+    /**
+     * Tilauksen mallilista: tilaustokenilla /v1/models palauttaa eri
+     * muodon kuin API-avaimella (`models`-lista, `slug`, `display_name`,
+     * `visibility`). Mukaan vain listattaviksi merkityt, palvelun omassa
+     * järjestyksessä, jotta uudet mallit näkyvät ilman sovelluspäivitystä.
+     */
+    fun parseChatGptPlanModels(body: String): List<Pair<String, String>> = try {
+        val models = JSONObject(body).optJSONArray("models")
+        val result = mutableListOf<Pair<String, String>>()
+        if (models != null) {
+            for (i in 0 until models.length()) {
+                val item = models.getJSONObject(i)
+                val slug = item.optString("slug")
+                if (slug.isNotEmpty() && item.optString("visibility", "list") == "list") {
+                    result.add(slug to item.optString("display_name").ifEmpty { slug })
+                }
+            }
+        }
+        result
+    } catch (e: JSONException) {
+        emptyList()
+    }
+
+    /**
      * Vastausteksti OpenAI:n Responses-vastauksesta tai null: output-
      * listasta poimitaan message-kohdan ensimmäinen output_text.
      */
@@ -244,8 +356,22 @@ object AiRequests {
      * selviää ilman arvailua.
      */
     fun parseErrorMessage(body: String?): String? = try {
-        body?.let { JSONObject(it).optJSONObject("error")?.optString("message") }
-            ?.trim()?.takeIf { it.isNotEmpty() }?.take(160)
+        body?.let { JSONObject(it) }?.let { json ->
+            // Tilausreitti vastaa ennen virran avaamista `detail`-muodossa
+            // (teksti tai {error_code}), token-pää OAuth-muodossa
+            // ({"error":"koodi","error_description":…}).
+            val error = json.opt("error")
+            val detail = json.opt("detail")
+            when {
+                error is JSONObject -> error.optString("message")
+                error is String -> listOf(error, json.optString("error_description"))
+                    .filter { it.isNotEmpty() }.joinToString(": ")
+                detail is JSONObject -> detail.optString("error_code")
+                    .ifEmpty { detail.optString("message") }
+                detail is String -> detail
+                else -> null
+            }
+        }?.trim()?.takeIf { it.isNotEmpty() }?.take(160)
     } catch (e: JSONException) {
         null
     }

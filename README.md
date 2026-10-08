@@ -29,6 +29,12 @@ Lataa uusin APK [Releases-sivulta](https://github.com/jrs8205/ARK-nappaimisto/re
 Asennus, AI-käännöksen ja sanelun API-avaimet sekä yksityisyys:
 **[Ohjeet](docs/ohjeet.md)**.
 
+**Rekisteröity Googlelle.** Paketin nimi ja allekirjoitusavain on rekisteröity
+Googlen Android Developer Consoleen, joten sovellus asentuu jatkossakin
+normaalisti, kun Googlen uudet
+[sivulataussäännöt](https://developer.android.com/developer-verification)
+tulevat voimaan.
+
 ## Lisenssi
 
 [GPL-3.0](LICENSE). Sanalista: Kotimaisten kielten keskus

@@ -44,8 +44,23 @@ class ChatGptLoginActivity : AppCompatActivity() {
     private var activeClient: Socket? = null
     private lateinit var status: TextView
 
-    @Volatile
+    // Yrityksen päättyminen (onnistuminen, virhe, aikakatkaisu, peruutus)
+    // varataan lukon alla: vain varaaja saa tallentaa tokenit tai näyttää
+    // tuloksen, joten aikakatkaisun jälkeen valmistuva vaihto ei enää
+    // kirjaa sisään.
+    private val lock = Any()
     private var done = false
+
+    private fun claimFinish(): Boolean = synchronized(lock) {
+        if (done) {
+            false
+        } else {
+            done = true
+            true
+        }
+    }
+
+    private fun isDone(): Boolean = synchronized(lock) { done }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,7 +130,7 @@ class ChatGptLoginActivity : AppCompatActivity() {
             return
         }
         mainHandler.postDelayed(
-            { if (!done) fail(getString(R.string.chatgpt_kirjautuminen_aikakatkaisu)) },
+            { fail(getString(R.string.chatgpt_kirjautuminen_aikakatkaisu)) },
             TIMEOUT_MS,
         )
     }
@@ -166,6 +181,7 @@ class ChatGptLoginActivity : AppCompatActivity() {
                     post { fail(getString(R.string.chatgpt_kirjautuminen_ei_oikeutta)) }
                     return
                 }
+                if (!claimFinish()) return
                 ChatGptPlan.save(prefs, result.login)
                 ChatGptPlan.model(prefs, result.login.accessToken)
                 post { succeed(result.login.email) }
@@ -181,7 +197,7 @@ class ChatGptLoginActivity : AppCompatActivity() {
      * voi kirjoittaa mikä tahansa laitteen sovellus ennen selaimen paluuta.
      */
     private fun awaitCallback(socket: ServerSocket): String? {
-        while (!done && !socket.isClosed) {
+        while (!isDone() && !socket.isClosed) {
             val client = try {
                 socket.accept()
             } catch (e: IOException) {
@@ -236,8 +252,8 @@ class ChatGptLoginActivity : AppCompatActivity() {
         mainHandler.post { if (!isDestroyed) action() }
     }
 
+    // Kutsuja on jo varannut päättymisen ja tallentanut tokenit.
     private fun succeed(email: String?) {
-        done = true
         closeServer()
         Toast.makeText(
             this,
@@ -248,7 +264,7 @@ class ChatGptLoginActivity : AppCompatActivity() {
     }
 
     private fun fail(reason: String) {
-        done = true
+        if (!claimFinish()) return
         closeServer()
         status.text = getString(R.string.chatgpt_kirjautuminen_virhe, reason)
     }
@@ -262,7 +278,7 @@ class ChatGptLoginActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        done = true
+        claimFinish()
         closeServer()
         mainHandler.removeCallbacksAndMessages(null)
         executor.shutdownNow()

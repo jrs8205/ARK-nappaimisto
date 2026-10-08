@@ -38,9 +38,8 @@ class ChatGptLoginActivity : AppCompatActivity() {
 
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
+    // server ja activeClient vain lock:n alla.
     private var server: ServerSocket? = null
-
-    @Volatile
     private var activeClient: Socket? = null
     private lateinit var status: TextView
 
@@ -203,7 +202,16 @@ class ChatGptLoginActivity : AppCompatActivity() {
             } catch (e: IOException) {
                 return null
             }
-            activeClient = client
+            // Rekisteröinti ja päättymistarkistus samassa lukossa kuin
+            // sulkeminen: hyväksynnän jälkeen tullut peruutus tai aikakatkaisu
+            // ei jätä yhteyttä ja lukusäiettä eloon.
+            synchronized(lock) {
+                if (done) {
+                    closeQuietly(client)
+                    return null
+                }
+                activeClient = client
+            }
             try {
                 client.soTimeout = 10_000
                 val target = LoopbackRequest.readTarget(client.getInputStream())
@@ -214,7 +222,7 @@ class ChatGptLoginActivity : AppCompatActivity() {
                 if (target != null) respond(client, 404, "")
             } catch (e: IOException) {
             } finally {
-                activeClient = null
+                synchronized(lock) { activeClient = null }
                 closeQuietly(client)
             }
         }
@@ -277,9 +285,12 @@ class ChatGptLoginActivity : AppCompatActivity() {
     // Myös kesken oleva asiakasyhteys suljetaan, ettei hidas lähettäjä
     // pidä lukusäiettä hengissä aikakatkaisun tai peruutuksen jälkeen.
     private fun closeServer() {
-        closeQuietly(server)
-        server = null
-        closeQuietly(activeClient)
+        synchronized(lock) {
+            closeQuietly(server)
+            server = null
+            closeQuietly(activeClient)
+            activeClient = null
+        }
     }
 
     // Peruuta-painike, työkalupalkin nuoli ja järjestelmän Takaisin

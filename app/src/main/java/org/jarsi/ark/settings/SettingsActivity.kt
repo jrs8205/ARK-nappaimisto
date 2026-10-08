@@ -172,14 +172,21 @@ class SettingsActivity : AppCompatActivity() {
                     .setMessage(R.string.chatgpt_uloskirjautuminen_varmistus)
                     .setPositiveButton(R.string.chatgpt_kirjaudu_ulos) { _, _ ->
                         ioExecutor.execute {
-                            ChatGptPlan.revoke(login)
+                            // Paikallinen poisto tehdään aina; jos kumoaminen
+                            // ei onnistu (ei yhteyttä), lupa jää voimaan
+                            // OpenAI:n päässä ja siitä on kerrottava.
+                            val revoked = ChatGptPlan.revoke(login)
                             ChatGptPlan.clear(prefs)
                             activity?.runOnUiThread {
                                 if (!isAdded) return@runOnUiThread
                                 Toast.makeText(
                                     requireContext(),
-                                    R.string.chatgpt_kirjauduttu_ulos,
-                                    Toast.LENGTH_SHORT,
+                                    if (revoked) {
+                                        R.string.chatgpt_kirjauduttu_ulos
+                                    } else {
+                                        R.string.chatgpt_kirjauduttu_ulos_paikallisesti
+                                    },
+                                    Toast.LENGTH_LONG,
                                 ).show()
                                 refreshAiServiceRows(
                                     findPreference<ListPreference>("ai_palvelu")?.value

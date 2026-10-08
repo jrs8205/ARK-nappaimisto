@@ -57,7 +57,9 @@ OpenAI:n [Sign in with ChatGPT](https://developers.openai.com/siwc)
 - Malli valitaan samasta rivistä kuin ennenkin; lista haetaan OpenAI:lta
   tilauksen malleista, ja oletuksena on listan ensimmäinen.
 - Kirjautuminen on laitekohtainen eikä sisälly varmuuskopioon.
-  Uloskirjautuminen samasta rivistä kumoaa luvan myös OpenAI:n päässä.
+  Uloskirjautuminen samasta rivistä poistaa kirjautumisen laitteelta ja
+  kumoaa luvan myös OpenAI:n päässä, kun verkkoyhteys on; ilman yhteyttä
+  luvan voi poistaa ChatGPT:n asetuksista.
 - Sanelu ei kuulu kirjautumisen piiriin: OpenAI-sanelu vaatii edelleen
   API-avaimen.
 

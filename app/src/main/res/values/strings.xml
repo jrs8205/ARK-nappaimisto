@@ -102,6 +102,7 @@
     <string name="chatgpt_uloskirjautuminen_varmistus">Kirjaudutaanko ulos ChatGPT-tilauksesta? AI-käännös palaa API-avaimeen, jos sellainen on asetettu.</string>
     <string name="chatgpt_kirjaudu_ulos">Kirjaudu ulos</string>
     <string name="chatgpt_kirjauduttu_ulos">Kirjauduttu ulos ChatGPT-tilauksesta</string>
+    <string name="chatgpt_kirjauduttu_ulos_paikallisesti">Kirjauduttu ulos tältä laitteelta, mutta lupaa ei voitu kumota OpenAI:n päässä (ei yhteyttä). Voit poistaa sen ChatGPT:n asetuksista.</string>
     <string name="kaannos_ai_kirjaudu_uudelleen">ChatGPT-kirjautuminen ei ole enää voimassa – kirjaudu uudelleen asetuksista</string>
     <string name="kaannos_ai_kiintio">ChatGPT-tilauksen käyttöraja on täynnä – katso ChatGPT:n asetuksista kohta Käyttö</string>
     <string name="kaannos_ai_tilaus_ei_mallia">mallilistaa ei saatu OpenAI:lta</string>

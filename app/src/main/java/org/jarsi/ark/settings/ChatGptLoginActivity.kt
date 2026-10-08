@@ -282,6 +282,15 @@ class ChatGptLoginActivity : AppCompatActivity() {
         closeQuietly(activeClient)
     }
 
+    // Peruuta-painike, työkalupalkin nuoli ja järjestelmän Takaisin
+    // päätyvät kaikki tänne: yritys varataan päättyneeksi heti, ettei
+    // työsäie ehdi tallentaa kirjautumista ennen viivästettyä onDestroyta.
+    override fun finish() {
+        claimFinish()
+        closeServer()
+        super.finish()
+    }
+
     override fun onDestroy() {
         claimFinish()
         closeServer()

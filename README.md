@@ -6,12 +6,10 @@
 Suomalainen Android-näppäimistö, joka oppii sinun sanasi – kokonaan
 laitteella.
 
-<p>
-  <img src="docs/kuvat/ehdotukset.png" width="200" alt="Sanaehdotukset kirjoitettaessa">
-  <img src="docs/kuvat/pitka-painallus.png" width="200" alt="Pitkän painalluksen merkkivalikko">
-  <img src="docs/kuvat/kaannos.png" width="200" alt="Käännösnäkymä ja AI-käännös">
-  <img src="docs/kuvat/leikepoyta.png" width="200" alt="Leikepöytä ja kiinnitetyt leikkeet">
-</p>
+<picture>
+  <source media="(max-width: 600px)" srcset="https://raw.githubusercontent.com/jrs8205/ARK-nappaimisto/main/docs/kuvat/esittely-kapea.png">
+  <img src="docs/kuvat/esittely-levea.png" width="100%" alt="Neljä kuvakaappausta: sanaehdotukset kirjoitettaessa, pitkän painalluksen merkkivalikko, käännösnäkymä ja leikepöytä">
+</picture>
 
 ## Ominaisuudet
 

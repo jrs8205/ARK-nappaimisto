@@ -146,6 +146,22 @@ class ChatGptAuthTest {
     }
 
     @Test
+    fun `rikkinainen prosenttikoodaus paluussa hylataan kaatumatta`() {
+        // Kuuntelijaan voi kirjoittaa mikä tahansa paikallinen sovellus;
+        // virheellinen koodaus ei saa kaataa näppäimistöprosessia.
+        val result = ChatGptAuth.parseCallback(
+            "code=%&state=tila&client_id=oaiapp_x",
+            expectedState = "tila",
+            savedClientId = null,
+        )
+        assertEquals(ChatGptAuth.Callback.BadState, result)
+        assertEquals(
+            ChatGptAuth.Callback.BadState,
+            ChatGptAuth.parseCallback("state=%zz", "tila", null),
+        )
+    }
+
+    @Test
     fun `koodin vaihtopyynto on lomakemuotoinen ilman salaisuutta`() {
         val body = ChatGptAuth.tokenExchangeBody(
             clientId = "oaiapp_x",

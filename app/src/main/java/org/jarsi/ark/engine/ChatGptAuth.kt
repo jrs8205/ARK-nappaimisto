@@ -256,7 +256,10 @@ object ChatGptAuth {
      * rekisteröinnin tokeneita sekoiteta tallennettuun.
      */
     fun parseCallback(query: String, expectedState: String, savedClientId: String?): Callback {
-        val p = parseQuery(query)
+        // Kuuntelijaan voi kirjoittaa mikä tahansa paikallinen sovellus:
+        // virheellinen koodaus on sama kuin väärä state, ei poikkeus, joka
+        // kaataisi näppäimistöprosessin.
+        val p = parseQuery(query) ?: return Callback.BadState
         if (p["state"] != expectedState) return Callback.BadState
         p["error"]?.let { return Callback.Denied(it) }
         val code = p["code"]?.takeIf { it.isNotEmpty() } ?: return Callback.Incomplete
@@ -307,10 +310,13 @@ object ChatGptAuth {
             k + "=" + URLEncoder.encode(v, "UTF-8")
         }
 
-    private fun parseQuery(query: String): Map<String, String> =
+    private fun parseQuery(query: String): Map<String, String>? = try {
         query.split("&").filter { it.isNotEmpty() }.associate {
             val key = it.substringBefore("=")
             val value = it.substringAfter("=", "")
             key to java.net.URLDecoder.decode(value, "UTF-8")
         }
+    } catch (e: IllegalArgumentException) {
+        null
+    }
 }

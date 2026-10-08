@@ -16,6 +16,7 @@ import com.google.android.material.button.MaterialButton
 import org.jarsi.ark.R
 import org.jarsi.ark.data.ChatGptPlan
 import org.jarsi.ark.engine.ChatGptAuth
+import org.jarsi.ark.engine.LoopbackRequest
 import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -38,6 +39,9 @@ class ChatGptLoginActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var server: ServerSocket? = null
+
+    @Volatile
+    private var activeClient: Socket? = null
     private lateinit var status: TextView
 
     @Volatile
@@ -126,12 +130,7 @@ class ChatGptLoginActivity : AppCompatActivity() {
         verifier: String,
         redirectUri: String,
     ) {
-        val query = try {
-            awaitCallback(socket)
-        } catch (e: IOException) {
-            // Kuuntelija suljettiin (peruutus tai aikakatkaisu).
-            return
-        } ?: return
+        val query = awaitCallback(socket) ?: return
         val callback = ChatGptAuth.parseCallback(query, state, previous?.clientId)
         val (code, clientId) = when (callback) {
             is ChatGptAuth.Callback.Ok -> callback.code to callback.clientId
@@ -176,24 +175,31 @@ class ChatGptLoginActivity : AppCompatActivity() {
 
     /**
      * Palvelee pyyntöjä kunnes paluupolku saapuu; muut polut (esim.
-     * favicon) saavat 404:n. Palauttaa paluun kyselyosan.
+     * favicon) saavat 404:n. Palauttaa paluun kyselyosan tai null, kun
+     * kuuntelija on suljettu. Yksittäisen asiakkaan vika (katkaisu,
+     * hidas tai liian pitkä pyyntö) ei lopeta kuuntelua, koska kuuntelijaan
+     * voi kirjoittaa mikä tahansa laitteen sovellus ennen selaimen paluuta.
      */
     private fun awaitCallback(socket: ServerSocket): String? {
-        while (!done) {
-            socket.accept().use { client ->
+        while (!done && !socket.isClosed) {
+            val client = try {
+                socket.accept()
+            } catch (e: IOException) {
+                return null
+            }
+            activeClient = client
+            try {
                 client.soTimeout = 10_000
-                val reader = client.getInputStream().bufferedReader()
-                val requestLine = reader.readLine() ?: return@use
-                while (true) {
-                    val line = reader.readLine()
-                    if (line.isNullOrEmpty()) break
-                }
-                val target = requestLine.split(" ").getOrNull(1) ?: return@use
-                if (target.substringBefore("?") == ChatGptAuth.CALLBACK_PATH) {
+                val target = LoopbackRequest.readTarget(client.getInputStream())
+                if (target != null && target.substringBefore("?") == ChatGptAuth.CALLBACK_PATH) {
                     respond(client, 200, callbackPage())
                     return target.substringAfter("?", "")
                 }
-                respond(client, 404, "")
+                if (target != null) respond(client, 404, "")
+            } catch (e: IOException) {
+            } finally {
+                activeClient = null
+                closeQuietly(client)
             }
         }
         return null
@@ -212,10 +218,17 @@ class ChatGptLoginActivity : AppCompatActivity() {
             "Content-Type: text/html; charset=utf-8\r\n" +
             "Content-Length: ${bytes.size}\r\n" +
             "Connection: close\r\n\r\n"
-        client.getOutputStream().use {
+        client.getOutputStream().let {
             it.write(head.toByteArray(Charsets.US_ASCII))
             it.write(bytes)
             it.flush()
+        }
+    }
+
+    private fun closeQuietly(socket: java.io.Closeable?) {
+        try {
+            socket?.close()
+        } catch (e: IOException) {
         }
     }
 
@@ -240,12 +253,12 @@ class ChatGptLoginActivity : AppCompatActivity() {
         status.text = getString(R.string.chatgpt_kirjautuminen_virhe, reason)
     }
 
+    // Myös kesken oleva asiakasyhteys suljetaan, ettei hidas lähettäjä
+    // pidä lukusäiettä hengissä aikakatkaisun tai peruutuksen jälkeen.
     private fun closeServer() {
-        try {
-            server?.close()
-        } catch (e: IOException) {
-        }
+        closeQuietly(server)
         server = null
+        closeQuietly(activeClient)
     }
 
     override fun onDestroy() {

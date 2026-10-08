@@ -182,9 +182,9 @@ class ChatGptLoginActivity : AppCompatActivity() {
                     return
                 }
                 if (!claimFinish()) return
-                ChatGptPlan.save(prefs, result.login)
+                val encrypted = ChatGptPlan.save(prefs, result.login)
                 ChatGptPlan.model(prefs, result.login.accessToken)
-                post { succeed(result.login.email) }
+                post { succeed(result.login.email, encrypted) }
             }
         }
     }
@@ -253,13 +253,18 @@ class ChatGptLoginActivity : AppCompatActivity() {
     }
 
     // Kutsuja on jo varannut päättymisen ja tallentanut tokenit.
-    private fun succeed(email: String?) {
+    private fun succeed(email: String?, encrypted: Boolean) {
         closeServer()
         Toast.makeText(
             this,
             getString(R.string.chatgpt_kirjautuminen_valmis, email.orEmpty()),
             Toast.LENGTH_LONG,
         ).show()
+        // Rikkinäisen Keystoren varareitti tallentaa tietueen salaamatta
+        // kuten API-avaimen; siitä kerrotaan samoin kuin avaimesta.
+        if (!encrypted) {
+            Toast.makeText(this, R.string.chatgpt_kirjautuminen_ei_salausta, Toast.LENGTH_LONG).show()
+        }
         finish()
     }
 

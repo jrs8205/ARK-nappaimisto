@@ -78,6 +78,8 @@ object ChatGptPlan {
             )
         ) {
             is ChatGptAuth.TokenResult.Ok -> {
+                // Salauksen varareitti on laitteen ominaisuus, josta
+                // kerrottiin jo kirjautuessa; päivitys ei toista ilmoitusta.
                 save(prefs, result.login)
                 Access.Ok(result.login)
             }

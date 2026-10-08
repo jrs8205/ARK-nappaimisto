@@ -35,6 +35,10 @@ object ChatGptPlan {
     fun exists(prefs: SharedPreferences): Boolean =
         ApiKeyStore.exists(prefs, ApiKeyStore.Slot.CHATGPT_LOGIN)
 
+    // Kaikki tietueen muutokset saman lukon alla: uusi kirjautuminen kesken
+    // päivityksen odottaa sen loppuun, eikä päivityksen virhehaara voi
+    // poistaa juuri tallennettua uutta kirjautumista.
+    @Synchronized
     fun save(prefs: SharedPreferences, login: ChatGptAuth.Login): Boolean =
         ApiKeyStore.save(prefs, login.toJson(), ApiKeyStore.Slot.CHATGPT_LOGIN)
 

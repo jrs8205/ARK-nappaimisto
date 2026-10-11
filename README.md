@@ -25,7 +25,8 @@ laitteella.
 
 ## Lataus ja ohjeet
 
-Lataa uusin APK [Releases-sivulta](https://github.com/jrs8205/ARK-nappaimisto/releases/latest).
+Lataa uusin APK [Releases-sivulta](https://github.com/jrs8205/ARK-nappaimisto/releases/latest)
+tai [SourceForgesta](https://sourceforge.net/projects/ark-nappaimisto/).
 Asennus, AI-käännöksen ja sanelun API-avaimet sekä yksityisyys:
 **[Ohjeet](docs/ohjeet.md)**.
 

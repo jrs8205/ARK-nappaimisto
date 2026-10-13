@@ -13,6 +13,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Build
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.WindowInsets
 import android.view.MotionEvent
 import android.view.View
@@ -428,6 +429,10 @@ class KeyboardView(context: Context) : View(context) {
         val key = info.bounded.key
         if (key.longPress.isEmpty() || alternatesPopup != null) return
         info.alternatesOpen = true
+        // Valikon avautuminen tuntuu samoin kuin valinta siitä (vrt. Gboard).
+        if (hapticsEnabled) {
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        }
         hidePreview()
         showAlternates(info.bounded)
     }
